@@ -182,6 +182,12 @@ importers:
         specifier: ^4.10.2
         version: 4.10.2
 
+  packages/sim:
+    dependencies:
+      '@bm/engine':
+        specifier: workspace:*
+        version: link:../engine
+
 packages:
 
   '@jridgewell/resolve-uri@3.1.2':
