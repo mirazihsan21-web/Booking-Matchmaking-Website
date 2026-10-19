@@ -4,3 +4,4 @@ export { DEFAULT_CONFIG, UNDER_MIN_PENALTY, canHost, groupCapacity, resolveConfi
 export { createScorer, scoreGroups, type Scorer } from './score';
 export { explainScore, type PlayerExplanation } from './explain';
 export { formGroups } from './form-groups';
+export { rankWaitlist, type OpenSeat, type WaitlistCandidate } from './rank-waitlist';
