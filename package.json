@@ -8,10 +8,15 @@
   },
   "scripts": {
     "test": "pnpm -r --if-present test",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "typecheck": "pnpm -r --if-present typecheck",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
+    "supabase": "^2.121.0",
     "typescript": "^5.9.3",
     "vitest": "^5.0.5"
   }
