@@ -12,10 +12,13 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
-    "db:test": "supabase test db"
+    "db:test": "supabase test db",
+    "test:race": "vitest run supabase/tests/race"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.1",
     "supabase": "^2.121.0",
     "typescript": "^5.9.3",
     "vitest": "^5.0.5"

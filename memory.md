@@ -65,6 +65,17 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 
 ## 5. Decisions & rulings log
 
+- **2026-10-20 · M1 T11: booking RPC contract** (`supabase/migrations/20261020000003_booking_rpcs.sql`). All are `service_role` only; server code calls them.
+  - **`cancel_booking(id)`** returns the freed `(group_id, seat_no, session_id)` and is idempotent. It raises `booking_not_cancellable` for attended/no-show bookings.
+  - **`create_offer(group, seat, entry)`** raises `seat_not_free`, `offer_pending`, `entry_not_waiting` (also covers an entry from another session), `seat_out_of_range` or `group_not_found`.
+  - **`accept_offer(id)`** returns `accepted`, `already_accepted`, `declined`, `expired`, `seat_taken`, `already_booked` or `not_found`.
+    - `seat_taken`: the entry goes **back to `waiting`**, so that player stays in line.
+    - `already_booked`: the entry becomes `withdrawn`.
+  - **`decline_offer(id)`** returns `declined`, `not_pending` or `not_found`.
+  - **`expire_offers()`** returns the freed seats, so the M2 job can offer each one to the next person in line.
+- **2026-10-20 · M1 T11: lock order** is offer → group → waitlist entry. Keep that order in any new RPC to avoid deadlocks. Two simultaneous "YES" replies are serialised by the offer row lock (`for update`). The race test proves it: without the lock, the second reply returns `seat_taken` instead of `already_accepted`.
+- **2026-10-20 · M1 T10:** the security-definer helpers for access rules live in a `private` schema (`private.is_venue_owner`, `is_venue_member`, `is_own_player(player, venue)`), not `public`, so the Data API never exposes them. Policies call them as `(select private.fn(...))` so they run once per query.
+- **2026-10-20 · M1 T10:** players can see **only their own** `players` row, not their tablemates. To show "who's at my table" later, add a server-side query or a security-definer RPC rather than loosening the access rules.
 - **2026-10-20 · M1 T7:** in the sim history, waitlisted players accept offers **1 to (TTL − 1) minutes** after they're sent (14 min with the default 900s TTL), not the plan's "1–30 min". Otherwise the history would show offers accepted after they expired, which the real `accept_offer` RPC refuses.
 - **2026-10-20 · M1 T7:** every cancellation in the history writes a `booking_cancelled` event, refilled or not, matching what the real `cancel_booking` RPC will do. About 70% of cancelled seats get refilled.
 - **2026-10-20 · M1 T3:** `formGroups` swap search scores only the two swapped groups (`scorer([A, B])`). This is exact because every score term is a per-group sum. **If you ever add a cross-group score term** (e.g. "balance average skill across tables"), switch back to a full `scorer(groups)` re-score.
