@@ -133,5 +133,17 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 
 ## 8. Change log
 
+- **2026-10-20: M1 complete** on branch `m1-foundation` (14 commits, `e5677ab..e152cf7`). Final test counts:
+  - Unit and property tests: engine 41, sim 23, web 7.
+  - Database: 85 pgTAP checks, plus 1 two-connection race test.
+  - Typecheck and `next build` are clean.
+
+  A fresh-reviewer pass found 1 Critical and 2 Important issues; all are fixed with tests that failed first. The 8 Minor findings are deferred (listed in §7).
+
+  Smaller M1 decisions not covered above:
+  - `generateVenue` takes an optional `skin`. Sim venue and player rows omit `created_at` and use the DB default.
+  - Every foreign-key column has a full (non-partial) index, and pgTAP enforces it.
+  - `create_offer` also raises `seat_out_of_range` / `group_not_found`.
+  - All three migrations were **edited in place** during M1 because nothing was deployed. **From M2 on, schema changes must be new migration files.**
 - **2026-10-20:** M1 Tasks 1–8 done on `m1-foundation`: engine (41 tests incl. property tests, 2ms/500 players), sim (23 tests), web shell (7 tests, `next build` OK). Supabase CLI 2.121.0 + `supabase/config.toml` (Postgres 17, ports 54321/54322/54323) added. **Tasks 9–11 (schema, RLS, RPCs) are blocked:** this machine has no WSL2 or Docker Desktop, and local Supabase needs both.
 - **2026-10-20:** Spec and M1 plan committed (`dd38762`, `e5677ab`). Started M1 on branch `m1-foundation`.
