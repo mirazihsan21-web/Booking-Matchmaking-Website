@@ -16,3 +16,5 @@ supabase/.branches/
 .vercel/
 .DS_Store
 Thumbs.db
+
+.superpowers/
