@@ -67,7 +67,13 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 
 ## 6. Known issues / gotchas
 
-_(none yet)_
+- **fast-check `shuffledSubarray`:** `maxLength` must not exceed the source array's length, or every property errors out immediately (looks like 6 failures in ~1ms). See `packages/engine/test/arbitraries.ts`.
+- **Vitest 5 hides `console.log` output by default.** To see benchmark output, run `npx vitest run test/bench.test.ts --silent=false --reporter=verbose` (from `packages/engine`).
+- **How to check property tests still have teeth:** break one rule in `form-groups.ts` (e.g. `<` → `<=` on capacity), run the property tests, and confirm one goes red. Then `git checkout` the file.
+
+## Numbers (for the case study)
+
+- `formGroups` with 500 players, 10 games, 60 tables, 2000 swap iterations: **median 2.04ms** (2026-10-20, dev laptop).
 
 ## 7. Upgrade ideas / future work
 
