@@ -65,6 +65,16 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 
 ## 5. Decisions & rulings log
 
+- **2026-10-20 · M1 final review: column-level privileges.** RLS policies say *which rows* a user can touch, not *which columns*. Two holes the reviewer found:
+  - A player could rewrite `players.venue_id` and join another venue.
+  - A player could set their own `seat_requests.priority` or `created_at` and jump the queue.
+
+  Fixed with column grants at the end of `20261020000002_rls.sql`:
+  - **players:** authenticated users can update only `name, phone, skill, sms_opt_in`.
+  - **seat_requests:** authenticated users can insert only `venue_id, session_id, player_id`.
+
+  **When you add a column to these tables, decide whether to grant it.** New columns are NOT writable by default.
+- **2026-10-20 · M1 final review: expiry has one owner.** `accept_offer` on a past-due offer returns `'expired'` **without changing anything**. Only `expire_offers()` expires offers, and it returns the freed seat so it can be offered to the next person. (The first version expired the offer inside `accept_offer`, so the seat was never re-offered.) The migration header lists who hands a freed seat onward for each outcome.
 - **2026-10-20 · M1 T11: booking RPC contract** (`supabase/migrations/20261020000003_booking_rpcs.sql`). All are `service_role` only; server code calls them.
   - **`cancel_booking(id)`** returns the freed `(group_id, seat_no, session_id)` and is idempotent. It raises `booking_not_cancellable` for attended/no-show bookings.
   - **`create_offer(group, seat, entry)`** raises `seat_not_free`, `offer_pending`, `entry_not_waiting` (also covers an entry from another session), `seat_out_of_range` or `group_not_found`.
@@ -107,6 +117,16 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 - `formGroups` with 500 players, 10 games, 60 tables, 2000 swap iterations: **median 2.04ms** (2026-10-20, dev laptop).
 
 ## 7. Upgrade ideas / future work
+
+**Deferred minor findings from the M1 review**, each worth a test plus a fix when the area is touched next:
+- **Cross-venue references.** `groups.session_id/table_id/game_id`, `bookings.group_id`, `player_games.game_id` and the like aren't tied to the row's `venue_id`. Example: an owner could make a group pointing at another venue's session. Fix with composite foreign keys on `(venue_id, id)`.
+- **Owner can attach any login.** `players_owner_all` lets an owner insert a player row with `user_id` set to *any* login. Players can also set `phone` to any number, which only matters once real Twilio sending is wider than presenter mode.
+- **RPCs don't check session state.** `create_offer` / `accept_offer` don't look at `sessions.status` or `starts_at`, so an offer could be made or accepted for a closed or past night.
+- **Duplicate player ids** in `formGroups` input get seated twice. The DB prevents duplicates upstream; add a dedupe or assert in the engine.
+- **The repair step's bans are permanent.** It bans a table+game pair forever, so a group dissolved early can't re-form even if enough players later arrive. This affects seating quality, not correctness.
+- **Clock-change gap times.** `zonedTimeToUtc` turns a wall time that doesn't exist on the spring-forward day (e.g. 01:30) into 02:30 BST. Reasonable, but untested.
+- **Rounding mismatch.** `seconds_since_cancel` is rounded down (`floor`) in the RPC but rounded to nearest (`Math.round`) in the sim, so analytics may differ by 1s.
+- **Missing events.** `accept_offer` writes no event for `seat_taken` / `already_booked`. Every other state change has one.
 
 - Second skin (padel courts or gym classes) to prove re-skinning works (stretch goal).
 - The swap search already re-scores only the two groups a swap touches (delta scoring). For much bigger venues, the next win is replacing the linear `seatings.find(...)` scans in the greedy `seatPass` with per-game open-group queues.
