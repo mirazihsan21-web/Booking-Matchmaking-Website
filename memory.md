@@ -55,6 +55,8 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 
 ## 5. Decisions & rulings log
 
+- **2026-10-20 · M1 T7:** in the sim history, waitlisted players accept offers **1 to (TTL − 1) minutes** after they're sent (14 min with the default 900s TTL), not the plan's "1–30 min". Otherwise the history would show offers accepted after they expired, which the real `accept_offer` RPC refuses.
+- **2026-10-20 · M1 T7:** every cancellation in the history writes a `booking_cancelled` event, refilled or not, matching what the real `cancel_booking` RPC will do. About 70% of cancelled seats get refilled.
 - **2026-10-20 · M1 T3:** `formGroups` swap search scores only the two swapped groups (`scorer([A, B])`). This is exact because every score term is a per-group sum. **If you ever add a cross-group score term** (e.g. "balance average skill across tables"), switch back to a full `scorer(groups)` re-score.
 - **2026-10-20 · M1 T3:** the engine's flow is greedy seating (service order: priority ↓, requestedAt ↑, id ↑) → repair under-minimum groups (ban that table+game pair, retry) → sort each game's players into tables by skill → seeded swap search. Tables are tried smallest first, so big tables stay free for big games.
 - **2026-10-20 · M1 T1:** `.gitattributes` forces LF line endings (`* text=auto eol=lf`) to stop Windows CRLF warnings and keep diffs clean.

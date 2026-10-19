@@ -4,3 +4,4 @@ export { zonedTimeToUtc } from './time';
 export { generateVenue, type SimVenue } from './venue';
 export { generatePlayers, type SimPlayers } from './players';
 export { toEngineGames, toEnginePlayer, toEngineTables } from './engine-adapters';
+export { generateHistory, type SimHistory } from './history';
