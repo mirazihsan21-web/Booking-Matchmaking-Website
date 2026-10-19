@@ -133,7 +133,7 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 
 ## 8. Change log
 
-- **2026-10-20: M1 complete** on branch `m1-foundation` (14 commits, `e5677ab..e152cf7`). Final test counts:
+- **2026-10-20: M1 complete and merged to `main`** (fast-forward; branch `m1-foundation` deleted). Merged `main` re-verified: install, typecheck, unit, pgTAP and race tests all green. Final test counts:
   - Unit and property tests: engine 41, sim 23, web 7.
   - Database: 85 pgTAP checks, plus 1 two-connection race test.
   - Typecheck and `next build` are clean.
