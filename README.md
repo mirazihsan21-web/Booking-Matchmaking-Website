@@ -42,3 +42,13 @@ pnpm typecheck           # every package
 pnpm db:reset            # re-apply all migrations to a clean local DB
 pnpm db:stop
 ```
+
+## Numbers
+
+Hard numbers for the case study, re-measured as features land.
+
+| Metric | Value | How |
+|---|---|---|
+| Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
+| Engine invariants checked per run | 7 properties × 300 random sessions | `packages/engine/test/form-groups.property.test.ts` |
+| Database assertions | 80 pgTAP checks + 1 two-connection race test | `pnpm db:test`, `pnpm test:race` |
