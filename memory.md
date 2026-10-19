@@ -38,7 +38,8 @@ Milestones: **M1** foundation + engine → **M2** booking flows → **M3** demo 
 - Local Supabase DB URL: `postgresql://postgres:postgres@127.0.0.1:54322/postgres`.
 - Git identity is repo-local: `Console Log Studio <pandasweet067@gmail.com>`.
 - Git warns "LF will be replaced by CRLF". This is harmless (Windows autocrlf).
-- TypeScript **7.x** is the native (Go) compiler. If `next build` type-checking breaks on it, pin `typescript@6.0.3` across the workspace.
+- **TypeScript is pinned to ^5.9.3 across the workspace.** `create-next-app` 16.4.2 scaffolds `typescript ^5`, so the whole repo follows it. TS 7.x (the native Go compiler) is newer and works for the engine/sim, but Next's type-check isn't verified against it. Try upgrading once Next templates move to TS 7.
+- `create-next-app` refuses to run ("application path is not writable") if the **parent folder doesn't exist**. Run `mkdir -p apps` first.
 
 ## 4. Architecture quick map
 
@@ -69,6 +70,14 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 
 ## 6. Known issues / gotchas
 
+- **Next.js 16.4 is newer than most AI training data.** `apps/web/AGENTS.md` says to read the bundled docs at `apps/web/node_modules/next/dist/docs/` before writing Next code. Do that. Notable differences:
+  - `LayoutProps<"/">` / `PageProps` are **global generated types**, created by `next dev`, `next build` or `next typegen`. That's why `apps/web`'s `typecheck` script is `next typegen && tsc --noEmit`; plain `tsc` fails on a clean checkout.
+  - The template enables `cacheComponents` and `partialPrefetching` in `next.config.ts`.
+  - Turbopack compiles workspace packages (`@bm/engine`, `@bm/sim`) automatically, so **no `transpilePackages`** is needed.
+- **Don't keep a nested `pnpm-workspace.yaml`** in `apps/web` (`create-next-app` writes one). pnpm treats the nearest one as the workspace root. Its `allowBuilds` (sharp, unrs-resolver: false) now lives in the root file.
+- **shadcn 4 (`base-nova` preset)** uses `@base-ui/react` (not Radix) and the `cn` package (by shadcn; replaces clsx + tailwind-merge). `lib/utils.ts` re-exports `cn` from it.
+- shadcn's `globals.css` references `var(--font-sans)`, so the Geist font in `layout.tsx` registers its variable as `--font-sans`. Without that, the font silently falls back.
+- **Skin colours** are applied as inline CSS variables on `<html>` (`skinToCssVars`). They override shadcn's `:root` values for `--primary`, `--accent`, `--background` and `--foreground` only. Other shadcn tokens (`--primary-foreground`, etc.) keep their defaults. Dark mode isn't skinned yet.
 - **fast-check `shuffledSubarray`:** `maxLength` must not exceed the source array's length, or every property errors out immediately (looks like 6 failures in ~1ms). See `packages/engine/test/arbitraries.ts`.
 - **Vitest 5 hides `console.log` output by default.** To see benchmark output, run `npx vitest run test/bench.test.ts --silent=false --reporter=verbose` (from `packages/engine`).
 - **How to check property tests still have teeth:** break one rule in `form-groups.ts` (e.g. `<` → `<=` on capacity), run the property tests, and confirm one goes red. Then `git checkout` the file.
