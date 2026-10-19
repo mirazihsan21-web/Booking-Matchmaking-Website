@@ -4,6 +4,11 @@
 -- Lock order, to stay deadlock-free: seat_offers row → groups row → waitlist_entries row.
 -- accept_offer is idempotent: a duplicate or concurrent YES blocks on the offer row lock,
 -- then sees the committed status and returns 'already_accepted'.
+--
+-- Who hands a freed seat to the next waitlisted player:
+--   expiry                       → expire_offers() returns the seat (the only place offers expire)
+--   'declined', 'already_booked' → the caller (SMS reply handler) offers the seat onward
+--   'seat_taken'                 → nothing to do; the seat is filled
 
 create function public.cancel_booking(p_booking_id uuid)
 returns table (group_id uuid, seat_no smallint, session_id uuid)
@@ -102,20 +107,14 @@ begin
     return 'already_accepted';
   elsif o.status = 'declined' then
     return 'declined';
-  elsif o.status = 'expired' then
+  elsif o.status = 'expired' or o.expires_at <= now() then
+    -- Too late. A past-due offer is left pending: expire_offers() is the only place an offer
+    -- expires, so the freed seat always comes back to the caller that hands it on.
     return 'expired';
   end if;
 
   select * into g from public.groups where id = o.group_id for update;
   select * into e from public.waitlist_entries where id = o.waitlist_entry_id for update;
-
-  if o.expires_at <= now() then
-    update public.seat_offers set status = 'expired' where id = o.id;
-    update public.waitlist_entries set status = 'expired' where id = e.id;
-    insert into public.events (venue_id, session_id, type, payload)
-    values (o.venue_id, g.session_id, 'offer_expired', jsonb_build_object('offer_id', o.id, 'player_id', e.player_id));
-    return 'expired';
-  end if;
 
   if exists (select 1 from public.bookings
              where group_id = g.id and seat_no = o.seat_no and status <> 'cancelled') then

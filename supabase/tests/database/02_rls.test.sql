@@ -2,7 +2,7 @@
 -- and booking-flow tables are written only through RPCs (service_role).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(16);
+select plan(20);
 
 -- Fixtures (as postgres). A* = owner A, B* = owner B, P = player with login, Q = another player.
 insert into auth.users (id, email) values
@@ -76,6 +76,28 @@ select throws_ok(
   $$ insert into public.availability (venue_id, player_id, weekday, start_time, end_time)
      values ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000c1', 5, '18:00', '23:00') $$,
   '42501', null, 'a player cannot file their own rows under another venue'
+);
+-- Review fix: a player must not be able to re-home their row (tenant isolation)
+select throws_ok(
+  $$ update public.players set venue_id = '00000000-0000-4000-8000-0000000000b1'
+     where id = '00000000-0000-4000-8000-0000000000c1' $$,
+  '42501', null, 'a player cannot move themselves into another venue'
+);
+-- Review fix: priority and request time are server-owned (fairness)
+select lives_ok(
+  $$ insert into public.seat_requests (venue_id, session_id, player_id)
+     values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a4', '00000000-0000-4000-8000-0000000000c1') $$,
+  'a player can request a seat'
+);
+select throws_ok(
+  $$ insert into public.seat_requests (venue_id, session_id, player_id, priority)
+     values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a4', '00000000-0000-4000-8000-0000000000c1', 32767) $$,
+  '42501', null, 'a player cannot set their own priority'
+);
+select throws_ok(
+  $$ update public.seat_requests set created_at = '2000-01-01'
+     where player_id = '00000000-0000-4000-8000-0000000000c1' $$,
+  '42501', null, 'a player cannot backdate their request'
 );
 
 -- Anonymous

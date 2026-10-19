@@ -2,7 +2,7 @@
 -- IDs: v=venue, t=table, g=game, s=session, grp=group, p1–pa=players, b1–b4=bookings, w4–w9=waitlist entries.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(36);
+select plan(37);
 
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-000000000001', 'owner@test.local');
 insert into public.venues (id, name, owner_id, offer_ttl_seconds)
@@ -88,6 +88,12 @@ select is(public.accept_offer((select id from public.seat_offers where waitlist_
   'expired', 'a YES after expiry is refused');
 select is((select count(*)::int from public.bookings where player_id = '00000000-0000-4000-8000-0000000001d6'), 0,
   'a late YES creates no booking');
+-- Review fix: expiry has one owner, so the freed seat reaches the next candidate
+select results_eq(
+  $$ select offer_id, seat_no from public.expire_offers() $$,
+  $$ select id, seat_no from public.seat_offers where waitlist_entry_id = '00000000-0000-4000-8000-0000000003a6' $$,
+  'a late YES leaves the seat for expire_offers to hand on'
+);
 select is((select status::text from public.waitlist_entries where id = '00000000-0000-4000-8000-0000000003a6'), 'expired',
   'the late player''s entry expires');
 select is((select status::text from public.seat_offers where waitlist_entry_id = '00000000-0000-4000-8000-0000000003a6'), 'expired',

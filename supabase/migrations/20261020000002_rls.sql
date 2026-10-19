@@ -164,3 +164,11 @@ create policy messages_self_select on public.messages
 
 create policy events_owner_select on public.events
   for select to authenticated using ((select private.is_venue_owner(venue_id)));
+
+-- Column-level privileges: what the API may write at all, whatever the policies allow.
+-- players: nobody re-homes a row (venue_id) or re-links a login (user_id) through the API.
+revoke update on public.players from anon, authenticated;
+grant update (name, phone, skill, sms_opt_in) on public.players to authenticated;
+-- seat_requests: priority and created_at decide who is served first, so the server owns them.
+revoke insert, update on public.seat_requests from anon, authenticated;
+grant insert (venue_id, session_id, player_id) on public.seat_requests to authenticated;
