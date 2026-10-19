@@ -34,7 +34,16 @@ Milestones: **M1** foundation + engine → **M2** booking flows → **M3** demo 
 - **pnpm 12.14.0** is installed via Corepack into the *user* npm dir:
   `corepack enable pnpm --install-directory "C:\Users\USER\AppData\Roaming\npm"`.
   Plain `corepack enable` fails with EPERM because it tries to write to `C:\Program Files\nodejs` (needs admin).
-- **Docker Desktop is required** for local Supabase (`supabase start`, pgTAP tests). It wasn't installed as of 2026-10-20.
+- **Docker Desktop is required** for local Supabase (`supabase start`, pgTAP tests). It was installed 2026-10-20 (Docker 29.9.1, WSL2 backend, WSL 3.0.3).
+  - **`wsl --install` fails with "Forbidden (403)" on this network.** WSL asks `api.github.com` for its latest version, and GitHub's API refuses anonymous requests from this connection with 403 (probably its per-IP rate limit). Workaround:
+    1. Enable the features: `dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart` and the same for `VirtualMachinePlatform`.
+    2. Download the MSI from `https://github.com/microsoft/WSL/releases/download/<ver>/wsl.<ver>.0.x64.msi` and install it with msiexec.
+    3. Reboot.
+  - **Docker Desktop:** download `https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe` and run it with `install --quiet --accept-license --backend=wsl-2`. No Ubuntu distro is needed.
+  - **PATH:** a shell opened before the install won't have `docker` on PATH. Add `/c/Program Files/Docker/Docker/resources/bin` (Git Bash) for the CLI. The Supabase CLI talks to the Docker engine directly, so it works anyway.
+  - **First `supabase start`** pulls about 13 images (several GB). One pull hit `tls: bad record MAC` and retried on its own.
+- **Local Supabase keys** are the standard public demo keys printed by `supabase start` (`pnpm exec supabase status`). They're safe to use locally and must never be used in production.
+- `supabase/seed.sql` doesn't exist yet, so `db reset` prints "no files matched pattern". That's harmless. Seeding from `@bm/sim` comes in M2/M3.
 - Local Supabase DB URL: `postgresql://postgres:postgres@127.0.0.1:54322/postgres`.
 - Git identity is repo-local: `Console Log Studio <pandasweet067@gmail.com>`.
 - Git warns "LF will be replaced by CRLF". This is harmless (Windows autocrlf).
