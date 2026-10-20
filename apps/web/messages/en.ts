@@ -214,6 +214,7 @@ export const en = {
     wholeNumber: 'Enter a whole number.',
     capacityRange: 'Between 1 and 30.',
     slotLength: 'Use 15 to 240 minutes, in steps of 15 (e.g. 60 or 90).',
+    slotsRange: 'Between 1 and 4 slots.',
     horizonRange: 'Between 1 and 90 days.',
     cutoffRange: 'Between 0 and 168 hours.',
     maxUpcomingRange: 'Between 1 and 20.',
