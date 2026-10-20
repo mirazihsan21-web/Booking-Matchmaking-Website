@@ -1,3 +1,6 @@
+// NOTE (Stage A): these row shapes follow the M1 single-venue schema (venue_id, venue_tables, games, players…).
+// The live schema is now multi-tenant (supabase/migrations/*_stage_a_schema.sql). Migrate these shapes
+// when a later stage first inserts sim data into the database.
 /**
  * Insertable DB rows. Keys are the exact snake_case column names from the schema
  * (supabase/migrations), so generated data can be inserted without mapping.

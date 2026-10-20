@@ -1,16 +1,19 @@
--- Schema shape and the booking invariants that live in constraints.
+-- Stage A schema shape and the invariants that live in constraints.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(28);
+select plan(47);
 
 select has_table('public', t, format('table %s exists', t))
 from unnest(array[
-  'venues', 'venue_tables', 'games', 'players', 'player_games', 'availability', 'sessions',
+  'organizations', 'organization_members', 'organization_invites', 'platform_admins',
+  'branches', 'resources', 'activities', 'open_play_sessions', 'open_play_session_resources',
+  'resource_reservations', 'player_profiles', 'profile_activities', 'availability',
   'seat_requests', 'groups', 'bookings', 'waitlist_entries', 'seat_offers', 'messages', 'events'
 ]) as t;
 
 select has_enum('public', e, format('enum %s exists', e))
 from unnest(array[
+  'business_type', 'org_status', 'member_role', 'team_mode', 'resource_kind', 'reservation_source',
   'session_status', 'booking_status', 'booking_source', 'waitlist_status', 'offer_status', 'message_direction'
 ]) as e;
 
@@ -30,76 +33,119 @@ select is_empty(
 );
 
 -- Fixtures
-insert into auth.users (id, email) values ('00000000-0000-4000-8000-000000000001', 'owner@test.local');
-insert into public.venues (id, name, owner_id)
-values ('00000000-0000-4000-8000-0000000000a1', 'Test Café', '00000000-0000-4000-8000-000000000001');
-insert into public.venue_tables (id, venue_id, name, capacity)
-values ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000a1', 'Table 1', 4);
-insert into public.games (id, venue_id, name, min_players, max_players, duration_min)
-values ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000a1', 'Catan', 3, 4, 90);
-insert into public.players (id, venue_id, name, phone, skill) values
-  ('00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000a1', 'Maya K.', '+447700900001', 3),
-  ('00000000-0000-4000-8000-0000000000d2', '00000000-0000-4000-8000-0000000000a1', 'Leo B.', '+447700900002', 4);
-insert into public.sessions (id, venue_id, starts_at, ends_at, seat_price_cents)
-values ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000a1', now(), now() + interval '4 hours', 800);
-insert into public.groups (id, venue_id, session_id, table_id, game_id, capacity)
+insert into auth.users (id, email) values
+  ('00000000-0000-4000-8000-000000000001', 'owner@test.local'),
+  ('00000000-0000-4000-8000-000000000002', 'p1@test.local'),
+  ('00000000-0000-4000-8000-000000000003', 'p2@test.local');
+insert into public.organizations (id, slug, name, business_type, created_by)
+values ('00000000-0000-4000-8000-0000000000a1', 'dhanmondi-turf', 'Dhanmondi Turf', 'turf', '00000000-0000-4000-8000-000000000001');
+insert into public.branches (id, organization_id, name)
+values ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000000a1', 'Main');
+insert into public.resources (id, organization_id, branch_id, name, kind, capacity) values
+  ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Pitch 1', 'pitch', 14),
+  ('00000000-0000-4000-8000-0000000000b2', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Pitch 2', 'pitch', 14);
+insert into public.activities (id, organization_id, name, min_players, max_players, duration_min, team_mode, team_size)
+values ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000a1', '5-a-side', 10, 10, 60, 'two_teams', 5);
+insert into public.open_play_sessions (id, organization_id, branch_id, activity_id, starts_at, ends_at, seat_price_poisha)
+values ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2',
+        '00000000-0000-4000-8000-0000000000c1', now(), now() + interval '1 hour', 30000);
+insert into public.groups (id, organization_id, session_id, resource_id, activity_id, capacity)
 values ('00000000-0000-4000-8000-0000000000f1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000e1',
-        '00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000c1', 4);
-insert into public.waitlist_entries (id, venue_id, session_id, player_id, queue_position)
+        '00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000c1', 10);
+insert into public.player_profiles (id, organization_id, user_id, display_name, skill) values
+  ('00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-000000000002', 'Rafi', 3),
+  ('00000000-0000-4000-8000-0000000000d2', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-000000000003', 'Nila', 4);
+insert into public.waitlist_entries (id, organization_id, session_id, profile_id, queue_position)
 values ('00000000-0000-4000-8000-0000000001a1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000e1',
         '00000000-0000-4000-8000-0000000000d2', 1);
 
--- Review Focus 5: bad data is rejected by CHECK constraints.
+-- CHECK constraints (Review Focus: bad data never lands)
 select throws_ok(
-  $$ insert into public.players (venue_id, name, phone, skill)
-     values ('00000000-0000-4000-8000-0000000000a1', 'Too Good', '+447700900009', 6) $$,
+  $$ update public.player_profiles set skill = 6 where id = '00000000-0000-4000-8000-0000000000d1' $$,
   '23514', null, 'skill above 5 is rejected'
 );
 select throws_ok(
-  $$ insert into public.players (venue_id, name, phone, skill)
-     values ('00000000-0000-4000-8000-0000000000a1', 'No Phone', 'not-a-phone', 3) $$,
+  $$ update public.player_profiles set phone = 'not-a-phone' where id = '00000000-0000-4000-8000-0000000000d1' $$,
   '23514', null, 'a malformed phone is rejected'
 );
 select throws_ok(
-  $$ insert into public.games (venue_id, name, min_players, max_players, duration_min)
+  $$ insert into public.activities (organization_id, name, min_players, max_players, duration_min)
      values ('00000000-0000-4000-8000-0000000000a1', 'Backwards', 5, 4, 30) $$,
-  '23514', null, 'a game with min_players > max_players is rejected'
-);
-
--- Seat invariants
-insert into public.bookings (id, venue_id, session_id, group_id, player_id, seat_no, price_cents)
-values ('00000000-0000-4000-8000-0000000001b1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000e1',
-        '00000000-0000-4000-8000-0000000000f1', '00000000-0000-4000-8000-0000000000d1', 1, 800);
-
-select throws_ok(
-  $$ insert into public.bookings (venue_id, session_id, group_id, player_id, seat_no, price_cents)
-     values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000e1',
-             '00000000-0000-4000-8000-0000000000f1', '00000000-0000-4000-8000-0000000000d1', 2, 800) $$,
-  '23505', null, 'a player cannot hold two live bookings in one session'
+  '23514', null, 'an activity with min_players > max_players is rejected'
 );
 select throws_ok(
-  $$ insert into public.bookings (venue_id, session_id, group_id, player_id, seat_no, price_cents)
+  $$ insert into public.activities (organization_id, name, min_players, max_players, duration_min, team_mode)
+     values ('00000000-0000-4000-8000-0000000000a1', 'No size', 10, 10, 60, 'two_teams') $$,
+  '23514', null, 'a two-team activity needs a team size'
+);
+select throws_ok(
+  $$ insert into public.activities (organization_id, name, min_players, max_players, duration_min, team_mode, team_size)
+     values ('00000000-0000-4000-8000-0000000000a1', 'Lopsided', 10, 8, 60, 'two_teams', 5) $$,
+  '23514', null, 'a two-team activity must seat exactly 2 × team size'
+);
+select throws_ok(
+  $$ insert into public.organizations (slug, name, business_type) values ('Bad Slug', 'Bad', 'turf') $$,
+  '23514', null, 'a malformed slug is rejected'
+);
+select throws_ok(
+  $$ insert into public.organizations (slug, name, business_type) values ('admin', 'Admin', 'turf') $$,
+  '23514', null, 'a reserved slug is rejected'
+);
+
+-- Seat invariants (carried over from M1)
+insert into public.bookings (id, organization_id, session_id, group_id, profile_id, seat_no, price_poisha)
+values ('00000000-0000-4000-8000-0000000002b1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000e1',
+        '00000000-0000-4000-8000-0000000000f1', '00000000-0000-4000-8000-0000000000d1', 1, 30000);
+select throws_ok(
+  $$ insert into public.bookings (organization_id, session_id, group_id, profile_id, seat_no, price_poisha)
      values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000e1',
-             '00000000-0000-4000-8000-0000000000f1', '00000000-0000-4000-8000-0000000000d2', 1, 800) $$,
+             '00000000-0000-4000-8000-0000000000f1', '00000000-0000-4000-8000-0000000000d1', 2, 30000) $$,
+  '23505', null, 'a profile cannot hold two live bookings in one session'
+);
+select throws_ok(
+  $$ insert into public.bookings (organization_id, session_id, group_id, profile_id, seat_no, price_poisha)
+     values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000e1',
+             '00000000-0000-4000-8000-0000000000f1', '00000000-0000-4000-8000-0000000000d2', 1, 30000) $$,
   '23505', null, 'two live bookings cannot share a seat'
 );
-
-update public.bookings set status = 'cancelled', cancelled_at = now() where id = '00000000-0000-4000-8000-0000000001b1';
+update public.bookings set status = 'cancelled', cancelled_at = now() where id = '00000000-0000-4000-8000-0000000002b1';
 select lives_ok(
-  $$ insert into public.bookings (venue_id, session_id, group_id, player_id, seat_no, price_cents)
+  $$ insert into public.bookings (organization_id, session_id, group_id, profile_id, seat_no, price_poisha)
      values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000e1',
-             '00000000-0000-4000-8000-0000000000f1', '00000000-0000-4000-8000-0000000000d2', 1, 800) $$,
+             '00000000-0000-4000-8000-0000000000f1', '00000000-0000-4000-8000-0000000000d2', 1, 30000) $$,
   'a cancelled booking frees its seat'
 );
-
-insert into public.seat_offers (venue_id, group_id, seat_no, waitlist_entry_id, expires_at)
+insert into public.seat_offers (organization_id, group_id, seat_no, waitlist_entry_id, expires_at)
 values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000f1', 2,
         '00000000-0000-4000-8000-0000000001a1', now() + interval '15 minutes');
 select throws_ok(
-  $$ insert into public.seat_offers (venue_id, group_id, seat_no, waitlist_entry_id, expires_at)
+  $$ insert into public.seat_offers (organization_id, group_id, seat_no, waitlist_entry_id, expires_at)
      values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000f1', 2,
              '00000000-0000-4000-8000-0000000001a1', now() + interval '15 minutes') $$,
   '23505', null, 'only one pending offer per seat'
+);
+
+-- Resource time can never be double-booked
+insert into public.resource_reservations (organization_id, resource_id, period, source, source_id)
+values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000b1',
+        tstzrange('2026-11-06 18:00+06', '2026-11-06 19:00+06'), 'session', gen_random_uuid());
+select throws_ok(
+  $$ insert into public.resource_reservations (organization_id, resource_id, period, source, source_id)
+     values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000b1',
+             tstzrange('2026-11-06 18:30+06', '2026-11-06 19:30+06'), 'booking', gen_random_uuid()) $$,
+  '23P01', null, 'overlapping reservations on one resource are rejected'
+);
+select lives_ok(
+  $$ insert into public.resource_reservations (organization_id, resource_id, period, source, source_id)
+     values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000b1',
+             tstzrange('2026-11-06 19:00+06', '2026-11-06 20:00+06'), 'booking', gen_random_uuid()) $$,
+  'back-to-back reservations are allowed'
+);
+select lives_ok(
+  $$ insert into public.resource_reservations (organization_id, resource_id, period, source, source_id)
+     values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000b2',
+             tstzrange('2026-11-06 18:30+06', '2026-11-06 19:30+06'), 'booking', gen_random_uuid()) $$,
+  'the same time on a different resource is allowed'
 );
 
 select * from finish();
