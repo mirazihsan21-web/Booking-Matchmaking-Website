@@ -15,6 +15,10 @@ const ids = {
   profile1: randomUUID(),
   profile2: randomUUID(),
 };
+/** HH:MM in Dhaka on a day 30 days ahead, so the fixtures never age out (the limit counts against now()). */
+const day = new Date(Date.now() + 30 * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
+const at = (hhmm: string) => `${day} ${hhmm}+06`;
+
 const setup = new pg.Client({ connectionString: DB_URL });
 const a = new pg.Client({ connectionString: DB_URL });
 const b = new pg.Client({ connectionString: DB_URL });
@@ -67,8 +71,8 @@ afterAll(async () => {
 describe('book_resource under concurrency', () => {
   it('gives a slot to exactly one of two players booking at once', async () => {
     const second = await raceAgainstOpenTransaction(
-      () => book(a, ids.profile1, '2027-03-05 20:00+06', ids.user1),
-      () => book(b, ids.profile2, '2027-03-05 20:00+06', ids.user2),
+      () => book(a, ids.profile1, at('20:00'), ids.user1),
+      () => book(b, ids.profile2, at('20:00'), ids.user2),
     );
     expect(second).toBe('taken');
   });
@@ -76,8 +80,8 @@ describe('book_resource under concurrency', () => {
   it('cannot beat the upcoming-bookings limit with two bookings at once', async () => {
     // The venue allows 1 upcoming booking; player two has none yet and tries two slots at once.
     const second = await raceAgainstOpenTransaction(
-      () => book(a, ids.profile2, '2027-03-05 21:00+06', ids.user2),
-      () => book(b, ids.profile2, '2027-03-05 22:00+06', ids.user2),
+      () => book(a, ids.profile2, at('21:00'), ids.user2),
+      () => book(b, ids.profile2, at('22:00'), ids.user2),
     );
     expect(second).toBe('limit_reached');
   });
