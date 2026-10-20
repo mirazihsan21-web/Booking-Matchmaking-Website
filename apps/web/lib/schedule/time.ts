@@ -14,7 +14,8 @@ export function weeklyStarts(first: { date: string; time: string }, weeks: numbe
   });
 }
 
-function localDayAndMinutes(instant: Date, timeZone: string): { weekday: number; minutes: number } {
+/** The local weekday (0 = Sunday) and minutes since local midnight of an instant. */
+export function localDayAndMinutes(instant: Date, timeZone: string): { weekday: number; minutes: number } {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(instant);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
   return { weekday: WEEKDAY_INDEX[get('weekday')]!, minutes: Number(get('hour')) * 60 + Number(get('minute')) };
@@ -23,7 +24,7 @@ function localDayAndMinutes(instant: Date, timeZone: string): { weekday: number;
 const toMinutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
 /** A day's window in minutes from that day's midnight; an overnight close runs past 1440. */
-function window(hours: OpeningHours, weekday: number): [number, number] | null {
+export function openingWindow(hours: OpeningHours, weekday: number): [number, number] | null {
   const day = hours[String(weekday) as Weekday];
   if (!day) return null;
   const open = toMinutes(day[0]);
@@ -40,10 +41,10 @@ export function withinOpeningHours(hours: OpeningHours, start: Date, durationMin
   const { weekday, minutes } = localDayAndMinutes(start, timeZone);
   const end = minutes + durationMin;
 
-  const today = window(hours, weekday);
+  const today = openingWindow(hours, weekday);
   if (today && today[0] <= minutes && end <= today[1]) return true;
 
-  const yesterday = window(hours, (weekday + 6) % 7);
+  const yesterday = openingWindow(hours, (weekday + 6) % 7);
   if (yesterday && yesterday[1] > 1440) {
     // Shift yesterday's overnight tail onto today's clock.
     return end <= yesterday[1] - 1440;
