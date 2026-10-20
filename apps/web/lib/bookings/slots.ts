@@ -1,6 +1,6 @@
 import { zonedTimeToUtc } from '@bm/sim';
 import type { OpeningHours } from '@/lib/opening-hours';
-import { openingWindow } from '@/lib/schedule/time';
+import { localDayAndMinutes, openingWindow } from '@/lib/schedule/time';
 
 /** One bookable slot of a space. */
 export interface Slot {
@@ -21,6 +21,17 @@ export function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * The business day it is now: today's date, or yesterday's while yesterday's overnight hours
+ * (e.g. 14:00–02:00) are still running — so after midnight a late venue still shows tonight.
+ */
+export function currentBusinessDate(hours: OpeningHours, now: Date, timeZone: string): string {
+  const today = localDate(now, timeZone);
+  const { weekday, minutes } = localDayAndMinutes(now, timeZone);
+  const yesterday = openingWindow(hours, (weekday + 6) % 7);
+  return yesterday && minutes < yesterday[1] - 1440 ? addDays(today, -1) : today;
 }
 
 /** A `?date=` query value if it is a real calendar date, otherwise `today` (never throws). */
@@ -55,6 +66,20 @@ export function businessDaySlots(hours: OpeningHours, date: string, slotMinutes:
 }
 
 /**
+ * The stretch of time that belongs to one business day: from the end of the previous night's
+ * overnight hours (or midnight) to the end of this day's (or the next midnight). Consecutive days
+ * never overlap, so every booking lands on exactly one day — even after hours change or a day closes.
+ */
+export function businessDayWindow(hours: OpeningHours, date: string, timeZone: string): { start: Date; end: Date } {
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+  const previous = openingWindow(hours, (weekday + 6) % 7);
+  const today = openingWindow(hours, weekday);
+  const startMinutes = previous && previous[1] > 1440 ? previous[1] - 1440 : 0;
+  const endMinutes = today && today[1] > 1440 ? today[1] : 1440;
+  return { start: instantAt(date, startMinutes, timeZone), end: instantAt(date, endMinutes, timeZone) };
+}
+
+/**
  * What each slot looks like to someone booking: `past` once it has started, `open_play` if a session
  * holds any of its time, `taken` if a booking does, else `free`. Overlap is by time, so bookings made
  * before a slot length or opening hours changed still block the right slots.
@@ -77,7 +102,8 @@ export function slotStates(
  * Whether a booking of `slots` consecutive slots may start at `startsAt`: on the grid of its business
  * day (the start's local date, or the day before when it falls in that day's overnight tail), ending
  * by closing time, not started yet, and — for players — within the venue's booking window.
- * `horizonDays: null` (staff) skips the window.
+ * `horizonDays: null` (staff) skips the window; `allowInProgress` (staff walk-ins) also accepts the
+ * slot that has started but not yet ended.
  */
 export function checkBookingStart(input: {
   hours: OpeningHours;
@@ -87,20 +113,22 @@ export function checkBookingStart(input: {
   slots: number;
   now: Date;
   horizonDays: number | null;
+  allowInProgress?: boolean;
 }): { ok: true; endsAt: Date; businessDate: string } | { ok: false; reason: 'bad_count' | 'past' | 'off_grid' | 'outside_hours' | 'beyond_horizon' } {
-  const { hours, slotMinutes, timeZone, startsAt, slots, now, horizonDays } = input;
+  const { hours, slotMinutes, timeZone, startsAt, slots, now, horizonDays, allowInProgress = false } = input;
   if (!Number.isInteger(slots) || slots < 1 || slots > 4) return { ok: false, reason: 'bad_count' };
-  if (startsAt <= now) return { ok: false, reason: 'past' };
+  if (startsAt <= now && !allowInProgress) return { ok: false, reason: 'past' };
 
   const sameDay = localDate(startsAt, timeZone);
   for (const businessDate of [sameDay, addDays(sameDay, -1)]) {
     const grid = businessDaySlots(hours, businessDate, slotMinutes, timeZone);
     const first = grid.findIndex((s) => s.start.getTime() === startsAt.getTime());
     if (first === -1) continue;
+    if (grid[first]!.end <= now) return { ok: false, reason: 'past' };
     const last = grid[first + slots - 1];
     if (!last) return { ok: false, reason: 'outside_hours' };
     if (horizonDays !== null && businessDate > addDays(localDate(now, timeZone), horizonDays)) return { ok: false, reason: 'beyond_horizon' };
     return { ok: true, endsAt: last.end, businessDate };
   }
-  return { ok: false, reason: 'off_grid' };
+  return { ok: false, reason: startsAt <= now ? 'past' : 'off_grid' };
 }

@@ -134,6 +134,26 @@ describe('bookSpace', () => {
     expect((await asStaff(far)).status).toBe('booked');
   });
 
+  it('lets staff record a walk-in for the slot that is on now, but not players', async () => {
+    const six = new Date('2026-10-23T12:00:00Z'); // Fri 6pm
+    const sixTen = new Date('2026-10-23T12:10:00Z');
+    expect(await bookSpace(db, { organizationId: orgId, resourceId: pitch1, startsAt: six, slots: 1, who: { profileId: b }, createdBy: users[1]!.id, actor: 'player', now: sixTen })).toEqual({
+      status: 'invalid',
+      reason: 'past',
+    });
+    const walkIn = await bookSpace(db, {
+      organizationId: orgId,
+      resourceId: pitch1,
+      startsAt: six,
+      slots: 1,
+      who: { guestName: 'Rumi', guestPhone: '+8801912345678' },
+      createdBy: staffUser.id,
+      actor: 'staff',
+      now: sixTen,
+    });
+    expect(walkIn.status).toBe('booked');
+  });
+
   it("refuses another venue's space", async () => {
     expect(await asPlayer(b, users[1]!.id, FRI_8PM, otherOrgPitch)).toEqual({ status: 'invalid', reason: 'not_bookable' });
   });
@@ -144,15 +164,16 @@ describe('day views', () => {
     const day = await spaceDay(db, { organizationId: orgId, resourceId: pitch1, date: '2026-10-23', withNames: false, now });
     const eight = day!.slots.find((s) => s.start.getTime() === FRI_8PM.getTime())!;
     expect(eight.state).toBe('taken');
-    expect(eight.booking).toBeUndefined();
-    expect(day!.slots.every((s) => s.booking === undefined)).toBe(true);
+    expect(eight.bookings).toBeUndefined();
+    expect(day!.slots.every((s) => s.bookings === undefined)).toBe(true);
+    expect(day!.extra).toBeUndefined();
   });
 
   it('shows staff the names, and the phone of a walk-in', async () => {
     const days = await branchDay(db, { organizationId: orgId, branchId: mainBranch, date: '2026-10-23', now });
     const pitch = days!.find((d) => d.resource.id === pitch1)!;
-    expect(pitch.slots.find((s) => s.start.getTime() === FRI_8PM.getTime())!.booking).toMatchObject({ name: 'Ayesha', phone: null });
-    expect(pitch.slots.find((s) => s.start.getTime() === FRI_9PM.getTime())!.booking).toMatchObject({ name: 'Karim', phone: '+8801712345678' });
+    expect(pitch.slots.find((s) => s.start.getTime() === FRI_8PM.getTime())!.bookings).toMatchObject([{ name: 'Ayesha', phone: null }]);
+    expect(pitch.slots.find((s) => s.start.getTime() === FRI_9PM.getTime())!.bookings).toMatchObject([{ name: 'Karim', phone: '+8801712345678' }]);
   });
 
   it("returns nothing for another venue's space or a malformed id (Review Focus 1)", async () => {
@@ -179,13 +200,39 @@ describe('cancelling', () => {
     expect(await cancelSpaceBooking(db, { organizationId: orgId, bookingId: aBooking, actor: { kind: 'player', profileId: b }, cancelledBy: users[1]!.id, now })).toBe('not_found');
   });
 
-  it('lets staff cancel after the cut-off and mark attendance', async () => {
+  it('lets staff cancel after the cut-off', async () => {
     const result = await asPlayer(b, users[1]!.id, new Date('2026-10-23T13:00:00Z'), pitch2); // Fri 7pm
     if (result.status !== 'booked') throw new Error(result.status);
     const late = new Date('2026-10-23T12:30:00Z'); // 30 minutes before
     expect(await cancelSpaceBooking(db, { organizationId: orgId, bookingId: result.bookingId, actor: { kind: 'staff' }, cancelledBy: staffUser.id, now: late })).toBe('cancelled');
-    expect(await setSpaceBookingStatus(db, { organizationId: orgId, bookingId: aBooking, status: 'attended' })).toBe('updated');
     expect(await setSpaceBookingStatus(db, { organizationId: orgId, bookingId: result.bookingId, status: 'no_show' })).toBe('invalid');
+  });
+
+  // Attendance and "has it ended" use the real clock, so these bookings are made relative to it.
+  it('marks attendance only once a booking has started, and never cancels one that has ended', async () => {
+    const hour = 3_600_000;
+    const top = Math.floor(Date.now() / hour) * hour;
+    const walkIn = async (start: number) => {
+      const { data, error } = await db.rpc('book_resource', {
+        p_organization_id: orgId,
+        p_resource_id: pitch1,
+        p_starts_at: new Date(start).toISOString(),
+        p_slots: 1,
+        p_profile_id: null,
+        p_guest_name: 'Rumi',
+        p_guest_phone: '+8801912345678',
+        p_created_by: staffUser.id,
+      });
+      if (error) throw error;
+      return (data as Array<{ booking_id: string }>)[0]!.booking_id;
+    };
+    const future = await walkIn(top + 30 * 24 * hour);
+    const started = await walkIn(top - hour); // ends at the top of this hour or later
+    const ended = await walkIn(top - 4 * hour);
+
+    expect(await setSpaceBookingStatus(db, { organizationId: orgId, bookingId: future, status: 'attended' })).toBe('not_started');
+    expect(await setSpaceBookingStatus(db, { organizationId: orgId, bookingId: started, status: 'attended' })).toBe('updated');
+    expect(await cancelSpaceBooking(db, { organizationId: orgId, bookingId: ended, actor: { kind: 'staff' }, cancelledBy: staffUser.id })).toBe('too_late');
   });
 });
 
@@ -214,5 +261,42 @@ describe('my bookings', () => {
 
     const order = (await listMyBookings(db, { organizationId: orgId, profileId: a, now })).upcoming.map((x) => x.startsAt);
     expect([...order].sort()).toEqual(order);
+  });
+});
+
+describe('staff day view keeps every booking (Review Focus 3, staff side)', () => {
+  it('shows bookings after the slot length changes, hours shorten, the day closes or the space is deactivated', async () => {
+    const { data: created, error } = await db
+      .from('resources')
+      .insert({ organization_id: orgId, branch_id: mainBranch, name: 'Pitch 3', kind: 'pitch', capacity: 14 })
+      .select('id')
+      .single();
+    if (error) throw error;
+    const pitch3 = created.id;
+    for (const start of [FRI_8PM, FRI_9PM]) expect((await asStaff(start, pitch3)).status).toBe('booked');
+    const view = async () => (await branchDay(db, { organizationId: orgId, branchId: mainBranch, date: '2026-10-23', now }))!.find((d) => d.resource.id === pitch3)!;
+    const { data: branch } = await db.from('branches').select('opening_hours').eq('id', mainBranch).single();
+    const hours = branch!.opening_hours as Record<string, unknown>;
+
+    // Two 60-minute bookings under one 120-minute slot: both are listed.
+    await db.from('resources').update({ slot_minutes: 120 }).eq('id', pitch3);
+    expect((await view()).slots.find((s) => s.start.getTime() === FRI_8PM.getTime())!.bookings).toHaveLength(2);
+
+    // Fridays shortened to 10:00–21:00: the 9pm booking is off the grid but still shown.
+    await db.from('resources').update({ slot_minutes: 60 }).eq('id', pitch3);
+    await db.from('branches').update({ opening_hours: { ...hours, '5': ['10:00', '21:00'] } }).eq('id', mainBranch);
+    expect((await view()).extra!.map((b) => b.start.getTime())).toEqual([FRI_9PM.getTime()]);
+
+    // Closed on Fridays: both bookings are still shown.
+    await db.from('branches').update({ opening_hours: { ...hours, '5': null } }).eq('id', mainBranch);
+    expect((await view()).extra).toHaveLength(2);
+
+    // The space is deactivated: it stays in the staff view while it has bookings that day.
+    await db.from('resources').update({ active: false }).eq('id', pitch3);
+    const inactive = await view();
+    expect(inactive.resource.active).toBe(false);
+    expect(inactive.extra).toHaveLength(2);
+
+    await db.from('branches').update({ opening_hours: hours }).eq('id', mainBranch);
   });
 });
