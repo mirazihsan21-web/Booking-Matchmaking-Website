@@ -123,6 +123,8 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 
 ## 6. Known issues / gotchas
 
+- **SQL `CHECK` constraints pass on NULL.** `team_size >= 1` with a null `team_size` evaluates to NULL, and a CHECK only fails on false. Write `team_size is not null and …` explicitly. The Stage A schema test caught this on `activities`.
+
 - **Next.js 16.4 is newer than most AI training data.** `apps/web/AGENTS.md` says to read the bundled docs at `apps/web/node_modules/next/dist/docs/` before writing Next code. Do that. Notable differences:
   - `LayoutProps<"/">` / `PageProps` are **global generated types**, created by `next dev`, `next build` or `next typegen`. That's why `apps/web`'s `typecheck` script is `next typegen && tsc --noEmit`; plain `tsc` fails on a clean checkout.
   - The template enables `cacheComponents` and `partialPrefetching` in `next.config.ts`.

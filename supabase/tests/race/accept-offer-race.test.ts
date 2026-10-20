@@ -2,18 +2,20 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-// Two real connections replying YES to the same offer at once (a Twilio webhook retry racing the
-// simulated-phone button). Needs the local Supabase stack: `pnpm db:start`.
+// Two real connections accepting the same offer at once (an email-link retry racing an in-app tap).
+// Needs the local Supabase stack: `pnpm db:start`.
 const DB_URL = process.env.SUPABASE_DB_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 
 const ids = {
   owner: randomUUID(),
-  venue: randomUUID(),
-  table: randomUUID(),
-  game: randomUUID(),
+  playerUser: randomUUID(),
+  org: randomUUID(),
+  branch: randomUUID(),
+  resource: randomUUID(),
+  activity: randomUUID(),
   session: randomUUID(),
   group: randomUUID(),
-  player: randomUUID(),
+  profile: randomUUID(),
   entry: randomUUID(),
 };
 let offerId = '';
@@ -25,36 +27,49 @@ beforeAll(async () => {
   await Promise.all([setup.connect(), a.connect(), b.connect()]);
   // Parameterised queries must be single statements, so fixtures go in one at a time.
   const run = (sql: string, params: unknown[]) => setup.query(sql, params);
-  await run(`insert into auth.users (id, email) values ($1, $2)`, [ids.owner, `${ids.owner}@race.test`]);
-  await run(`insert into public.venues (id, name, owner_id) values ($1, 'Race Café', $2)`, [ids.venue, ids.owner]);
-  await run(`insert into public.venue_tables (id, venue_id, name, capacity) values ($1, $2, 'Table 1', 4)`, [ids.table, ids.venue]);
+  await run(`insert into auth.users (id, email) values ($1, $2), ($3, $4)`, [
+    ids.owner,
+    `${ids.owner}@race.test`,
+    ids.playerUser,
+    `${ids.playerUser}@race.test`,
+  ]);
   await run(
-    `insert into public.games (id, venue_id, name, min_players, max_players, duration_min) values ($1, $2, 'Azul', 2, 4, 40)`,
-    [ids.game, ids.venue],
+    `insert into public.organizations (id, slug, name, business_type, created_by) values ($1, $2, 'Race Café', 'boardgame_cafe', $3)`,
+    [ids.org, `race-${ids.org.slice(0, 8)}`, ids.owner],
+  );
+  await run(`insert into public.branches (id, organization_id, name) values ($1, $2, 'Main')`, [ids.branch, ids.org]);
+  await run(
+    `insert into public.resources (id, organization_id, branch_id, name, kind, capacity) values ($1, $2, $3, 'Table 1', 'table', 4)`,
+    [ids.resource, ids.org, ids.branch],
   );
   await run(
-    `insert into public.sessions (id, venue_id, starts_at, ends_at, seat_price_cents)
-     values ($1, $2, now() + interval '1 day', now() + interval '1 day 4 hours', 800)`,
-    [ids.session, ids.venue],
+    `insert into public.activities (id, organization_id, name, min_players, max_players, duration_min) values ($1, $2, 'Azul', 2, 4, 40)`,
+    [ids.activity, ids.org],
   );
   await run(
-    `insert into public.groups (id, venue_id, session_id, table_id, game_id, capacity) values ($1, $2, $3, $4, $5, 4)`,
-    [ids.group, ids.venue, ids.session, ids.table, ids.game],
+    `insert into public.open_play_sessions (id, organization_id, branch_id, starts_at, ends_at, seat_price_poisha)
+     values ($1, $2, $3, now() + interval '1 day', now() + interval '1 day 4 hours', 80000)`,
+    [ids.session, ids.org, ids.branch],
   );
   await run(
-    `insert into public.players (id, venue_id, name, phone, skill) values ($1, $2, 'Racer R.', '+447700900999', 3)`,
-    [ids.player, ids.venue],
+    `insert into public.groups (id, organization_id, session_id, resource_id, activity_id, capacity) values ($1, $2, $3, $4, $5, 4)`,
+    [ids.group, ids.org, ids.session, ids.resource, ids.activity],
   );
   await run(
-    `insert into public.waitlist_entries (id, venue_id, session_id, player_id, queue_position) values ($1, $2, $3, $4, 1)`,
-    [ids.entry, ids.venue, ids.session, ids.player],
+    `insert into public.player_profiles (id, organization_id, user_id, display_name, skill) values ($1, $2, $3, 'Racer R.', 3)`,
+    [ids.profile, ids.org, ids.playerUser],
+  );
+  await run(
+    `insert into public.waitlist_entries (id, organization_id, session_id, profile_id, queue_position) values ($1, $2, $3, $4, 1)`,
+    [ids.entry, ids.org, ids.session, ids.profile],
   );
   const offer = await run(`select public.create_offer($1, 1::smallint, $2) as id`, [ids.group, ids.entry]);
   offerId = offer.rows[0].id;
 });
 
 afterAll(async () => {
-  await setup.query(`delete from auth.users where id = $1`, [ids.owner]); // cascades to the venue
+  await setup.query(`delete from public.organizations where id = $1`, [ids.org]); // cascades to everything else
+  await setup.query(`delete from auth.users where id in ($1, $2)`, [ids.owner, ids.playerUser]);
   await Promise.all([setup.end(), a.end(), b.end()]);
 });
 
@@ -76,8 +91,8 @@ describe('accept_offer under concurrency', () => {
     expect((await second).rows[0].result).toBe('already_accepted');
 
     const live = await setup.query(
-      `select count(*)::int as n from public.bookings where session_id = $1 and player_id = $2 and status <> 'cancelled'`,
-      [ids.session, ids.player],
+      `select count(*)::int as n from public.bookings where session_id = $1 and profile_id = $2 and status <> 'cancelled'`,
+      [ids.session, ids.profile],
     );
     expect(live.rows[0].n).toBe(1);
   });
