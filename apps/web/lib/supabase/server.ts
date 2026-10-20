@@ -1,8 +1,12 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { connection } from 'next/server';
 
 /** Per-request Supabase client acting as the signed-in user (RLS applies). Official @supabase/ssr pattern. */
 export async function createClient() {
+  // supabase-js reads the clock (Date.now()) while loading the session. Under Cache Components that's
+  // only allowed at request time, so stop prerendering here explicitly.
+  await connection();
   const cookieStore = await cookies();
 
   return createServerClient(
