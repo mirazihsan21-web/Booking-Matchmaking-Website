@@ -36,6 +36,24 @@ export async function signedInClient(email: string, password: string): Promise<S
   return client;
 }
 
+/** The first link in the newest email Supabase Auth sent to that address (local stack: Mailpit). */
+export async function emailLinkTo(address: string): Promise<URL> {
+  const mailpit = process.env.MAILPIT_URL ?? 'http://127.0.0.1:54324';
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const list = (await (await fetch(`${mailpit}/api/v1/messages`)).json()) as {
+      messages: Array<{ ID: string; To: Array<{ Address: string }> }>;
+    };
+    const found = list.messages.find((m) => m.To.some((t) => t.Address.toLowerCase() === address.toLowerCase()));
+    if (found) {
+      const message = (await (await fetch(`${mailpit}/api/v1/message/${found.ID}`)).json()) as { HTML: string };
+      const href = /href="([^"]+)"/.exec(message.HTML)?.[1];
+      if (href) return new URL(href.replaceAll('&amp;', '&'));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`no email reached ${address}`);
+}
+
 export async function deleteTestUser(db: SupabaseClient, id: string): Promise<void> {
   const { error } = await db.auth.admin.deleteUser(id);
   if (error) throw error;

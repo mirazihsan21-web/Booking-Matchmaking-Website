@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { acceptPendingInvites, inviteMember } from '@/lib/orgs/invites';
-import { createTestUser, deleteTestUser, serviceDb, type TestUser } from './helpers';
+import { completeSignIn } from '@/lib/auth/complete-sign-in';
+import { acceptPendingInvites, cancelInvite, inviteMember } from '@/lib/orgs/invites';
+import { anonClient, createTestUser, deleteTestUser, emailLinkTo, serviceDb, type TestUser } from './helpers';
 
 const db = serviceDb();
 const users: string[] = [];
@@ -46,6 +47,38 @@ describe('staff invites', () => {
 
     const { data } = await db.from('organization_members').select('role').eq('organization_id', orgId).eq('user_id', staffId).single();
     expect(data?.role).toBe('staff');
+  });
+
+  it('the invite email signs the invitee in on the root site, and the invite becomes a membership', async () => {
+    const email = `invitee-${randomUUID().slice(0, 8)}@example.test`;
+    const result = await inviteMember(db, { organizationId: orgId, email, role: 'staff', invitedBy: owner.id, redirectTo: 'http://localhost:3000/auth/callback?next=/manage' });
+    expect(result).toEqual({ status: 'invited', emailSent: true });
+    users.push(await userIdByEmail(email));
+
+    // What the invitee clicks: our callback with a one-time token hash (PKCE can't be used for admin invites)
+    const link = await emailLinkTo(email);
+    expect(`${link.origin}${link.pathname}`).toBe('http://localhost:3000/auth/callback');
+    expect(link.searchParams.get('type')).toBe('invite');
+    expect(link.searchParams.get('next')).toBe('/manage');
+
+    const browser = anonClient();
+    expect(await completeSignIn(browser, link.searchParams)).toBe(true);
+    const { data } = await browser.auth.getUser();
+    expect(data.user?.email).toBe(email);
+    expect(await acceptPendingInvites(db, data.user!.id, email)).toBe(1);
+  });
+
+  it('a cancelled invite (say, a mistyped address) is never accepted', async () => {
+    const email = `typo-${randomUUID().slice(0, 8)}@example.test`;
+    await inviteMember(db, { organizationId: orgId, email, role: 'staff', invitedBy: owner.id, redirectTo: 'http://localhost:3000/auth/callback' });
+    const strangerId = await userIdByEmail(email);
+    users.push(strangerId);
+    const { data: invite } = await db.from('organization_invites').select('id').eq('organization_id', orgId).eq('email', email).single();
+
+    expect(await cancelInvite(db, randomUUID(), invite!.id)).toBe('not_found'); // only from its own venue
+    expect(await cancelInvite(db, orgId, invite!.id)).toBe('cancelled');
+    expect(await cancelInvite(db, orgId, invite!.id)).toBe('not_found');
+    expect(await acceptPendingInvites(db, strangerId, email)).toBe(0);
   });
 
   it('acceptance is idempotent', async () => {

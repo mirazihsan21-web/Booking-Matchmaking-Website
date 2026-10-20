@@ -26,9 +26,27 @@ describe('validateSlug (Review Focus 1)', () => {
     expect(validateSlug(slug)).toEqual({ ok: true });
   });
 
+  // Self-serve signup means anyone can claim <slug>.<platform domain>: keep phishing-prone names for us.
+  it.each(['login', 'signin', 'signup', 'account', 'verify', 'secure', 'pay', 'payment', 'checkout', 'billing', 'wallet', 'bkash', 'nagad', 'dev', 'staging', 'cdn'])(
+    '%j is reserved (phishing-prone on the platform domain)',
+    (slug) => {
+      expect(validateSlug(slug)).toEqual({ ok: false, reason: 'reserved' });
+    },
+  );
+
+  // Browsers show xn-- (punycode) labels as Unicode, which allows look-alike venue addresses.
+  it.each(['xn--dhanmondi', 'xn--80ak6aa92e'])('%j (punycode) is reserved', (slug) => {
+    expect(validateSlug(slug)).toEqual({ ok: false, reason: 'reserved' });
+  });
+
   it('matches the database reserved list', () => {
     expect([...RESERVED_SLUGS].sort()).toEqual(
-      ['www', 'app', 'admin', 'api', 'manage', 'auth', 'static', 't', 'help', 'support', 'status', 'docs', 'blog', 'mail'].sort(),
+      [
+        'www', 'app', 'admin', 'api', 'manage', 'auth', 'static', 't', 'help', 'support', 'status', 'docs', 'blog', 'mail',
+        'login', 'signin', 'signup', 'register', 'account', 'accounts', 'verify', 'secure', 'security',
+        'pay', 'payment', 'payments', 'checkout', 'billing', 'wallet', 'bkash', 'nagad',
+        'dev', 'staging', 'cdn', 'assets', 'media', 'onboarding',
+      ].sort(),
     );
   });
 });

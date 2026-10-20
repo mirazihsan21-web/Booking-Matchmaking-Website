@@ -6,7 +6,7 @@ import type { FormState } from "@/components/forms/action-form";
 import { parseActivityForm } from "@/lib/forms/activity";
 import { parseBranchForm } from "@/lib/forms/branch";
 import { parseResourceForm } from "@/lib/forms/resource";
-import { inviteMember } from "@/lib/orgs/invites";
+import { cancelInvite, inviteMember } from "@/lib/orgs/invites";
 import { changeRole, removeMember } from "@/lib/orgs/members";
 import { publishOrganization } from "@/lib/orgs/publish";
 import { createServiceClient } from "@/lib/service-client";
@@ -176,6 +176,13 @@ export async function inviteStaffAction(slug: string, _state: FormState, form: F
   refresh();
   if (result.status === "already_member") return { ok: false, message: m.manage.alreadyMember };
   return { ok: true, message: m.manage.invited(parsed.data.email.toLowerCase()) };
+}
+
+export async function cancelInviteAction(slug: string, inviteId: string, _state: FormState, _form: FormData): Promise<FormState> {
+  const { org } = await requireOrgRole(slug, "owner");
+  await cancelInvite(createServiceClient(), org.id, inviteId);
+  refresh();
+  return { ok: true, message: m.manage.inviteCancelled };
 }
 
 export async function changeRoleAction(slug: string, userId: string, _state: FormState, form: FormData): Promise<FormState> {

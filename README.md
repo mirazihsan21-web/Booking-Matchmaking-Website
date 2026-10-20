@@ -58,6 +58,9 @@ Then:
    (the user must have signed in once). With `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SECRET_KEY`
    set in the shell, the same command targets a hosted project instead.
 
+Staff invites arrive in Mailpit too. Their template lives in `supabase/templates/invite.html`; copy it to the
+hosted project's "Invite user" email template when you deploy.
+
 ### Google sign-in (optional)
 
 Email links work out of the box. For Google:
@@ -73,7 +76,7 @@ Email links work out of the box. For Google:
 pnpm typecheck           # every package (web runs `next typegen` first)
 pnpm test                # engine, sim and web unit/property tests
 pnpm test:integration    # web against the local Supabase (real auth users, RLS)
-pnpm db:test             # pgTAP: schema, tenancy RLS, grants, booking and schedule RPCs
+pnpm db:test             # pgTAP: schema, tenancy RLS, grants, booking/schedule RPCs, cross-venue references
 pnpm test:race           # two simultaneous "accept offer" calls
 pnpm db:lint             # Supabase security/performance advisors, fails on warnings
 pnpm db:reset            # re-apply all migrations to a clean local DB
@@ -90,6 +93,6 @@ Hard numbers for the case study, re-measured as features land.
 |---|---|---|
 | Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
 | Engine tests (incl. property tests) | 51 | `pnpm --filter @bm/engine test` |
-| Web unit tests | 100 | `pnpm --filter web test` |
-| Web integration tests (real Supabase) | 36 | `pnpm test:integration` |
-| Database assertions | 132 pgTAP checks + 1 two-connection race test | `pnpm db:test`, `pnpm test:race` |
+| Web unit tests | 123 | `pnpm --filter web test` |
+| Web integration tests (real Supabase) | 38 | `pnpm test:integration` |
+| Database assertions | 143 pgTAP checks + 1 two-connection race test | `pnpm db:test`, `pnpm test:race` |

@@ -1,7 +1,7 @@
 -- Stage A schema shape and the invariants that live in constraints.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(47);
+select plan(49);
 
 select has_table('public', t, format('table %s exists', t))
 from unnest(array[
@@ -38,7 +38,7 @@ insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-000000000002', 'p1@test.local'),
   ('00000000-0000-4000-8000-000000000003', 'p2@test.local');
 insert into public.organizations (id, slug, name, business_type, created_by)
-values ('00000000-0000-4000-8000-0000000000a1', 'dhanmondi-turf', 'Dhanmondi Turf', 'turf', '00000000-0000-4000-8000-000000000001');
+values ('00000000-0000-4000-8000-0000000000a1', 'pgtap-schema-turf', 'Dhanmondi Turf', 'turf', '00000000-0000-4000-8000-000000000001');
 insert into public.branches (id, organization_id, name)
 values ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000000a1', 'Main');
 insert into public.resources (id, organization_id, branch_id, name, kind, capacity) values
@@ -90,6 +90,14 @@ select throws_ok(
 select throws_ok(
   $$ insert into public.organizations (slug, name, business_type) values ('admin', 'Admin', 'turf') $$,
   '23514', null, 'a reserved slug is rejected'
+);
+select throws_ok(
+  $$ insert into public.organizations (slug, name, business_type) values ('bkash', 'Fake bKash', 'turf') $$,
+  '23514', null, 'a phishing-prone slug is reserved'
+);
+select throws_ok(
+  $$ insert into public.organizations (slug, name, business_type) values ('xn--dhanmondi', 'Lookalike', 'turf') $$,
+  '23514', null, 'a punycode (xn--) slug is rejected'
 );
 
 -- Seat invariants (carried over from M1)

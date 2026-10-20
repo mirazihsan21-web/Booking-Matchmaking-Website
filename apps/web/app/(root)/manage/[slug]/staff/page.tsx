@@ -6,7 +6,7 @@ import { createServiceClient } from "@/lib/service-client";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrgRole } from "@/lib/tenancy/dal";
 import { m } from "@/messages";
-import { changeRoleAction, inviteStaffAction, removeMemberAction } from "../actions";
+import { cancelInviteAction, changeRoleAction, inviteStaffAction, removeMemberAction } from "../actions";
 
 const roleOptions = [
   { value: "staff", label: m.manage.roles.staff! },
@@ -52,10 +52,13 @@ async function Staff({ params }: { params: Promise<{ slug: string }> }) {
             <CardTitle>{m.manage.pendingInvites}</CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="text-sm">
+            <ul className="flex flex-col gap-2 text-sm">
               {invites!.map((i) => (
-                <li key={i.id}>
-                  {i.email} — {m.manage.roles[i.role]}
+                <li key={i.id} className="flex flex-wrap items-center gap-3">
+                  <span className="min-w-56">
+                    {i.email} — {m.manage.roles[i.role]}
+                  </span>
+                  <ActionButton action={cancelInviteAction.bind(null, org.slug, i.id)} label={m.manage.cancelInvite} variant="outline" />
                 </li>
               ))}
             </ul>
