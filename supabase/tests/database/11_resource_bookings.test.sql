@@ -83,8 +83,8 @@ select is(pg_temp.book('x3', pg_temp.at('12:00'), 1, null, null, null, '00000000
 -- Notifications
 select is(
   (select payload - 'booking_id' from public.notifications where kind = 'booking_confirmed' and payload->>'booking_id' = (select id::text from b where label = 'a20')),
-  jsonb_build_object('resource_name', 'Pitch 1', 'starts_at', pg_temp.at('20:00'), 'ends_at', pg_temp.at('21:00'), 'price_poisha', 250000),
-  'A is told the booking is confirmed (space, time and price)'
+  jsonb_build_object('resource_name', 'Pitch 1', 'branch_name', 'Main', 'multi_branch', false, 'starts_at', pg_temp.at('20:00'), 'ends_at', pg_temp.at('21:00'), 'price_poisha', 250000),
+  'A is told the booking is confirmed (space, branch, time and price)'
 );
 select is(
   (select link || '/' || email_status from public.notifications where payload->>'booking_id' = (select id::text from b where label = 'a20')),

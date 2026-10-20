@@ -16,9 +16,10 @@ export type NotificationKind =
 
 const str = (value: unknown) => (typeof value === 'string' ? value : '');
 
-/** "Pitch 1, Fri 23 Oct, 8pm–9pm" in the venue's time zone. */
+/** "Pitch 1, Fri 23 Oct, 8pm–9pm" in the venue's time zone; "Pitch 1 (Gulshan), …" when it has several branches. */
 function spaceAndTime(payload: Record<string, unknown>, timeZone: string): string {
-  return `${str(payload.resource_name)}, ${formatNight(str(payload.starts_at), timeZone)}–${formatShortTime(str(payload.ends_at), timeZone)}`;
+  const branch = payload.multi_branch && str(payload.branch_name) ? ` (${str(payload.branch_name)})` : '';
+  return `${str(payload.resource_name)}${branch}, ${formatNight(str(payload.starts_at), timeZone)}–${formatShortTime(str(payload.ends_at), timeZone)}`;
 }
 
 /** The words for a notification, from its kind and data. Used by the inbox and the email. */

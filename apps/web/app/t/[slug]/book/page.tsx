@@ -4,9 +4,10 @@ import { SlotPicker } from "@/components/bookings/slot-picker";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/dal";
 import { spaceDay } from "@/lib/bookings/bookings";
-import { addDays, localDate, parseDateParam } from "@/lib/bookings/slots";
+import { addDays, currentBusinessDate, parseDateParam } from "@/lib/bookings/slots";
 import { formatDay, formatShortTime } from "@/lib/format";
 import { formatBdt } from "@/lib/money";
+import type { OpeningHours } from "@/lib/opening-hours";
 import { createServiceClient } from "@/lib/service-client";
 import { getPlayer } from "@/lib/tenancy/player";
 import { m } from "@/messages";
@@ -38,21 +39,28 @@ async function Book({ params, searchParams }: { params: Promise<{ slug: string }
 
   const { org } = player;
   const db = createServiceClient();
-  const [{ data: rules }, { data: spaces }] = await Promise.all([
+  const [{ data: rules }, { data: allSpaces }, { data: allBranches }] = await Promise.all([
     db.from("organizations").select("booking_horizon_days").eq("id", org.id).single(),
-    db.from("resources").select("id, name, slot_minutes, price_per_hour_poisha").eq("organization_id", org.id).eq("active", true).order("name"),
+    db.from("resources").select("id, name, slot_minutes, price_per_hour_poisha, branch_id").eq("organization_id", org.id).eq("active", true).order("name"),
+    db.from("branches").select("id, name, opening_hours").eq("organization_id", org.id).order("created_at"),
   ]);
-  if (!spaces || spaces.length === 0) return <p className="text-foreground/60">{m.bookings.unavailable}</p>;
+  const branches = (allBranches ?? []).filter((b) => (allSpaces ?? []).some((s) => s.branch_id === b.id));
+  if (branches.length === 0) return <p className="text-foreground/60">{m.bookings.unavailable}</p>;
 
-  // Junk or out-of-window ?date= and unknown ?resource= fall back to today and the first space.
-  const today = localDate(new Date(), org.timezone);
+  // Branch first (when there are several), then a space there. Junk or foreign ?branch=/?resource=
+  // and junk or out-of-window ?date= fall back to the first branch, its first space, and today.
+  const askedSpace = (allSpaces ?? []).find((s) => s.id === one(query.resource));
+  const branch = branches.find((b) => b.id === one(query.branch)) ?? branches.find((b) => b.id === askedSpace?.branch_id) ?? branches[0]!;
+  const spaces = (allSpaces ?? []).filter((s) => s.branch_id === branch.id);
+  const space = spaces.find((s) => s.id === askedSpace?.id) ?? spaces[0]!;
+  // After midnight at a late-night venue, "today" is still last night's business day.
+  const today = currentBusinessDate(branch.opening_hours as OpeningHours, new Date(), org.timezone);
   const lastDay = addDays(today, rules?.booking_horizon_days ?? 14);
   const asked = parseDateParam(one(query.date), today);
   const date = asked < today || asked > lastDay ? today : asked;
-  const space = spaces.find((s) => s.id === one(query.resource)) ?? spaces[0]!;
   const day = await spaceDay(db, { organizationId: org.id, resourceId: space.id, date, withNames: false });
 
-  const link = (d: string) => `/book?resource=${space.id}&date=${d}`;
+  const link = (d: string) => `/book?branch=${branch.id}&resource=${space.id}&date=${d}`;
   const price = space.price_per_hour_poisha === null ? m.bookings.priceAtVenue : m.bookings.perSlot(formatBdt(Math.round((space.price_per_hour_poisha * space.slot_minutes) / 60)));
 
   return (
@@ -62,6 +70,18 @@ async function Book({ params, searchParams }: { params: Promise<{ slug: string }
         <p className="text-foreground/70">{m.bookings.intro}</p>
       </div>
       <form action="/book" method="get" className="flex flex-wrap items-end gap-3">
+        {branches.length > 1 && (
+          <label className="flex flex-col gap-1.5 text-sm font-medium">
+            {m.bookings.branch}
+            <select name="branch" defaultValue={branch.id} className="h-9 rounded-lg border border-input bg-transparent px-2">
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="flex flex-col gap-1.5 text-sm font-medium">
           {m.bookings.space}
           <select name="resource" defaultValue={space.id} className="h-9 rounded-lg border border-input bg-transparent px-2">
@@ -84,7 +104,8 @@ async function Book({ params, searchParams }: { params: Promise<{ slug: string }
         <div className="flex items-center justify-between gap-3">
           {date > today ? <Link href={link(addDays(date, -1))} className="text-sm hover:underline">{m.bookings.previousDay}</Link> : <span />}
           <h2 className="text-lg font-semibold">
-            {space.name} · {formatDay(date)}
+            {space.name}
+            {branches.length > 1 && ` (${branch.name})`} · {formatDay(date)}
           </h2>
           {date < lastDay ? <Link href={link(addDays(date, 1))} className="text-sm hover:underline">{m.bookings.nextDay}</Link> : <span />}
         </div>

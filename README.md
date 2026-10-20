@@ -105,6 +105,6 @@ Hard numbers for the case study, re-measured as features land.
 |---|---|---|
 | Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
 | Engine tests (incl. property tests) | 51 | `pnpm --filter @bm/engine test` |
-| Web unit tests | 183 | `pnpm --filter web test` |
-| Web integration tests (real Supabase, Realtime, Mailpit) | 62 | `pnpm test:integration` |
-| Database assertions | 211 pgTAP checks + 3 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
+| Web unit tests | 191 | `pnpm --filter web test` |
+| Web integration tests (real Supabase, Realtime, Mailpit) | 65 | `pnpm test:integration` |
+| Database assertions | 213 pgTAP checks + 3 two-connection race tests | `pnpm db:test`, `pnpm test:race` |

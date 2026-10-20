@@ -11,10 +11,13 @@ import { getPlayer } from "@/lib/tenancy/player";
 import { m } from "@/messages";
 import { cancelMyBookingAction } from "./actions";
 
-function Row({ booking, slug, timeZone, upcoming }: { booking: MyBooking; slug: string; timeZone: string; upcoming: boolean }) {
+function Row({ booking, slug, timeZone, upcoming, showBranch }: { booking: MyBooking; slug: string; timeZone: string; upcoming: boolean; showBranch: boolean }) {
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border px-4 py-3 text-sm">
-      <span className="font-medium">{booking.resourceName}</span>
+      <span className="font-medium">
+        {booking.resourceName}
+        {showBranch && <span className="font-normal text-foreground/70"> · {booking.branchName}</span>}
+      </span>
       <span>
         {formatNight(booking.startsAt, timeZone)}–{formatShortTime(booking.endsAt, timeZone)}
       </span>
@@ -48,7 +51,12 @@ async function MyBookings({ params }: { params: Promise<{ slug: string }> }) {
       </p>
     );
   }
-  const { upcoming, past } = await listMyBookings(createServiceClient(), { organizationId: player.org.id, profileId: player.profileId });
+  const db = createServiceClient();
+  const [{ upcoming, past }, { count: branchCount }] = await Promise.all([
+    listMyBookings(db, { organizationId: player.org.id, profileId: player.profileId }),
+    db.from("branches").select("id", { count: "exact", head: true }).eq("organization_id", player.org.id),
+  ]);
+  const showBranch = (branchCount ?? 0) > 1;
   const tz = player.org.timezone;
 
   return (
@@ -61,7 +69,7 @@ async function MyBookings({ params }: { params: Promise<{ slug: string }> }) {
         ) : (
           <ul className="flex flex-col gap-2">
             {upcoming.map((b) => (
-              <Row key={b.id} booking={b} slug={slug} timeZone={tz} upcoming />
+              <Row key={b.id} booking={b} slug={slug} timeZone={tz} upcoming showBranch={showBranch} />
             ))}
           </ul>
         )}
@@ -73,7 +81,7 @@ async function MyBookings({ params }: { params: Promise<{ slug: string }> }) {
         ) : (
           <ul className="flex flex-col gap-2">
             {past.map((b) => (
-              <Row key={b.id} booking={b} slug={slug} timeZone={tz} upcoming={false} />
+              <Row key={b.id} booking={b} slug={slug} timeZone={tz} upcoming={false} showBranch={showBranch} />
             ))}
           </ul>
         )}
