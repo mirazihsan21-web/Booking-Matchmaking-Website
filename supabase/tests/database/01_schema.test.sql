@@ -1,20 +1,22 @@
 -- Stage A schema shape and the invariants that live in constraints.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(52);
+select plan(54);
 
 select has_table('public', t, format('table %s exists', t))
 from unnest(array[
   'organizations', 'organization_members', 'organization_invites', 'platform_admins',
   'branches', 'resources', 'activities', 'open_play_sessions', 'open_play_session_resources',
   'resource_reservations', 'player_profiles', 'profile_activities', 'availability',
-  'seat_requests', 'groups', 'bookings', 'waitlist_entries', 'seat_offers', 'notifications', 'events'
+  'seat_requests', 'groups', 'bookings', 'waitlist_entries', 'seat_offers', 'notifications', 'events',
+  'resource_bookings'
 ]) as t;
 
 select has_enum('public', e, format('enum %s exists', e))
 from unnest(array[
   'business_type', 'org_status', 'member_role', 'team_mode', 'resource_kind', 'reservation_source',
-  'session_status', 'booking_status', 'booking_source', 'waitlist_status', 'offer_status', 'notification_kind', 'email_status'
+  'session_status', 'booking_status', 'booking_source', 'waitlist_status', 'offer_status', 'notification_kind', 'email_status',
+  'resource_booking_status'
 ]) as e;
 
 select is_empty(
