@@ -14,7 +14,9 @@
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
     "test:race": "vitest run supabase/tests/race",
-    "db:lint": "supabase db advisors --local --type all --fail-on warn"
+    "db:lint": "supabase db advisors --local --type all --fail-on warn",
+    "test:integration": "pnpm --filter web test:integration",
+    "env:local": "pnpm --filter web env:local"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
