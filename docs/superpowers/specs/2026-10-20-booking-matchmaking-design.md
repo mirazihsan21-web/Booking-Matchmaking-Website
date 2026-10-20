@@ -1,3 +1,5 @@
+> **Superseded (2026-10-20):** the project pivoted from a portfolio demo to a real multi-tenant platform. See `docs/superpowers/specs/2026-10-20-booking-platform-design.md`. Kept for history; M1 work described here is merged and still in use.
+
 # Booking & Matchmaking Platform: Design + Build Plan
 
 ## Context
