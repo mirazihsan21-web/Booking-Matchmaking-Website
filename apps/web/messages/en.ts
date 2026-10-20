@@ -115,6 +115,18 @@ export const en = {
     slugLocked: 'The web address is fixed once the venue is live.',
     colourFormat: 'Use a colour like #15803D.',
   },
+  admin: {
+    title: 'All venues',
+    venue: 'Venue',
+    type: 'Type',
+    owner: 'Owner',
+    created: 'Created',
+    status: 'Status',
+    suspend: 'Suspend',
+    restore: 'Restore',
+    suspended: 'Suspended. The venue site now shows "not available".',
+    restored: 'Restored. The venue is live again.',
+  },
   tenant: {
     signIn: 'Sign in',
     myProfile: 'My profile',
