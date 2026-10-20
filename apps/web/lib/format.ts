@@ -11,3 +11,10 @@ export function formatNight(iso: string, timeZone: string): string {
     .replace(',', '');
   return `${day}, ${formatShortTime(iso, timeZone)}`;
 }
+
+/** `'Fri 23 Oct'` for a calendar date `YYYY-MM-DD` (a business day; no time-zone shift). */
+export function formatDay(date: string): string {
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+    .format(new Date(`${date}T00:00:00Z`))
+    .replace(',', '');
+}
