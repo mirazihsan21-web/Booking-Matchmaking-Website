@@ -18,3 +18,4 @@ supabase/.branches/
 Thumbs.db
 
 .superpowers/
+.playwright-mcp/
