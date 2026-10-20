@@ -1,7 +1,7 @@
 -- Explicit table privileges (the Data API no longer exposes new tables by default).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(14);
+select plan(15);
 
 select is_empty(
   $$ select t from unnest(array[
@@ -22,6 +22,9 @@ from unnest(array['groups', 'bookings', 'waitlist_entries', 'seat_offers', 'noti
 select ok(has_table_privilege('service_role', 'public.bookings', 'INSERT,UPDATE,DELETE'), 'service_role can write booking-flow tables');
 select ok(has_column_privilege('authenticated', 'public.organizations', 'max_upcoming_bookings', 'UPDATE'), 'owners can change booking settings (RLS limits it to owners)');
 select ok(not has_column_privilege('authenticated', 'public.organizations', 'status', 'UPDATE'), 'nobody can publish or suspend through the API');
+select ok(not has_table_privilege('authenticated', 'public.seat_requests', 'INSERT,DELETE')
+          and not has_any_column_privilege('authenticated', 'public.seat_requests', 'INSERT'),
+  'players cannot write seat requests directly (requests go through the server)');
 
 select * from finish();
 rollback;
