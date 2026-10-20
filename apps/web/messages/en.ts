@@ -166,7 +166,7 @@ export const en = {
     none: '—',
     availability: 'When can you usually play?',
     availabilityRange: 'Start must be before end (24-hour times).',
-    emailOptIn: 'Email me when a seat opens up for me',
+    emailOptIn: 'Email me about my bookings and seats',
     save: 'Save profile',
     saved: 'Profile saved.',
     unavailable: "This venue isn't taking new players right now.",
@@ -181,6 +181,10 @@ export const en = {
     payAtVenue: (price: string) => `Pay ${price} at the venue.`,
     payAtVenueNoPrice: 'Pay at the venue.',
     update: 'Update',
+  },
+  email: {
+    open: 'View details',
+    settings: 'Change your email settings on your profile:',
   },
   schedule: {
     none: 'Nothing scheduled yet.',
