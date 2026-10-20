@@ -1,0 +1,297 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { OpeningHours } from '@/lib/opening-hours';
+import { businessDaySlots, checkBookingStart, slotStates, type Slot, type SlotState } from './slots';
+
+/**
+ * Whole-space bookings for players (tenant site) and staff (manage). Pass the service client: callers
+ * have already checked who is asking. The clock- and calendar-based rules live here (via slots.ts);
+ * overlaps, the booking limit and the notifications live in the SQL functions (spec §3).
+ */
+
+export type BookSpaceInput = {
+  organizationId: string;
+  resourceId: string;
+  startsAt: Date;
+  slots: number;
+  who: { profileId: string } | { guestName: string; guestPhone: string };
+  createdBy: string;
+  actor: 'player' | 'staff';
+  now?: Date;
+};
+
+export type BookSpaceResult =
+  | { status: 'booked'; bookingId: string }
+  | { status: 'taken' }
+  | { status: 'already_yours' }
+  | { status: 'limit_reached' }
+  | { status: 'invalid'; reason: 'not_bookable' | 'bad_count' | 'past' | 'off_grid' | 'outside_hours' | 'beyond_horizon' };
+
+export interface SpaceDay {
+  resource: { id: string; name: string; slotMinutes: number; pricePerHourPoisha: number | null };
+  slots: Array<Slot & { state: SlotState; booking?: { id: string; name: string; phone: string | null; status: string } }>;
+}
+
+export interface MyBooking {
+  id: string;
+  resourceName: string;
+  startsAt: string;
+  endsAt: string;
+  pricePoisha: number;
+  status: string;
+  cancellable: boolean;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RANGE_BOUND = /(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2}(?:\.\d+)?)([+-]\d{2})(?::?(\d{2}))?/;
+
+/** A Postgres tstzrange as PostgREST returns it, e.g. `["2026-10-23 14:00:00+00","2026-10-23 15:00:00+00")`. */
+export function parseTstzRange(value: string): { start: Date; end: Date } {
+  const [lower, upper] = value.slice(1, -1).split(',').map((bound) => {
+    const match = RANGE_BOUND.exec(bound);
+    if (!match) throw new Error(`Unexpected range bound: ${bound}`);
+    return new Date(`${match[1]}T${match[2]}${match[3]}:${match[4] ?? '00'}`);
+  });
+  return { start: lower!, end: upper! };
+}
+
+const asRange = (from: Date, to: Date) => `[${from.toISOString()},${to.toISOString()})`;
+
+interface Venue {
+  status: string;
+  timezone: string;
+  bookingHorizonDays: number;
+  cancelCutoffMinutes: number;
+}
+
+async function loadVenue(db: SupabaseClient, organizationId: string): Promise<Venue | null> {
+  if (!UUID.test(organizationId)) return null;
+  const { data } = await db
+    .from('organizations')
+    .select('status, timezone, booking_horizon_days, cancel_cutoff_minutes')
+    .eq('id', organizationId)
+    .maybeSingle();
+  return data
+    ? { status: data.status, timezone: data.timezone, bookingHorizonDays: data.booking_horizon_days, cancelCutoffMinutes: data.cancel_cutoff_minutes }
+    : null;
+}
+
+interface Space {
+  id: string;
+  name: string;
+  slotMinutes: number;
+  pricePerHourPoisha: number | null;
+  active: boolean;
+  hours: OpeningHours;
+}
+
+async function loadSpace(db: SupabaseClient, organizationId: string, resourceId: string): Promise<Space | null> {
+  if (!UUID.test(resourceId)) return null;
+  const { data } = await db
+    .from('resources')
+    .select('id, name, slot_minutes, price_per_hour_poisha, active, branches(opening_hours)')
+    .eq('id', resourceId)
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+  if (!data) return null;
+  const branch = data.branches as unknown as { opening_hours: OpeningHours } | null;
+  return {
+    id: data.id,
+    name: data.name,
+    slotMinutes: data.slot_minutes,
+    pricePerHourPoisha: data.price_per_hour_poisha,
+    active: data.active,
+    hours: branch?.opening_hours ?? ({} as OpeningHours),
+  };
+}
+
+export async function bookSpace(db: SupabaseClient, input: BookSpaceInput): Promise<BookSpaceResult> {
+  const now = input.now ?? new Date();
+  const [venue, space] = await Promise.all([loadVenue(db, input.organizationId), loadSpace(db, input.organizationId, input.resourceId)]);
+  if (!venue || venue.status !== 'live' || !space || !space.active) return { status: 'invalid', reason: 'not_bookable' };
+
+  const check = checkBookingStart({
+    hours: space.hours,
+    slotMinutes: space.slotMinutes,
+    timeZone: venue.timezone,
+    startsAt: input.startsAt,
+    slots: input.slots,
+    now,
+    horizonDays: input.actor === 'staff' ? null : venue.bookingHorizonDays,
+  });
+  if (!check.ok) return { status: 'invalid', reason: check.reason };
+
+  const profileId = 'profileId' in input.who ? input.who.profileId : null;
+  const guest = 'guestName' in input.who ? input.who : null;
+  const { data, error } = await db.rpc('book_resource', {
+    p_organization_id: input.organizationId,
+    p_resource_id: input.resourceId,
+    p_starts_at: input.startsAt.toISOString(),
+    p_slots: input.slots,
+    p_profile_id: profileId,
+    p_guest_name: guest?.guestName ?? null,
+    p_guest_phone: guest?.guestPhone ?? null,
+    p_created_by: input.createdBy,
+  });
+  if (error) throw error;
+  const row = (data as Array<{ status: string; booking_id: string | null }>)[0]!;
+
+  if (row.status === 'booked') return { status: 'booked', bookingId: row.booking_id! };
+  if (row.status === 'limit_reached') return { status: 'limit_reached' };
+  if (row.status === 'taken') {
+    if (profileId) {
+      // A double click: the slot is "taken" by this player's own booking.
+      const { count } = await db
+        .from('resource_bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('profile_id', profileId)
+        .eq('resource_id', input.resourceId)
+        .eq('status', 'confirmed')
+        .overlaps('period', asRange(input.startsAt, check.endsAt));
+      if ((count ?? 0) > 0) return { status: 'already_yours' };
+    }
+    return { status: 'taken' };
+  }
+  return { status: 'invalid', reason: 'not_bookable' };
+}
+
+export async function cancelSpaceBooking(
+  db: SupabaseClient,
+  input: { organizationId: string; bookingId: string; actor: { kind: 'player'; profileId: string } | { kind: 'staff' }; cancelledBy: string; now?: Date },
+): Promise<'cancelled' | 'too_late' | 'not_cancellable' | 'not_found'> {
+  if (!UUID.test(input.bookingId)) return 'not_found';
+  const { data: booking } = await db
+    .from('resource_bookings')
+    .select('profile_id, period, status')
+    .eq('id', input.bookingId)
+    .eq('organization_id', input.organizationId)
+    .maybeSingle();
+  if (!booking) return 'not_found';
+  if (input.actor.kind === 'player' && booking.profile_id !== input.actor.profileId) return 'not_found';
+  if (booking.status !== 'confirmed') return 'not_cancellable';
+
+  if (input.actor.kind === 'player') {
+    const venue = await loadVenue(db, input.organizationId);
+    const start = parseTstzRange(booking.period).start;
+    const now = input.now ?? new Date();
+    if (!venue || now.getTime() >= start.getTime() - venue.cancelCutoffMinutes * 60_000) return 'too_late';
+  }
+
+  const { data, error } = await db.rpc('cancel_resource_booking', { p_booking_id: input.bookingId, p_cancelled_by: input.cancelledBy });
+  if (error) throw error;
+  return data as 'cancelled' | 'not_cancellable' | 'not_found';
+}
+
+export async function setSpaceBookingStatus(
+  db: SupabaseClient,
+  input: { organizationId: string; bookingId: string; status: 'attended' | 'no_show' },
+): Promise<'updated' | 'invalid' | 'not_found'> {
+  if (!UUID.test(input.bookingId)) return 'not_found';
+  const { data: booking } = await db.from('resource_bookings').select('id').eq('id', input.bookingId).eq('organization_id', input.organizationId).maybeSingle();
+  if (!booking) return 'not_found';
+  const { data, error } = await db.rpc('set_resource_booking_status', { p_booking_id: input.bookingId, p_status: input.status });
+  if (error) throw error;
+  return data as 'updated' | 'invalid' | 'not_found';
+}
+
+/**
+ * One space's slots on a business day, each with its state. `withNames` (staff only) attaches who
+ * booked: a player's display name, or a walk-in's name and phone. Players never see either.
+ * Returns null for a space outside the organization, or a malformed id.
+ */
+export async function spaceDay(
+  db: SupabaseClient,
+  input: { organizationId: string; resourceId: string; date: string; withNames: boolean; now?: Date },
+): Promise<SpaceDay | null> {
+  const [venue, space] = await Promise.all([loadVenue(db, input.organizationId), loadSpace(db, input.organizationId, input.resourceId)]);
+  if (!venue || !space) return null;
+  const grid = businessDaySlots(space.hours, input.date, space.slotMinutes, venue.timezone);
+  const resource = { id: space.id, name: space.name, slotMinutes: space.slotMinutes, pricePerHourPoisha: space.pricePerHourPoisha };
+  if (grid.length === 0) return { resource, slots: [] };
+
+  const window = asRange(grid[0]!.start, grid.at(-1)!.end);
+  const { data: reservations, error } = await db
+    .from('resource_reservations')
+    .select('period, source')
+    .eq('resource_id', space.id)
+    .eq('organization_id', input.organizationId)
+    .overlaps('period', window);
+  if (error) throw error;
+  const busy = reservations.map((r) => ({ ...parseTstzRange(r.period), source: r.source as 'booking' | 'session' }));
+  const slots = slotStates(grid, busy, input.now ?? new Date());
+  if (!input.withNames) return { resource, slots };
+
+  const { data: bookings, error: bookingsError } = await db
+    .from('resource_bookings')
+    .select('id, period, status, guest_name, guest_phone, player_profiles(display_name)')
+    .eq('resource_id', space.id)
+    .eq('organization_id', input.organizationId)
+    .neq('status', 'cancelled')
+    .overlaps('period', window);
+  if (bookingsError) throw bookingsError;
+  const named = bookings.map((b) => {
+    const profile = b.player_profiles as unknown as { display_name: string } | null;
+    return { ...parseTstzRange(b.period), id: b.id, name: profile?.display_name ?? b.guest_name ?? '', phone: profile ? null : b.guest_phone, status: b.status };
+  });
+  return {
+    resource,
+    slots: slots.map((slot) => {
+      const b = named.find((x) => x.start < slot.end && x.end > slot.start);
+      return b ? { ...slot, booking: { id: b.id, name: b.name, phone: b.phone, status: b.status } } : slot;
+    }),
+  };
+}
+
+/** Every active space of a branch for the staff day view (names included). Null for a foreign branch. */
+export async function branchDay(
+  db: SupabaseClient,
+  input: { organizationId: string; branchId: string; date: string; now?: Date },
+): Promise<SpaceDay[] | null> {
+  if (!UUID.test(input.branchId)) return null;
+  const { data: branch } = await db.from('branches').select('id').eq('id', input.branchId).eq('organization_id', input.organizationId).maybeSingle();
+  if (!branch) return null;
+  const { data: spaces, error } = await db
+    .from('resources')
+    .select('id')
+    .eq('branch_id', input.branchId)
+    .eq('organization_id', input.organizationId)
+    .eq('active', true)
+    .order('name');
+  if (error) throw error;
+  const days = await Promise.all(
+    spaces.map((s) => spaceDay(db, { organizationId: input.organizationId, resourceId: s.id, date: input.date, withNames: true, now: input.now })),
+  );
+  return days.filter((d): d is SpaceDay => d !== null);
+}
+
+/** A player's bookings at one venue: upcoming (confirmed, not yet ended) soonest first; the rest newest first. */
+export async function listMyBookings(
+  db: SupabaseClient,
+  input: { organizationId: string; profileId: string; now?: Date },
+): Promise<{ upcoming: MyBooking[]; past: MyBooking[] }> {
+  const now = input.now ?? new Date();
+  const venue = await loadVenue(db, input.organizationId);
+  const { data, error } = await db
+    .from('resource_bookings')
+    .select('id, period, price_poisha, status, resources(name)')
+    .eq('profile_id', input.profileId)
+    .eq('organization_id', input.organizationId);
+  if (error) throw error;
+  const cutoff = (venue?.cancelCutoffMinutes ?? 0) * 60_000;
+  const all = data.map((b) => {
+    const { start, end } = parseTstzRange(b.period);
+    return {
+      id: b.id,
+      resourceName: (b.resources as unknown as { name: string } | null)?.name ?? '',
+      startsAt: start.toISOString(),
+      endsAt: end.toISOString(),
+      pricePoisha: b.price_poisha,
+      status: b.status,
+      cancellable: b.status === 'confirmed' && now.getTime() < start.getTime() - cutoff,
+      ended: end <= now,
+    };
+  });
+  const strip = ({ ended: _ended, ...rest }: (typeof all)[number]): MyBooking => rest;
+  const upcoming = all.filter((b) => b.status === 'confirmed' && !b.ended).sort((x, y) => x.startsAt.localeCompare(y.startsAt));
+  const past = all.filter((b) => !(b.status === 'confirmed' && !b.ended)).sort((x, y) => y.startsAt.localeCompare(x.startsAt));
+  return { upcoming: upcoming.map(strip), past: past.map(strip) };
+}
