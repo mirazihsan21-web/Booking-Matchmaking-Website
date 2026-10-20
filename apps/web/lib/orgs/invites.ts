@@ -40,6 +40,19 @@ export async function inviteMember(
   return { status: 'invited', emailSent: !mailError };
 }
 
+/** Withdraws an open invite of this organization (e.g. sent to a mistyped address) so it can never be accepted. */
+export async function cancelInvite(db: SupabaseClient, organizationId: string, inviteId: string): Promise<'cancelled' | 'not_found'> {
+  const { data, error } = await db
+    .from('organization_invites')
+    .delete()
+    .eq('id', inviteId)
+    .eq('organization_id', organizationId)
+    .is('accepted_at', null)
+    .select('id');
+  if (error) throw error;
+  return data.length > 0 ? 'cancelled' : 'not_found';
+}
+
 /** Turns the user's open, unexpired invites into memberships. Returns how many were accepted. Idempotent. */
 export async function acceptPendingInvites(db: SupabaseClient, userId: string, email: string): Promise<number> {
   const { data: invites, error } = await db

@@ -33,7 +33,19 @@ describe('safeNext (no open redirects after sign-in)', () => {
     ['//evil.example', '/'],
     ['/\\evil.example', '/'],
     ['manage', '/'],
+    // URL parsers strip tab/CR/LF, so these would become //evil.example
+    ['/\t/evil.example', '/'],
+    ['/\n/evil.example', '/'],
+    ['/\r/evil.example', '/'],
+    ['/\u0000/evil.example', '/'],
   ])('%j → %j', (input, expected) => {
     expect(safeNext(input)).toBe(expected);
+  });
+
+  it('never resolves to another origin', () => {
+    for (const ch of ['\t', '\n', '\r', '\u000b', '\u000c', ' ', '\u007f']) {
+      const next = safeNext(`/${ch}/evil.example`);
+      expect(new URL(next, 'http://localhost:3000').origin).toBe('http://localhost:3000');
+    }
   });
 });

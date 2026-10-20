@@ -102,6 +102,8 @@ export const en = {
     invited: (email: string) => `Invited ${email}. They'll join when they sign in with that email.`,
     alreadyMember: 'That person is already on your team.',
     pendingInvites: 'Pending invites',
+    cancelInvite: 'Cancel invite',
+    inviteCancelled: 'Invite cancelled. That link no longer adds anyone to your team.',
     changeRole: 'Change role',
     remove: 'Remove',
     lastOwner: 'Every venue needs at least one owner.',

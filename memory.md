@@ -105,6 +105,14 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 
 ## 5. Decisions & rulings log
 
+- **2026-10-20 · Stage A final review (fresh Opus reviewer): 0 Critical, 3 Important, 15 Minor; no cross-tenant data leak.** Fixed, each with a test that failed first:
+  - **Cross-venue references are now impossible in the database.** Every reference between tenant tables is a composite foreign key `(x_id, organization_id) → parent (id, organization_id)` (migration `20261020191000_tenant_scoped_fks.sql`, 23 keys, original ON DELETE kept; `messages.profile_id` uses `on delete set null (profile_id)` so the venue column stays). Before, an owner could hang a resource under another venue's branch, or a player could request a seat in another venue's session, straight through PostgREST: RLS checks who writes a row, not where its keys point. `06_tenant_refs.test.sql` has a catalog check that fails if a new table forgets this. **When you add a tenant table, reference parents by `(x_id, organization_id)`** and index `(x_id, organization_id)`.
+  - **Open redirect closed.** `safeNext` now rejects control characters/whitespace (URL parsers strip tab/CR/LF, so `/\t/evil.com` became `//evil.com`) and resolves the path to prove it stays on the same origin.
+  - **Staff invite emails work.** `inviteUserByEmail` can't use PKCE, so its default link handed the session over in a URL fragment our callback ignored ("link expired"). The invite template (`supabase/templates/invite.html`, wired in `config.toml`) now links to `/auth/callback?token_hash=…&type=invite&next=/manage`, and `completeSignIn()` (`lib/auth/complete-sign-in.ts`) handles both `code` and `token_hash`. **Mirror the template on the hosted project** (Auth → Email Templates → Invite user).
+  - **Owners can cancel a pending invite** (`cancelInvite`), so a mistyped address can't turn a stranger into staff.
+  - **More reserved slugs:** phishing-prone names on the platform domain (login, signin, pay, checkout, bkash, nagad, billing, wallet…) and any `xn--` (punycode look-alike) label. The DB CHECK (`20261020191100_reserved_slugs.sql`) and `RESERVED_SLUGS` must stay in sync; a unit test compares them.
+  - **`apps/web/.env.example` is committed now** (`.gitignore` had `.env*`; `!.env.example` added).
+  - Reviewer-confirmed: every service-client path checks the caller's role first, and all five Review Focus areas behave.
 - **2026-10-20 · Stage A (platform foundation).** Rulings made while building it, newest first:
   - **Platform admin listing** (`lib/admin/platform.ts`) shows the 200 newest venues and looks up each first owner's email through the Auth admin API, one call per venue. Fine for an operator page; paginate once there are hundreds of venues.
   - **`pnpm admin:grant`** uses `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SECRET_KEY` from the shell when set, else the local stack, so the same script works in production.
@@ -118,7 +126,7 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
   - **`createOrganization`** returns `invalid_name` for names outside 2–80 characters instead of letting the DB CHECK become a 500.
   - **Local auth email rate limit** is 100/hour in `config.toml` so sign-in links can be tested repeatedly. Set real limits on the hosted project.
   - **Staff invites** never fail on Auth email errors: the `organization_invites` row is the source of truth and becomes a membership when that email signs in on the root site. "Already a member" is detected by reading members' emails via the Auth admin API (there is no lookup by email, and a security-definer lookup in `public` is not allowed).
-  - **`safeNext()`** only allows same-site relative paths after sign-in (no open redirect).
+  - **`safeNext()`** only allows same-site relative paths after sign-in. (Its first version missed control characters; fixed after the final review, see above.)
   - **Logos:** the `org-assets` bucket is public (1 MB, png/jpeg/webp). Only a venue's owners can write to their `<orgId>/` folder; they also get SELECT because re-uploading (upsert) needs it. The folder check compares text, so a non-uuid folder is denied rather than erroring.
   - **Groups** are readable like sessions (live venue or member). They hold no personal data and players need to see their table.
   - **A non-live venue's site shows "not available" to everyone, owners included.** Owners manage it from `/manage` on the root site. A "preview before publish" can come later.
@@ -159,13 +167,16 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 
 ## 6. Known issues / gotchas
 
+- **Server-sent auth emails can't use PKCE.** `auth.admin.inviteUserByEmail` (and other admin-sent links) put the session in a URL fragment, which a server route never sees. Give them a template that links to our callback with `{{ .TokenHash }}` and verify with `verifyOtp`. Email templates only load on `supabase stop && supabase start`.
+- **Keep "Confirm email" on in the hosted project.** Invite acceptance trusts the signed-in email; every sign-in path we use proves it (magic link, invite token, Google).
+- **pgTAP tests must not assume an empty database.** Scope counts to the test's own fixture ids and use fixture slugs no real venue would take, so `pnpm db:test` works beside local data. To prove migrations apply from scratch without `db:reset`, run `pnpm exec supabase db diff --local --schema public` (replays every migration in a shadow DB; expect "No schema changes found").
 - **In a Next route handler, `request.url` carries Next's own hostname, not the one the browser used.** On `dhanmondi-turf.localhost:3000` it says `localhost:3000`, so redirecting with `new URL(next, request.url)` sent venue sign-ins to the root site's `/me` (a 404). Build redirect origins with `requestOrigin(host, request.url, root)`, which validates the Host header first.
 - **Sessions are per host.** Supabase's auth cookie is host-only, so signing in on `localhost:3000` doesn't sign you in on `<slug>.localhost:3000` and vice versa. Players sign in on the venue's subdomain; owners on the root. Sharing a session across subdomains (cookie `Domain=.<root>`) is a later decision.
 
 - **React 19 clears form inputs after every form-action submission, errors included.** Our `ActionForm` (`components/forms/action-form.tsx`) submits through `onSubmit` + `startTransition` instead, so inputs survive validation errors and schedule clashes. Pass `resetOnSuccess` on "add" forms that should clear after a save. Keep this if you refactor the form.
 
 - **supabase-js + Cache Components: `await connection()` before creating the server client.** supabase-js reads `Date.now()` while loading the session. Next 16 rejects that during prerendering ("encountered the unstable value Date.now()"), and the page renders empty. `lib/supabase/server.ts` calls `await connection()` first. Keep that line.
-- **Stopping a background `next dev` task leaves the node process running.** It keeps port 3000 and serves stale modules (e.g. "m.onboarding is undefined" or "reading 'availability' of undefined" right after editing `messages/en.ts`). To fix it, kill whatever listens on 3000: PowerShell `Get-NetTCPConnection -LocalPort 3000 -State Listen | % { Stop-Process -Id $_.OwningProcess -Force }`, then restart.
+- **The dev server can keep serving an old `messages/en.ts`** after you add keys (new labels render empty, e.g. a blank "Cancel invite" button), even without an orphan process. Restart it. Also: **stopping a background `next dev` task leaves the node process running.** It keeps port 3000 and serves stale modules (e.g. "m.onboarding is undefined" or "reading 'availability' of undefined" right after editing `messages/en.ts`). To fix it, kill whatever listens on 3000: PowerShell `Get-NetTCPConnection -LocalPort 3000 -State Listen | % { Stop-Process -Id $_.OwningProcess -Force }`, then restart.
 - **Playwright MCP can only upload files from inside the repo** (or `.playwright-mcp/`, which is gitignored), not from the system temp folder.
 
 - **An unknown venue subdomain returns HTTP 200 with `noindex`, not 404.** The tenant layout calls `notFound()` inside `<Suspense>` (Cache Components needs the params read there), and once streaming has started Next can no longer change the status code. The "not available" page still renders and search engines skip it. Unknown or nested hosts, and `/t/...` typed on the root host, are rewritten in `proxy.ts` and do get a real 404.
@@ -194,7 +205,7 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 - **Product name still to be decided.** The UI uses the working name "Booking & Matchmaking" from `apps/web/messages/en.ts` (`m.platform.name`). Change it there once the user picks a name, and set the root domain in `NEXT_PUBLIC_ROOT_DOMAIN`.
 
 **Deferred minor findings from the M1 review**, each worth a test plus a fix when the area is touched next:
-- **Cross-venue references.** `groups.session_id/table_id/game_id`, `bookings.group_id`, `player_games.game_id` and the like aren't tied to the row's `venue_id`. Example: an owner could make a group pointing at another venue's session. Fix with composite foreign keys on `(venue_id, id)`.
+- ~~Cross-venue references~~ — fixed in Stage A's final review with composite foreign keys (see §5).
 - **Owner can attach any login.** `players_owner_all` lets an owner insert a player row with `user_id` set to *any* login. Players can also set `phone` to any number, which only matters once real Twilio sending is wider than presenter mode.
 - **RPCs don't check session state.** `create_offer` / `accept_offer` don't look at `sessions.status` or `starts_at`, so an offer could be made or accepted for a closed or past night.
 - **Duplicate player ids** in `formGroups` input get seated twice. The DB prevents duplicates upstream; add a dedupe or assert in the engine.
@@ -203,11 +214,27 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 - **Rounding mismatch.** `seconds_since_cancel` is rounded down (`floor`) in the RPC but rounded to nearest (`Math.round`) in the sim, so analytics may differ by 1s.
 - **Missing events.** `accept_offer` writes no event for `seat_taken` / `already_booked`. Every other state change has one.
 
+**Deferred minor findings from the Stage A final review** (fix with a test when the area is next touched):
+- **Before Stage B/C writes real bookings:** `on delete cascade` from `player_profiles` and `activities` would erase booking history. Switch to `restrict`/`set null` plus soft deletes.
+- The last-owner guard is check-then-write: two owners removing each other at the same moment can leave none. Enforce it in the DB.
+- Deleting a branch that ever had a session fails (23503) and shows the raw Postgres text. Map it to a message, like `activityInUse`.
+- No upper bound on money input (above int4 poisha gives a 500). A one-emoji venue name passes the JS 2-character check but fails the DB CHECK.
+- Admin "Restore" always sets `live`; restoring a suspended *onboarding* venue skips the owner's publish. Restore the previous status instead.
+- Unknown or suspended venue returns 200 + noindex, not 404 (see §6).
+- A re-uploaded logo keeps its URL (cached for 1h); switching png→jpg leaves the old file. Use versioned file names.
+- The schedule form lists every branch's resources and accepts past dates.
+- The slug can't be edited even during onboarding.
+- `saveProfile` is select-then-write: a double submit says "phone already used", and `phone_taken` lets a signed-in user probe whether a number is registered at a venue.
+- `organizations.created_by` is readable by any signed-in user (table-wide select grant).
+- `createOrganization` isn't atomic; a crash mid-way leaves an owner-less org holding the slug.
+- The "Invite cancelled" confirmation never shows (its row disappears on refresh).
+
 - Second skin (padel courts or gym classes) to prove re-skinning works (stretch goal).
 - The swap search already re-scores only the two groups a swap touches (delta scoring). For much bigger venues, the next win is replacing the linear `seatings.find(...)` scans in the greedy `seatPass` with per-game open-group queues.
 
 ## 8. Change log
 
+- **2026-10-20: Stage A final review and fix pass.** A fresh reviewer found 0 Critical, 3 Important and 15 Minor issues. I fixed the three Important ones and three Minor ones re-graded to Important (cancel invites, reserved slugs, `.env.example`), each RED→GREEN, and deferred the other 12 Minor ones (§7). Two new migrations. Counts now: engine 51, sim 23, web unit 123, web integration 38, pgTAP 143, race 1; advisors clean, build clean. Invite and cancel flows checked in a real browser.
 - **2026-10-20: Stage A (platform foundation) built** on branch `stage-a-platform-foundation` (15 tasks). What now works:
   - Multi-tenant schema with organizations, members, invites, branches, resources, activities, open-play sessions, player profiles and platform admins. The M1 venue tables were dropped (nothing was deployed).
   - Email-link sign-in (Google ready behind a flag), venue subdomains, the self-serve wizard (type → name/slug → branding/logo → location → review → publish), owner admin for branches, spaces, activities, staff, settings and the weekly open-play schedule (clash and opening-hours checks), a venue's public page, player profiles, and `/admin` with suspend/restore.
