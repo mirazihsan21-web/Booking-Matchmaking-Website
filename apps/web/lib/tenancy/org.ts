@@ -7,6 +7,7 @@ export interface PublicOrganization {
   slug: string;
   name: string;
   businessType: BusinessType;
+  timezone: string;
   branding: { logo_path?: string; primary?: string; accent?: string };
 }
 
@@ -19,7 +20,7 @@ export const getLiveOrganization = cache(async (slug: string): Promise<PublicOrg
   const supabase = await createClient();
   const { data } = await supabase
     .from('organizations')
-    .select('id, slug, name, business_type, branding')
+    .select('id, slug, name, business_type, timezone, branding')
     .eq('slug', slug)
     .eq('status', 'live')
     .maybeSingle();
@@ -29,6 +30,7 @@ export const getLiveOrganization = cache(async (slug: string): Promise<PublicOrg
     slug: data.slug,
     name: data.name,
     businessType: data.business_type as BusinessType,
+    timezone: data.timezone,
     branding: (data.branding ?? {}) as PublicOrganization['branding'],
   };
 });
