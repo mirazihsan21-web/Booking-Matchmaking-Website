@@ -5,3 +5,4 @@ export { createScorer, scoreGroups, type Scorer } from './score';
 export { explainScore, type PlayerExplanation } from './explain';
 export { formGroups } from './form-groups';
 export { rankWaitlist, type OpenSeat, type WaitlistCandidate } from './rank-waitlist';
+export { splitTeams, type TeamPlayer, type TeamSplit } from './split-teams';
