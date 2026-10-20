@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { notificationEmail } from '@/lib/email/notification-email';
 import type { EmailSender } from '@/lib/email/sender';
+import { issueOfferToken } from '@/lib/open-play/open-play';
 import { tenantUrl } from '@/lib/tenancy/urls';
 import { getPreset } from '@/presets';
 import type { NotificationKind } from './render';
@@ -16,6 +17,8 @@ interface Venue {
  * Sends a batch of pending notification emails (the outbox). Run by the job tick with the service
  * client. Each row is claimed first, so overlapping runs never send the same email twice; players who
  * opted out, or have no email, are `skipped`. A failed send is retried by a later run (see finish_email).
+ * An offer email carries a one-time link: its token is minted here and only its hash is stored, so a
+ * retried email gets a fresh link, and an offer that is no longer open sends nothing (`skipped`).
  */
 export async function deliverPendingEmails(
   db: SupabaseClient,
@@ -43,13 +46,22 @@ export async function deliverPendingEmails(
         await finish(row.id, 'skipped');
         continue;
       }
+      let link = row.link;
+      if (row.kind === 'offer') {
+        const token = await issueOfferToken(db, String(row.payload?.offer_id ?? ''));
+        if (!token) {
+          await finish(row.id, 'skipped');
+          continue;
+        }
+        link = `/offers/${token}`;
+      }
       const email = notificationEmail({
         kind: row.kind,
         payload: row.payload ?? {},
         venueName: venue.name,
         primaryColour: venue.primary,
         siteUrl: tenantUrl(venue.slug),
-        link: row.link,
+        link,
         timeZone: venue.timezone,
       });
       await sender.send({ to, ...email });
