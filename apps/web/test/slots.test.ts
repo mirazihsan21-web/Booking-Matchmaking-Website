@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, businessDaySlots, checkBookingStart, localDate, parseDateParam, slotStates } from '../lib/bookings/slots';
+import { addDays, businessDaySlots, businessDayWindow, checkBookingStart, currentBusinessDate, localDate, parseDateParam, slotStates } from '../lib/bookings/slots';
 import type { OpeningHours } from '../lib/opening-hours';
 
 const zone = 'Asia/Dhaka'; // UTC+6, no daylight saving; 2026-10-23 is a Friday
@@ -62,6 +62,17 @@ describe('checkBookingStart', () => {
     expect(at('2026-10-20T04:00:00Z')).toEqual({ ok: false, reason: 'past' }); // 10:00 today; it is 12:00
   });
 
+  it('lets staff book the slot in progress (a walk-in at 12:10), but not one that has ended', () => {
+    const tenPast = new Date('2026-10-20T06:10:00Z'); // 12:10 in Dhaka
+    expect(at('2026-10-20T06:00:00Z', 1, { now: tenPast, horizonDays: null, allowInProgress: true })).toEqual({
+      ok: true,
+      endsAt: new Date('2026-10-20T07:00:00Z'),
+      businessDate: '2026-10-20',
+    });
+    expect(at('2026-10-20T05:00:00Z', 1, { now: tenPast, horizonDays: null, allowInProgress: true })).toEqual({ ok: false, reason: 'past' });
+    expect(at('2026-10-20T06:00:00Z', 1, { now: tenPast })).toEqual({ ok: false, reason: 'past' }); // players: no
+  });
+
   it('keeps players inside the booking window, but not staff', () => {
     expect(at('2026-11-04T14:00:00Z')).toEqual({ ok: false, reason: 'beyond_horizon' }); // 15 days ahead
     expect(at('2026-11-04T14:00:00Z', 1, { horizonDays: null }).ok).toBe(true);
@@ -95,6 +106,39 @@ describe('slotStates', () => {
 
   it('marks a slot that has started as past', () => {
     expect(slotStates(slots, [], new Date('2026-10-23T04:00:00Z'))[0]!.state).toBe('past');
+  });
+});
+
+describe('businessDayWindow (every booking belongs to exactly one business day)', () => {
+  const win = (hours: OpeningHours) => {
+    const w = businessDayWindow(hours, '2026-10-23', zone);
+    return [iso(w.start), iso(w.end)];
+  };
+
+  it('is the calendar day for a venue that closes before midnight', () => {
+    expect(win(tenToEleven)).toEqual(['2026-10-22T18:00:00.000Z', '2026-10-23T18:00:00.000Z']); // Fri 00:00 → Sat 00:00
+  });
+
+  it("runs from the end of last night's hours to the end of tonight's for an overnight venue", () => {
+    expect(win(lateNights)).toEqual(['2026-10-22T20:00:00.000Z', '2026-10-23T20:00:00.000Z']); // Fri 02:00 → Sat 02:00
+  });
+
+  it('still covers a closed day, so bookings on it are not lost', () => {
+    expect(win({ ...lateNights, '5': null })).toEqual(['2026-10-22T20:00:00.000Z', '2026-10-23T18:00:00.000Z']); // Fri 02:00 → Sat 00:00
+  });
+});
+
+describe('currentBusinessDate (Review Focus 2)', () => {
+  it('stays on Friday at 00:30 Saturday while an overnight venue is still open', () => {
+    expect(currentBusinessDate(lateNights, new Date('2026-10-23T18:30:00Z'), zone)).toBe('2026-10-23');
+  });
+
+  it('moves to Saturday once the overnight hours have ended', () => {
+    expect(currentBusinessDate(lateNights, new Date('2026-10-23T20:30:00Z'), zone)).toBe('2026-10-24'); // 02:30
+  });
+
+  it('is just the calendar date for a venue that closes before midnight', () => {
+    expect(currentBusinessDate(tenToEleven, new Date('2026-10-23T18:30:00Z'), zone)).toBe('2026-10-24');
   });
 });
 

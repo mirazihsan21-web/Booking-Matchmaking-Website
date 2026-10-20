@@ -34,6 +34,7 @@ export async function staffCancelBookingAction(slug: string, bookingId: string, 
   refresh();
   if (result === "cancelled") return { ok: true, message: m.staffBookings.cancelled };
   if (result === "not_cancellable") return { ok: false, message: m.staffBookings.alreadyCancelled };
+  if (result === "too_late") return { ok: false, message: m.staffBookings.ended };
   return { ok: false, message: m.staffBookings.notFound };
 }
 
@@ -48,6 +49,7 @@ export async function setBookingStatusAction(
   const result = await setSpaceBookingStatus(createServiceClient(), { organizationId: org.id, bookingId, status });
   refresh();
   if (result === "updated") return { ok: true, message: m.staffBookings.marked };
+  if (result === "not_started") return { ok: false, message: m.staffBookings.notStarted };
   if (result === "invalid") return { ok: false, message: m.staffBookings.cannotMark };
   return { ok: false, message: m.staffBookings.notFound };
 }

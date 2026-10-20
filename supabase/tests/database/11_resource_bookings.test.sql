@@ -5,7 +5,7 @@
 -- Org X (…11a9) owns Pitch X (…11c9). Opening hours and the booking window are checked in TypeScript.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(32);
+select plan(34);
 
 -- Day D, 30 days ahead in Dhaka; pg_temp.at('20:00') is 8pm that day.
 create function pg_temp.at(hhmm text) returns timestamptz language sql as $$
@@ -102,7 +102,10 @@ select is((select payload->>'by_venue' from public.notifications where kind = 'b
 select is(public.cancel_resource_booking('00000000-0000-4000-8000-00000000ffff', '00000000-0000-4000-8000-0000000011d3'), 'not_found', 'an unknown booking is not found');
 
 -- Attendance
-select is(public.set_resource_booking_status((select id from b where label = 'b21'), 'no_show'), 'updated', 'staff mark a confirmed booking as a no-show');
+select is(public.set_resource_booking_status((select id from b where label = 'b21'), 'no_show'), 'not_started', 'attendance cannot be marked before a booking starts');
+-- A walk-in that started an hour ago (the SQL function does not check start times; TypeScript does).
+select is(pg_temp.book('wnow', date_trunc('hour', now()) - interval '1 hour', 1, null, 'Rumi', '+8801912345678', '00000000-0000-4000-8000-0000000011d3'), 'booked', 'a walk-in that has started');
+select is(public.set_resource_booking_status((select id from b where label = 'wnow'), 'no_show'), 'updated', 'staff mark a started booking as a no-show');
 select is(public.set_resource_booking_status((select id from b where label = 'a20'), 'attended'), 'invalid', 'a cancelled booking cannot be marked');
 
 -- Who sees what

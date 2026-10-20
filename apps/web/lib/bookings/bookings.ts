@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { OpeningHours } from '@/lib/opening-hours';
-import { businessDaySlots, checkBookingStart, slotStates, type Slot, type SlotState } from './slots';
+import { businessDaySlots, businessDayWindow, checkBookingStart, slotStates, type Slot, type SlotState } from './slots';
 
 /**
  * Whole-space bookings for players (tenant site) and staff (manage). Pass the service client: callers
@@ -26,9 +26,22 @@ export type BookSpaceResult =
   | { status: 'limit_reached' }
   | { status: 'invalid'; reason: 'not_bookable' | 'bad_count' | 'past' | 'off_grid' | 'outside_hours' | 'beyond_horizon' };
 
+/** A booking as staff see it: a player's display name (no phone), or a walk-in's name and phone. */
+export interface SlotBooking {
+  id: string;
+  name: string;
+  phone: string | null;
+  status: string;
+  start: Date;
+  end: Date;
+}
+
 export interface SpaceDay {
-  resource: { id: string; name: string; slotMinutes: number; pricePerHourPoisha: number | null };
-  slots: Array<Slot & { state: SlotState; booking?: { id: string; name: string; phone: string | null; status: string } }>;
+  resource: { id: string; name: string; slotMinutes: number; pricePerHourPoisha: number | null; active: boolean };
+  /** `bookings` (staff only) lists every booking overlapping the slot. */
+  slots: Array<Slot & { state: SlotState; bookings?: SlotBooking[] }>;
+  /** Staff only: bookings on this business day that no current slot covers (hours changed, day closed). */
+  extra?: SlotBooking[];
 }
 
 export interface MyBooking {
@@ -117,6 +130,7 @@ export async function bookSpace(db: SupabaseClient, input: BookSpaceInput): Prom
     slots: input.slots,
     now,
     horizonDays: input.actor === 'staff' ? null : venue.bookingHorizonDays,
+    allowInProgress: input.actor === 'staff', // a walk-in for the slot that is on now
   });
   if (!check.ok) return { status: 'invalid', reason: check.reason };
 
@@ -169,10 +183,12 @@ export async function cancelSpaceBooking(
   if (input.actor.kind === 'player' && booking.profile_id !== input.actor.profileId) return 'not_found';
   if (booking.status !== 'confirmed') return 'not_cancellable';
 
+  const { start, end } = parseTstzRange(booking.period);
+  const now = input.now ?? new Date();
+  // Nobody cancels a booking that has already ended (staff mark attendance instead).
+  if (now >= end) return 'too_late';
   if (input.actor.kind === 'player') {
     const venue = await loadVenue(db, input.organizationId);
-    const start = parseTstzRange(booking.period).start;
-    const now = input.now ?? new Date();
     if (!venue || now.getTime() >= start.getTime() - venue.cancelCutoffMinutes * 60_000) return 'too_late';
   }
 
@@ -184,18 +200,20 @@ export async function cancelSpaceBooking(
 export async function setSpaceBookingStatus(
   db: SupabaseClient,
   input: { organizationId: string; bookingId: string; status: 'attended' | 'no_show' },
-): Promise<'updated' | 'invalid' | 'not_found'> {
+): Promise<'updated' | 'not_started' | 'invalid' | 'not_found'> {
   if (!UUID.test(input.bookingId)) return 'not_found';
   const { data: booking } = await db.from('resource_bookings').select('id').eq('id', input.bookingId).eq('organization_id', input.organizationId).maybeSingle();
   if (!booking) return 'not_found';
   const { data, error } = await db.rpc('set_resource_booking_status', { p_booking_id: input.bookingId, p_status: input.status });
   if (error) throw error;
-  return data as 'updated' | 'invalid' | 'not_found';
+  return data as 'updated' | 'not_started' | 'invalid' | 'not_found';
 }
 
 /**
  * One space's slots on a business day, each with its state. `withNames` (staff only) attaches who
  * booked: a player's display name, or a walk-in's name and phone. Players never see either.
+ * Staff get every booking of the business day (see businessDayWindow), so bookings made before the
+ * slot length or opening hours changed — or on a day that is now closed — are never hidden.
  * Returns null for a space outside the organization, or a malformed id.
  */
 export async function spaceDay(
@@ -205,43 +223,51 @@ export async function spaceDay(
   const [venue, space] = await Promise.all([loadVenue(db, input.organizationId), loadSpace(db, input.organizationId, input.resourceId)]);
   if (!venue || !space) return null;
   const grid = businessDaySlots(space.hours, input.date, space.slotMinutes, venue.timezone);
-  const resource = { id: space.id, name: space.name, slotMinutes: space.slotMinutes, pricePerHourPoisha: space.pricePerHourPoisha };
-  if (grid.length === 0) return { resource, slots: [] };
+  const resource = { id: space.id, name: space.name, slotMinutes: space.slotMinutes, pricePerHourPoisha: space.pricePerHourPoisha, active: space.active };
 
-  const window = asRange(grid[0]!.start, grid.at(-1)!.end);
-  const { data: reservations, error } = await db
-    .from('resource_reservations')
-    .select('period, source')
-    .eq('resource_id', space.id)
-    .eq('organization_id', input.organizationId)
-    .overlaps('period', window);
-  if (error) throw error;
-  const busy = reservations.map((r) => ({ ...parseTstzRange(r.period), source: r.source as 'booking' | 'session' }));
-  const slots = slotStates(grid, busy, input.now ?? new Date());
+  let slots: SpaceDay['slots'] = [];
+  if (grid.length > 0) {
+    const { data: reservations, error } = await db
+      .from('resource_reservations')
+      .select('period, source')
+      .eq('resource_id', space.id)
+      .eq('organization_id', input.organizationId)
+      .overlaps('period', asRange(grid[0]!.start, grid.at(-1)!.end));
+    if (error) throw error;
+    const busy = reservations.map((r) => ({ ...parseTstzRange(r.period), source: r.source as 'booking' | 'session' }));
+    slots = slotStates(grid, busy, input.now ?? new Date());
+  }
   if (!input.withNames) return { resource, slots };
 
+  // Every booking that starts within this business day, whatever the grid looks like now.
+  const day = businessDayWindow(space.hours, input.date, venue.timezone);
   const { data: bookings, error: bookingsError } = await db
     .from('resource_bookings')
     .select('id, period, status, guest_name, guest_phone, player_profiles(display_name)')
     .eq('resource_id', space.id)
     .eq('organization_id', input.organizationId)
     .neq('status', 'cancelled')
-    .overlaps('period', window);
+    .overlaps('period', asRange(day.start, day.end));
   if (bookingsError) throw bookingsError;
-  const named = bookings.map((b) => {
-    const profile = b.player_profiles as unknown as { display_name: string } | null;
-    return { ...parseTstzRange(b.period), id: b.id, name: profile?.display_name ?? b.guest_name ?? '', phone: profile ? null : b.guest_phone, status: b.status };
-  });
+  const named: SlotBooking[] = bookings
+    .map((b) => {
+      const profile = b.player_profiles as unknown as { display_name: string } | null;
+      return { ...parseTstzRange(b.period), id: b.id, name: profile?.display_name ?? b.guest_name ?? '', phone: profile ? null : b.guest_phone, status: b.status };
+    })
+    .filter((b) => b.start >= day.start && b.start < day.end)
+    .sort((x, y) => x.start.getTime() - y.start.getTime());
+  const overlaps = (b: SlotBooking, slot: Slot) => b.start < slot.end && b.end > slot.start;
   return {
     resource,
-    slots: slots.map((slot) => {
-      const b = named.find((x) => x.start < slot.end && x.end > slot.start);
-      return b ? { ...slot, booking: { id: b.id, name: b.name, phone: b.phone, status: b.status } } : slot;
-    }),
+    slots: slots.map((slot) => ({ ...slot, bookings: named.filter((b) => overlaps(b, slot)) })),
+    extra: named.filter((b) => !slots.some((slot) => overlaps(b, slot))),
   };
 }
 
-/** Every active space of a branch for the staff day view (names included). Null for a foreign branch. */
+/**
+ * The staff day view of a branch: every active space, plus any inactive space that still has bookings
+ * that day (so staff can cancel them). Names included. Null for a foreign branch.
+ */
 export async function branchDay(
   db: SupabaseClient,
   input: { organizationId: string; branchId: string; date: string; now?: Date },
@@ -254,13 +280,13 @@ export async function branchDay(
     .select('id')
     .eq('branch_id', input.branchId)
     .eq('organization_id', input.organizationId)
-    .eq('active', true)
     .order('name');
   if (error) throw error;
   const days = await Promise.all(
     spaces.map((s) => spaceDay(db, { organizationId: input.organizationId, resourceId: s.id, date: input.date, withNames: true, now: input.now })),
   );
-  return days.filter((d): d is SpaceDay => d !== null);
+  const hasBookings = (d: SpaceDay) => (d.extra?.length ?? 0) > 0 || d.slots.some((slot) => (slot.bookings?.length ?? 0) > 0);
+  return days.filter((d): d is SpaceDay => d !== null && (d.resource.active || hasBookings(d)));
 }
 
 /** A player's bookings at one venue: upcoming (confirmed, not yet ended) soonest first; the rest newest first. */

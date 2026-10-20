@@ -153,6 +153,10 @@ export const en = {
     marked: 'Saved.',
     cannotMark: 'Only confirmed bookings can be marked.',
     notFound: 'That booking no longer exists.',
+    notStarted: 'Attendance can be marked once the booking has started.',
+    ended: 'This booking has already ended.',
+    offGrid: 'Outside the current hours',
+    inactive: 'Inactive',
   },
   admin: {
     title: 'All venues',
