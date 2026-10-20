@@ -46,8 +46,8 @@ async function VenueHome({ params }: { params: Promise<{ slug: string }> }) {
         {logo && <img src={logo} alt="" className="h-14 w-14 rounded-xl object-contain" />}
         <h1 className="text-4xl font-semibold text-primary">{org.name}</h1>
         <nav className="ml-auto flex gap-3 text-sm">
-          <Link href="/me" className="rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground hover:bg-primary/90">
-            {m.tenant.myProfile}
+          <Link href="/book" className="rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground hover:bg-primary/90">
+            {m.tenant.bookSpace}
           </Link>
         </nav>
       </header>
