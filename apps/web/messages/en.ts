@@ -9,6 +9,10 @@ export const en = {
     tagline: 'Bookings and fair matchmaking for cafés, turfs and gaming lounges.',
     businessTypes: 'Built for board-game cafés, futsal turfs and gaming lounges in Bangladesh.',
   },
+  unavailable: {
+    title: 'Not available',
+    body: "This venue isn't available right now.",
+  },
 };
 
 export type Messages = typeof en;

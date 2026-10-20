@@ -123,6 +123,9 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 
 ## 6. Known issues / gotchas
 
+- **An unknown venue subdomain returns HTTP 200 with `noindex`, not 404.** The tenant layout calls `notFound()` inside `<Suspense>` (Cache Components needs the params read there), and once streaming has started Next can no longer change the status code. The "not available" page still renders and search engines skip it. Unknown or nested hosts, and `/t/...` typed on the root host, are rewritten in `proxy.ts` and do get a real 404.
+- **Grepping server HTML for copy is unreliable.** Next embeds the not-found UI and metadata in every page's data payload, so check rendered output in a browser instead.
+
 - **SQL `CHECK` constraints pass on NULL.** `team_size >= 1` with a null `team_size` evaluates to NULL, and a CHECK only fails on false. Write `team_size is not null and …` explicitly. The Stage A schema test caught this on `activities`.
 
 - **Next.js 16.4 is newer than most AI training data.** `apps/web/AGENTS.md` says to read the bundled docs at `apps/web/node_modules/next/dist/docs/` before writing Next code. Do that. Notable differences:
