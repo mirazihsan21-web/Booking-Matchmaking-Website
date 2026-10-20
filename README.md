@@ -42,9 +42,9 @@ keeps a fair waitlist. Bookings, matchmaking and bKash payments land in Stages B
 
 ```bash
 pnpm install
-pnpm db:start            # local Supabase: API :54321, DB :54322, Studio :54323, Mailpit :54324
-pnpm env:local           # writes apps/web/.env.local from the running stack
-pnpm --filter web dev    # http://localhost:3000
+pnpm db:start            # local Supabase: API :54321, DB :54322, Studio :54323, Mailpit :54324 (SMTP :54325)
+pnpm env:local           # writes apps/web/.env.local and points the database's job tick at this app
+pnpm --filter web dev    # http://localhost:3000 (keep it on :3000: the job tick calls it)
 ```
 
 Then:
@@ -57,6 +57,18 @@ Then:
 4. To use `/admin`, make yourself a platform admin: `pnpm admin:grant you@example.com`
    (the user must have signed in once). With `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SECRET_KEY`
    set in the shell, the same command targets a hosted project instead.
+
+### Bookings, notifications and the job tick
+
+- Players book a space at `http://<slug>.localhost:3000/book` (after creating a profile at `/me`), see their
+  bookings at `/me/bookings`, and get a live bell plus an email for each booking change.
+- Staff see every booking, add walk-ins (name + phone) and mark attendance at `/manage/<slug>/bookings`.
+- Every 10 seconds the database (`pg_cron` → `pg_net`) calls `POST /api/jobs/tick` with a shared secret,
+  and the app sends pending notification emails. `pnpm env:local` stores the app URL
+  (`http://host.docker.internal:3000`) and a fresh `JOB_SECRET` in Supabase Vault and `.env.local`, so
+  **restart the dev server after running it**. Locally the emails go to Mailpit over SMTP port 54325.
+- Owners set the booking rules in **Settings → Bookings**: how far ahead players can book, the cancellation
+  and matching cut-offs, and how many upcoming bookings one player may hold. Each space has a slot length.
 
 Staff invites arrive in Mailpit too. Their template lives in `supabase/templates/invite.html`; copy it to the
 hosted project's "Invite user" email template when you deploy.
@@ -76,11 +88,11 @@ Email links work out of the box. For Google:
 pnpm typecheck           # every package (web runs `next typegen` first)
 pnpm test                # engine, sim and web unit/property tests
 pnpm test:integration    # web against the local Supabase (real auth users, RLS)
-pnpm db:test             # pgTAP: schema, tenancy RLS, grants, booking/schedule RPCs, cross-venue references
-pnpm test:race           # two simultaneous "accept offer" calls
+pnpm db:test             # pgTAP: schema, RLS, grants, RPCs, cross-venue references, history, outbox, jobs, bookings
+pnpm test:race           # two-connection races: accepting an offer, booking the same slot, beating the limit
 pnpm db:lint             # Supabase security/performance advisors, fails on warnings
 pnpm db:reset            # re-apply all migrations to a clean local DB
-pnpm env:local           # regenerate apps/web/.env.local
+pnpm env:local           # regenerate apps/web/.env.local + the Vault job secrets (then restart the dev server)
 pnpm admin:grant <email> # make a user a platform admin
 pnpm db:stop
 ```
@@ -93,6 +105,6 @@ Hard numbers for the case study, re-measured as features land.
 |---|---|---|
 | Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
 | Engine tests (incl. property tests) | 51 | `pnpm --filter @bm/engine test` |
-| Web unit tests | 123 | `pnpm --filter web test` |
-| Web integration tests (real Supabase) | 38 | `pnpm test:integration` |
-| Database assertions | 143 pgTAP checks + 1 two-connection race test | `pnpm db:test`, `pnpm test:race` |
+| Web unit tests | 183 | `pnpm --filter web test` |
+| Web integration tests (real Supabase, Realtime, Mailpit) | 62 | `pnpm test:integration` |
+| Database assertions | 211 pgTAP checks + 3 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
