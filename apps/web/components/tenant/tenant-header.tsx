@@ -35,7 +35,7 @@ export async function TenantHeader({ slug }: { slug: string }) {
           <Link href={player ? "/me" : "/signin"} className="rounded-lg px-3 py-1.5 hover:bg-foreground/5">
             {player ? m.tenant.profile : m.tenant.signIn}
           </Link>
-          {player?.profileId && <Bell key={unread} profileId={player.profileId} initialUnread={unread} />}
+          {player?.profileId && <Bell key={unread} profileId={player.profileId} organizationId={org.id} initialUnread={unread} />}
         </nav>
       </div>
     </header>
