@@ -123,6 +123,10 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 
 ## 6. Known issues / gotchas
 
+- **supabase-js + Cache Components: `await connection()` before creating the server client.** supabase-js reads `Date.now()` while loading the session. Next 16 rejects that during prerendering ("encountered the unstable value Date.now()"), and the page renders empty. `lib/supabase/server.ts` calls `await connection()` first. Keep that line.
+- **Stopping a background `next dev` task leaves the node process running.** It keeps port 3000 and serves stale modules (e.g. "m.onboarding is undefined" right after editing `messages/en.ts`). To fix it, kill whatever listens on 3000: PowerShell `Get-NetTCPConnection -LocalPort 3000 -State Listen | % { Stop-Process -Id $_.OwningProcess -Force }`, then restart.
+- **Playwright MCP can only upload files from inside the repo** (or `.playwright-mcp/`, which is gitignored), not from the system temp folder.
+
 - **An unknown venue subdomain returns HTTP 200 with `noindex`, not 404.** The tenant layout calls `notFound()` inside `<Suspense>` (Cache Components needs the params read there), and once streaming has started Next can no longer change the status code. The "not available" page still renders and search engines skip it. Unknown or nested hosts, and `/t/...` typed on the root host, are rewritten in `proxy.ts` and do get a real 404.
 - **Grepping server HTML for copy is unreliable.** Next embeds the not-found UI and metadata in every page's data payload, so check rendered output in a browser instead.
 
