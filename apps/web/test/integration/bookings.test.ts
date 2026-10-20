@@ -259,8 +259,10 @@ describe('my bookings', () => {
     const day = await spaceDay(db, { organizationId: orgId, resourceId: zoneL, date: '2026-10-23', withNames: false, now });
     expect(day!.slots.at(-1)!.state).toBe('taken'); // the 01:00–02:00 slot belongs to Friday's grid
 
-    const order = (await listMyBookings(db, { organizationId: orgId, profileId: a, now })).upcoming.map((x) => x.startsAt);
+    const upcoming = (await listMyBookings(db, { organizationId: orgId, profileId: a, now })).upcoming;
+    const order = upcoming.map((x) => x.startsAt);
     expect([...order].sort()).toEqual(order);
+    expect(upcoming.find((x) => x.resourceName === 'Zone L')?.branchName).toBe('Late'); // two branches: each booking says where
   });
 });
 

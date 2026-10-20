@@ -175,6 +175,7 @@ export const en = {
     intro: 'Pick a space, a day and a time. You pay at the venue.',
     createProfileFirst: 'Create your profile at this venue first, so the venue knows who is coming.',
     createProfile: 'Create my profile',
+    branch: 'Branch',
     space: 'Space',
     day: 'Day',
     show: 'Show',

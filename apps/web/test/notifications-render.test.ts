@@ -18,6 +18,13 @@ describe('renderNotification', () => {
     );
   });
 
+  it('names the branch when the venue has more than one', () => {
+    expect(renderNotification({ kind: 'booking_confirmed', payload: { ...when, branch_name: 'Gulshan', multi_branch: true, price_poisha: 0 } }, zone).body).toBe(
+      'Pitch 1 (Gulshan), Fri 23 Oct, 8pm–9pm. Pay at the venue.',
+    );
+    expect(renderNotification({ kind: 'booking_cancelled', payload: { ...when, branch_name: 'Main', multi_branch: false } }, zone).body).toBe('Pitch 1, Fri 23 Oct, 8pm–9pm.');
+  });
+
   it('says who cancelled', () => {
     expect(renderNotification({ kind: 'booking_cancelled', payload: { ...when, by_venue: true } }, zone)).toEqual({
       title: 'The venue cancelled your booking',

@@ -116,7 +116,14 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 - **2026-10-20 · Stage B1 build rulings** (bookings, notifications, jobs):
   - Booking history is protected: booking-flow references are `on delete no action` (deleting a profile/activity/session with history is refused; deleting a whole venue still works). A branch with history answers "has bookings or sessions" instead of a raw error.
   - `resource_bookings` is either a player (no guest fields) or a walk-in (name + phone), enforced by a CHECK stricter than the plan's XOR.
-  - A double click on Book answers "already yours", a second Cancel "already cancelled". Staff skip the booking window, the limit and the cancel cut-off, never opening hours or overlaps.
+  - A double click on Book answers "already yours" (except at the booking limit, where it still says "limit reached" — deferred minor), a second Cancel "already cancelled". Staff skip the booking window, the limit and the cancel cut-off, never opening hours or overlaps.
+  - **Final review fixes (fresh Opus reviewer, 0 Critical / 4 Important):**
+    - The **staff day view never hides a booking**: it lists every booking of the business day (`businessDayWindow`: from the end of last night's overnight hours to the end of tonight's), several per slot if needed, plus an "Outside the current hours" section for bookings the current grid no longer covers; inactive spaces with bookings stay visible.
+    - **Attendance only after the start**, cancelling only before the end (`set_resource_booking_status` → `not_started`; `cancelSpaceBooking` → `too_late` once ended). Before, a mis-click on "No-show" for next week made the booking uncancellable.
+    - **Staff can book the slot in progress** (`checkBookingStart({ allowInProgress })`): a walk-in at 8:05pm for the 8–9pm slot.
+    - **/book has a branch step** when a venue has more than one branch; notifications carry `branch_name` + `multi_branch` and name the branch ("Pitch 1 (Gulshan), …"); My bookings shows the branch.
+    - **"Today" is the current business day** (`currentBusinessDate`): after midnight a 14:00–02:00 lounge still shows tonight.
+    - Booking pgTAP/race fixtures use a day 30 days ahead (they would have started failing in 2027).
   - The tick route is `POST /api/jobs/tick` with `Authorization: Bearer <JOB_SECRET>` (constant-time compare); `proxy.ts` lets `/api/jobs/*` through for any host because the DB calls in as `host.docker.internal`.
   - `deliverPendingEmails` logs each failed send; failures retry until the 3rd attempt.
   - The bell re-reads the unread count on each Realtime event (adding 1 double-counted right after a booking, because the server refresh already included the new row).
@@ -246,6 +253,16 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 - **Rounding mismatch.** `seconds_since_cancel` is rounded down (`floor`) in the RPC but rounded to nearest (`Math.round`) in the sim, so analytics may differ by 1s.
 - **Missing events.** `accept_offer` writes no event for `seat_taken` / `already_booked`. Every other state change has one.
 
+**Deferred minor findings from the Stage B1 final review** (fix before production / when touched):
+- `claim_pending_emails`' OR filter can't use the pending partial index → a seq scan every 10 s; add a partial index on `email_status in ('pending','sending')`.
+- `cron.job_run_details` grows ~8,640 rows/day; add a cleanup job or turn off `cron.log_run`.
+- Double submit at the booking limit answers "limit reached" instead of "already yours".
+- `book_resource` price math is int and overflows above ~৳22,000/h × 960 min; cast to numeric and bound the price input.
+- Email sends have no timeouts (a >5 min hang lets the next tick reclaim and double-send); `/api/jobs/tick` builds the sender before the tick, so missing EMAIL_* vars make every tick a 500 — **move sender creation into the email step before B2 adds steps**.
+- The staff "+ Walk-in" form shows on a non-live venue but always fails; a tampered walk-in `startsAt` → RangeError 500; a multi-slot booking running into another booking says "just taken" while its start shows Free.
+- Integration tests claim the local DB's real pending notifications (demo emails get marked sent/failed without sending).
+- Deleting an auth user with bookings fails (history is protected); account deletion will need anonymisation.
+
 **Deferred minor findings from the Stage A final review** (fix with a test when the area is next touched):
 - **Before Stage B/C writes real bookings:** `on delete cascade` from `player_profiles` and `activities` would erase booking history. Switch to `restrict`/`set null` plus soft deletes.
 - The last-owner guard is check-then-write: two owners removing each other at the same moment can leave none. Enforce it in the DB.
@@ -266,6 +283,7 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 
 ## 8. Change log
 
+- **2026-10-21: Stage B1 final review and fix pass.** A fresh reviewer found 0 Critical, 4 Important and 9 Minor issues; I fixed the 4 Important ones plus 2 re-graded Minors (time-bomb fixtures, overnight "today"), each with a test that failed first, and deferred 7 (§7). Two new migrations (`20261021010000_attendance_after_start`, `20261021010100_branch_in_payloads`). Counts: web unit 191, integration 65, pgTAP 213, race 3. Browser-checked: branch picker, branch in My bookings and notifications, attendance hidden on future bookings.
 - **2026-10-20/21: Stage B1 built** on `stage-b1-bookings` (11 tasks): booking-history protection, venue booking settings + slot length, the notifications outbox with a live bell, email delivery (Mailpit/Resend), the 10-second `pg_cron` → `pg_net` → `/api/jobs/tick` job, whole-space bookings with walk-ins, the slot grid, `/book`, `/me/bookings`, `/me/notifications` and the staff Bookings day view. Tests: engine 51, sim 23, web unit 183, integration 62, pgTAP 211, race 3; advisors clean; migrations replay from scratch. The browser journey found and fixed a bell double count. Final review pending.
 - **2026-10-20: Stage B spec written** (branch `stage-b-design`), awaiting the user's review. Next: the B1 plan.
 - **2026-10-20: Stage A merged to `main`** (fast-forward from `640a2c5`; branch `stage-a-platform-foundation` deleted). The merged tree was re-verified: typecheck, unit, pgTAP, race and integration tests. Next up: the Stage B spec and plan (booking & matchmaking). Start with the deferred cascade-into-bookings minor (§7).

@@ -47,6 +47,7 @@ export interface SpaceDay {
 export interface MyBooking {
   id: string;
   resourceName: string;
+  branchName: string;
   startsAt: string;
   endsAt: string;
   pricePoisha: number;
@@ -298,7 +299,7 @@ export async function listMyBookings(
   const venue = await loadVenue(db, input.organizationId);
   const { data, error } = await db
     .from('resource_bookings')
-    .select('id, period, price_poisha, status, resources(name)')
+    .select('id, period, price_poisha, status, resources(name, branches(name))')
     .eq('profile_id', input.profileId)
     .eq('organization_id', input.organizationId);
   if (error) throw error;
@@ -308,6 +309,7 @@ export async function listMyBookings(
     return {
       id: b.id,
       resourceName: (b.resources as unknown as { name: string } | null)?.name ?? '',
+      branchName: (b.resources as unknown as { branches: { name: string } | null } | null)?.branches?.name ?? '',
       startsAt: start.toISOString(),
       endsAt: end.toISOString(),
       pricePoisha: b.price_poisha,
