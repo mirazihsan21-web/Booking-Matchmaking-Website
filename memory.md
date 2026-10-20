@@ -38,6 +38,7 @@ The agency re-skins it per business type through presets.
 |---|---|
 | **Platform spec (the authority)** | `docs/superpowers/specs/2026-10-20-booking-platform-design.md` |
 | Demo spec (superseded, history) | `docs/superpowers/specs/2026-10-20-booking-matchmaking-design.md` |
+| **Stage B spec** (booking & matchmaking) | `docs/superpowers/specs/2026-10-20-stage-b-booking-matchmaking-design.md` |
 | Stage A plan (done) | `docs/superpowers/plans/2026-10-20-stage-a-platform-foundation.md` |
 | M1 plan (done, merged) | `docs/superpowers/plans/2026-10-20-m1-foundation-and-engine.md` |
 | M2 demo plan (superseded, never built) | `docs/superpowers/plans/2026-10-20-m2-booking-flows.md`. Its research is still useful: SSR auth code, Data API grants, Cache Components rules, pg_cron + pg_net + Vault |
@@ -104,6 +105,16 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 - **Notifications (Stage B)** reach players in-app and by email, with a signed "Take the seat" link instead of an SMS "YES". The M1-era Notifier/Twilio idea is shelved; SMS via a BD gateway is a later stage.
 
 ## 5. Decisions & rulings log
+
+- **2026-10-20 · Stage B design (user decisions).** Spec: `2026-10-20-stage-b-booking-matchmaking-design.md`.
+  - **Walk-ins:** staff book a space for anyone with a name and phone; `resource_bookings` has either a profile or a guest, never both.
+  - **Slots:** venue-set length per space (`resources.slot_minutes`), on a grid from opening time; 1–4 back-to-back slots per booking.
+  - **Matching** runs automatically at a cut-off, plus a "Match now" button. Too few players → the session stays open and matching retries every tick until start.
+  - **Cancelling:** players cancel online until a venue cut-off; staff can always cancel.
+  - **Defaults:** match cut-off 6h, cancel cut-off 2h (the DB requires match > cancel). With equal cut-offs nobody could cancel after matching, so the waitlist would never be used.
+  - **Timed work:** `pg_cron` → `pg_net` → `POST /api/jobs/tick` every 10s (secret in Vault). Notifications are an outbox written inside the same SQL function as the state change; the tick sends their emails (SMTP→Mailpit locally, Resend in Stage E).
+  - **Offer emails** link to `/offers/<token>`. Only the token's hash is stored, and the seat is taken by a POST button, never by opening the link (email scanners open links).
+  - **Build order:** **B1** (history protection, notifications/email/jobs, whole-space bookings + walk-ins), then **B2** (open play, matching, offers), each reviewed and merged separately.
 
 - **2026-10-20 · Stage A final review (fresh Opus reviewer): 0 Critical, 3 Important, 15 Minor; no cross-tenant data leak.** Fixed, each with a test that failed first:
   - **Cross-venue references are now impossible in the database.** Every reference between tenant tables is a composite foreign key `(x_id, organization_id) → parent (id, organization_id)` (migration `20261020191000_tenant_scoped_fks.sql`, 23 keys, original ON DELETE kept; `messages.profile_id` uses `on delete set null (profile_id)` so the venue column stays). Before, an owner could hang a resource under another venue's branch, or a player could request a seat in another venue's session, straight through PostgREST: RLS checks who writes a row, not where its keys point. `06_tenant_refs.test.sql` has a catalog check that fails if a new table forgets this. **When you add a tenant table, reference parents by `(x_id, organization_id)`** and index `(x_id, organization_id)`.
@@ -234,6 +245,7 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 
 ## 8. Change log
 
+- **2026-10-20: Stage B spec written** (branch `stage-b-design`), awaiting the user's review. Next: the B1 plan.
 - **2026-10-20: Stage A merged to `main`** (fast-forward from `640a2c5`; branch `stage-a-platform-foundation` deleted). The merged tree was re-verified: typecheck, unit, pgTAP, race and integration tests. Next up: the Stage B spec and plan (booking & matchmaking). Start with the deferred cascade-into-bookings minor (§7).
 - **2026-10-20: Stage A final review and fix pass.** A fresh reviewer found 0 Critical, 3 Important and 15 Minor issues. I fixed the three Important ones and three Minor ones re-graded to Important (cancel invites, reserved slugs, `.env.example`), each RED→GREEN, and deferred the other 12 Minor ones (§7). Two new migrations. Counts now: engine 51, sim 23, web unit 123, web integration 38, pgTAP 143, race 1; advisors clean, build clean. Invite and cancel flows checked in a real browser.
 - **2026-10-20: Stage A (platform foundation) built** on branch `stage-a-platform-foundation` (15 tasks). What now works:
