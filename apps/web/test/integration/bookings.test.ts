@@ -26,8 +26,8 @@ let aBooking: string;
 
 beforeAll(async () => {
   const must = <T>(r: { data: T; error: unknown }): NonNullable<T> => {
-    if (r.error || r.data === null) throw r.error ?? new Error('no data');
-    return r.data as NonNullable<T>;
+    if (r.error) throw r.error;
+    return r.data as NonNullable<T>; // inserts without .select() return no data; their result is unused
   };
   const [ua, ub, us] = await Promise.all([createTestUser(db), createTestUser(db), createTestUser(db)]);
   users.push(ua, ub, us);
