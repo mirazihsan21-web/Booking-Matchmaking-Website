@@ -234,6 +234,7 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 
 ## 8. Change log
 
+- **2026-10-20: Stage A merged to `main`** (fast-forward from `640a2c5`; branch `stage-a-platform-foundation` deleted). The merged tree was re-verified: typecheck, unit, pgTAP, race and integration tests. Next up: the Stage B spec and plan (booking & matchmaking). Start with the deferred cascade-into-bookings minor (§7).
 - **2026-10-20: Stage A final review and fix pass.** A fresh reviewer found 0 Critical, 3 Important and 15 Minor issues. I fixed the three Important ones and three Minor ones re-graded to Important (cancel invites, reserved slugs, `.env.example`), each RED→GREEN, and deferred the other 12 Minor ones (§7). Two new migrations. Counts now: engine 51, sim 23, web unit 123, web integration 38, pgTAP 143, race 1; advisors clean, build clean. Invite and cancel flows checked in a real browser.
 - **2026-10-20: Stage A (platform foundation) built** on branch `stage-a-platform-foundation` (15 tasks). What now works:
   - Multi-tenant schema with organizations, members, invites, branches, resources, activities, open-play sessions, player profiles and platform admins. The M1 venue tables were dropped (nothing was deployed).
