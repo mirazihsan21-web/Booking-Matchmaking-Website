@@ -176,6 +176,7 @@ pnpm monorepo (existing)
 ## 8. Later stages (each gets its own spec section and plan when reached)
 
 ### Stage B — Booking & matchmaking
+**Detailed design:** `2026-10-20-stage-b-booking-matchmaking-design.md` (walk-ins, venue-set slots, auto-matching at a cut-off, venue-set cancel cut-off; built as B1 then B2). The bullets below are the original outline.
 - **Whole-resource booking:** a player picks a resource and time within opening hours. The booking writes to `resource_reservations`, so there's no double-booking. Its status is `confirmed` (pay at venue) until Stage C.
 - **Open play:** requests → matching runs at a cut-off or by the owner (`formGroups`, plus `splitTeams` for `two_teams`). Then waitlist, cancellations, and offers to the next best player.
 - **Offers** reach players as an in-app notification (Realtime) and an email with a **signed, single-use "Take the seat" link**, reusing `accept_offer`. Unanswered offers expire through the `pg_cron` → `pg_net` job.
