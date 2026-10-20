@@ -95,13 +95,12 @@ select throws_ok(
 delete from public.branches where id = '00000000-0000-4000-8000-00000000e00b';
 select is((select count(*)::int from public.resources where id = '00000000-0000-4000-8000-00000000e00c'), 0,
   'deleting a branch still deletes its resources');
-insert into public.messages (organization_id, profile_id, direction, provider, body)
-values ('00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e005', 'outbound', 'simulated', 'Seat open');
+insert into public.notifications (organization_id, profile_id, kind, link)
+values ('00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e005', 'booking_confirmed', '/me/bookings');
 delete from public.player_profiles where id = '00000000-0000-4000-8000-00000000e005';
 select is(
-  (select organization_id from public.messages where body = 'Seat open' and profile_id is null),
-  '00000000-0000-4000-8000-00000000e000'::uuid,
-  'deleting a profile keeps its messages in the venue (only profile_id is cleared)'
+  (select count(*)::int from public.notifications where profile_id = '00000000-0000-4000-8000-00000000e005'),
+  0, 'deleting a profile with no history deletes its notifications'
 );
 
 select * from finish();
