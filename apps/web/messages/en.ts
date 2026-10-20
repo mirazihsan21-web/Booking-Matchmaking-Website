@@ -171,6 +171,17 @@ export const en = {
     saved: 'Profile saved.',
     unavailable: "This venue isn't taking new players right now.",
   },
+  notifications: {
+    title: 'Notifications',
+    none: 'Nothing yet.',
+    bell: (n: number) => (n === 1 ? '1 unread notification' : `${n} unread notifications`),
+    bookingConfirmed: 'Booking confirmed',
+    bookingCancelled: 'Booking cancelled',
+    cancelledByVenue: 'The venue cancelled your booking',
+    payAtVenue: (price: string) => `Pay ${price} at the venue.`,
+    payAtVenueNoPrice: 'Pay at the venue.',
+    update: 'Update',
+  },
   schedule: {
     none: 'Nothing scheduled yet.',
     add: 'Schedule open play',
