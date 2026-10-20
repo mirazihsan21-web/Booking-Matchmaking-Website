@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import type { FormState } from "@/components/forms/action-form";
 import { parseActivityForm } from "@/lib/forms/activity";
+import { parseBookingSettingsForm } from "@/lib/forms/booking-settings";
 import { parseBranchForm } from "@/lib/forms/branch";
 import { parseResourceForm } from "@/lib/forms/resource";
 import { cancelInvite, inviteMember } from "@/lib/orgs/invites";
@@ -56,6 +57,26 @@ export async function saveSettingsAction(slug: string, _state: FormState, form: 
 }
 
 // ── Branches ─────────────────────────────────────────────────────────────────
+export async function saveBookingSettingsAction(slug: string, _state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrgRole(slug, "owner");
+  const parsed = parseBookingSettingsForm(form);
+  if (!parsed.ok) return { ok: false, errors: parsed.errors };
+  const v = parsed.value;
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("organizations")
+    .update({
+      booking_horizon_days: v.bookingHorizonDays,
+      cancel_cutoff_minutes: v.cancelCutoffMinutes,
+      match_cutoff_minutes: v.matchCutoffMinutes,
+      max_upcoming_bookings: v.maxUpcomingBookings,
+    })
+    .eq("id", org.id);
+  if (error) return fail(error);
+  refresh();
+  return saved;
+}
+
 export async function saveBranchAction(slug: string, branchId: string | null, _state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrgRole(slug, "owner");
   const parsed = parseBranchForm(form);
@@ -93,6 +114,7 @@ export async function saveResourceAction(slug: string, resourceId: string | null
     kind: parsed.value.kind,
     capacity: parsed.value.capacity,
     price_per_hour_poisha: parsed.value.pricePerHourPoisha,
+    slot_minutes: parsed.value.slotMinutes,
   };
   if (resourceId) {
     const { error } = await supabase.from("resources").update(row).eq("id", resourceId).eq("organization_id", org.id);

@@ -19,7 +19,8 @@ export interface Preset {
     participantPlural: string;
   };
   palette: { primary: string; accent: string };
-  resources: Array<{ name: string; kind: ResourceKind; capacity: number; pricePerHourPoisha: number | null }>;
+  /** `slotMinutes`: the booking slot length (120 for café tables, 60 otherwise). */
+  resources: Array<{ name: string; kind: ResourceKind; capacity: number; pricePerHourPoisha: number | null; slotMinutes: number }>;
   activities: Array<{
     name: string;
     minPlayers: number;

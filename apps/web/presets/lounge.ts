@@ -14,10 +14,10 @@ export const lounge: Preset = {
   },
   palette: { primary: '#7C3AED', accent: '#22D3EE' },
   resources: [
-    { name: 'PC Zone A', kind: 'zone', capacity: 10, pricePerHourPoisha: 150000 },
-    { name: 'PC Zone B', kind: 'zone', capacity: 10, pricePerHourPoisha: 150000 },
-    { name: 'Console Pod 1', kind: 'pod', capacity: 4, pricePerHourPoisha: 40000 },
-    { name: 'Console Pod 2', kind: 'pod', capacity: 4, pricePerHourPoisha: 40000 },
+    { name: 'PC Zone A', kind: 'zone', capacity: 10, pricePerHourPoisha: 150000, slotMinutes: 60 },
+    { name: 'PC Zone B', kind: 'zone', capacity: 10, pricePerHourPoisha: 150000, slotMinutes: 60 },
+    { name: 'Console Pod 1', kind: 'pod', capacity: 4, pricePerHourPoisha: 40000, slotMinutes: 60 },
+    { name: 'Console Pod 2', kind: 'pod', capacity: 4, pricePerHourPoisha: 40000, slotMinutes: 60 },
   ],
   activities: [
     { name: 'Valorant 5v5', minPlayers: 10, maxPlayers: 10, durationMin: 60, popularity: 10, teamMode: 'two_teams', teamSize: 5 },

@@ -45,21 +45,36 @@ describe('parseBranchForm', () => {
 
 describe('parseResourceForm', () => {
   it('reads price in taka', () => {
-    expect(parseResourceForm(form({ name: 'Pitch 3', kind: 'pitch', capacity: '14', price: '2,500' }))).toEqual({
+    expect(parseResourceForm(form({ name: 'Pitch 3', kind: 'pitch', capacity: '14', price: '2,500', slotMinutes: '60' }))).toEqual({
       ok: true,
-      value: { name: 'Pitch 3', kind: 'pitch', capacity: 14, pricePerHourPoisha: 250000 },
+      value: { name: 'Pitch 3', kind: 'pitch', capacity: 14, pricePerHourPoisha: 250000, slotMinutes: 60 },
     });
   });
 
   it('treats an empty price as no price', () => {
-    const result = parseResourceForm(form({ name: 'Table 9', kind: 'table', capacity: '4', price: '' }));
+    const result = parseResourceForm(form({ name: 'Table 9', kind: 'table', capacity: '4', price: '', slotMinutes: '120' }));
     expect(result.ok && result.value.pricePerHourPoisha).toBeNull();
   });
 
   it('rejects capacity 31 and unknown kinds', () => {
-    const result = parseResourceForm(form({ name: 'Huge', kind: 'stadium', capacity: '31', price: '' }));
+    const result = parseResourceForm(form({ name: 'Huge', kind: 'stadium', capacity: '31', price: '', slotMinutes: '60' }));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(Object.keys(result.errors).sort()).toEqual(['capacity', 'kind']);
+  });
+
+  it.each([
+    ['90', true],
+    ['15', true],
+    ['240', true],
+    ['50', false],
+    ['255', false],
+    ['0', false],
+    ['', false],
+  ])('slot length %j minutes → ok %s', (slotMinutes, ok) => {
+    const result = parseResourceForm(form({ name: 'Pitch 3', kind: 'pitch', capacity: '14', price: '', slotMinutes }));
+    expect(result.ok).toBe(ok);
+    if (result.ok) expect(result.value.slotMinutes).toBe(Number(slotMinutes));
+    else expect(Object.keys(result.errors)).toEqual(['slotMinutes']);
   });
 });
 

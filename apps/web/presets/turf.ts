@@ -24,9 +24,9 @@ export const turf: Preset = {
   },
   palette: { primary: '#15803D', accent: '#FACC15' },
   resources: [
-    { name: 'Pitch 1', kind: 'pitch', capacity: 14, pricePerHourPoisha: 250000 },
-    { name: 'Pitch 2', kind: 'pitch', capacity: 14, pricePerHourPoisha: 250000 },
-    { name: 'Badminton Court 1', kind: 'court', capacity: 4, pricePerHourPoisha: 60000 },
+    { name: 'Pitch 1', kind: 'pitch', capacity: 14, pricePerHourPoisha: 250000, slotMinutes: 60 },
+    { name: 'Pitch 2', kind: 'pitch', capacity: 14, pricePerHourPoisha: 250000, slotMinutes: 60 },
+    { name: 'Badminton Court 1', kind: 'court', capacity: 4, pricePerHourPoisha: 60000, slotMinutes: 60 },
   ],
   activities: [teams('5-a-side futsal', 5, 60, 10), teams('7-a-side', 7, 60, 6), teams('Badminton doubles', 2, 60, 5)],
   seatPricePoisha: 30000,

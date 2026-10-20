@@ -28,6 +28,7 @@ export const boardgame: Preset = {
     kind: 'table' as const,
     capacity,
     pricePerHourPoisha: null,
+    slotMinutes: 120,
   })),
   activities: [
     game('Catan', 3, 4, 90, 10),
