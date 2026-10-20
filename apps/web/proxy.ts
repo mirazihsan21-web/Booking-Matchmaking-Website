@@ -21,6 +21,10 @@ function carrySession(from: NextResponse, to: NextResponse): NextResponse {
  *    unknown hosts and direct `/t/…` requests on the root host get a 404.
  */
 export async function proxy(request: NextRequest) {
+  // The job tick: called by the database (as host.docker.internal locally) and authorized by its own
+  // secret, so it needs neither a session nor host routing.
+  if (request.nextUrl.pathname.startsWith('/api/jobs/')) return NextResponse.next();
+
   const session = await updateSession(request);
   const target = resolveHost(request.headers.get('host'), process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'localhost:3000');
   const { pathname } = request.nextUrl;
