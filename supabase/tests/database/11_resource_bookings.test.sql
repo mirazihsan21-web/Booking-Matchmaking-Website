@@ -1,10 +1,16 @@
 -- Whole-space bookings: book_resource / cancel_resource_booking / set_resource_booking_status.
 -- Org R (…11a0, max 2 upcoming bookings per player): Pitch 1 (…11c0, ৳2,500/h, 60-min slots) with an
--- open-play session reserving it 19:00–20:00 on Fri 15 Jan 2027 (Dhaka). Players A and B, staff S.
+-- open-play session reserving it 19:00–20:00 on day D (Dhaka), 30 days from today so the fixtures never
+-- age out (the booking limit counts against the real now()). Players A and B, staff S.
 -- Org X (…11a9) owns Pitch X (…11c9). Opening hours and the booking window are checked in TypeScript.
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(32);
+
+-- Day D, 30 days ahead in Dhaka; pg_temp.at('20:00') is 8pm that day.
+create function pg_temp.at(hhmm text) returns timestamptz language sql as $$
+  select ((now() at time zone 'Asia/Dhaka')::date + 30 + hhmm::time) at time zone 'Asia/Dhaka';
+$$;
 
 insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-0000000011d1', 'rb-a@test.local'),
@@ -26,58 +32,58 @@ insert into public.player_profiles (id, organization_id, user_id, display_name, 
   ('00000000-0000-4000-8000-0000000011e2', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011d2', 'B', 3);
 insert into public.open_play_sessions (id, organization_id, branch_id, starts_at, ends_at, seat_price_poisha)
 values ('00000000-0000-4000-8000-0000000011f0', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011b0',
-        '2027-01-15 19:00+06', '2027-01-15 20:00+06', 30000);
+        pg_temp.at('19:00'), pg_temp.at('20:00'), 30000);
 insert into public.resource_reservations (organization_id, resource_id, period, source, source_id)
 values ('00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011c0',
-        tstzrange('2027-01-15 19:00+06', '2027-01-15 20:00+06'), 'session', '00000000-0000-4000-8000-0000000011f0');
+        tstzrange(pg_temp.at('19:00'), pg_temp.at('20:00')), 'session', '00000000-0000-4000-8000-0000000011f0');
 
 create temp table b (label text primary key, status text, id uuid);
 grant select on b to authenticated; -- the "who sees what" checks compare against it as a signed-in user
-create function pg_temp.book(label text, at text, slots int, profile uuid, guest text, phone text, by_user uuid, org uuid default '00000000-0000-4000-8000-0000000011a0', res uuid default '00000000-0000-4000-8000-0000000011c0')
+create function pg_temp.book(label text, at timestamptz, slots int, profile uuid, guest text, phone text, by_user uuid, org uuid default '00000000-0000-4000-8000-0000000011a0', res uuid default '00000000-0000-4000-8000-0000000011c0')
 returns text language sql as $$
-  insert into b select label, r.status, r.booking_id from public.book_resource(org, res, at::timestamptz, slots, profile, guest, phone, by_user) r
+  insert into b select label, r.status, r.booking_id from public.book_resource(org, res, at, slots, profile, guest, phone, by_user) r
   returning status;
 $$;
 
 -- Booking and overlaps
-select is(pg_temp.book('a20', '2027-01-15 20:00+06', 1, '00000000-0000-4000-8000-0000000011e1', null, null, '00000000-0000-4000-8000-0000000011d1'), 'booked', 'A books Pitch 1 for 8–9pm');
+select is(pg_temp.book('a20', pg_temp.at('20:00'), 1, '00000000-0000-4000-8000-0000000011e1', null, null, '00000000-0000-4000-8000-0000000011d1'), 'booked', 'A books Pitch 1 for 8–9pm');
 select is((select price_poisha from public.resource_bookings where id = (select id from b where label = 'a20')), 250000, 'priced at the hourly rate');
 select is((select count(*)::int from public.resource_reservations where source = 'booking' and source_id = (select id from b where label = 'a20')), 1, 'and it reserves the pitch');
-select is(pg_temp.book('b20', '2027-01-15 20:00+06', 1, '00000000-0000-4000-8000-0000000011e2', null, null, '00000000-0000-4000-8000-0000000011d2'), 'taken', 'B cannot book the same slot');
-select is(pg_temp.book('b19', '2027-01-15 19:00+06', 1, '00000000-0000-4000-8000-0000000011e2', null, null, '00000000-0000-4000-8000-0000000011d2'), 'taken', 'nor a slot held by open play');
-select is(pg_temp.book('b21', '2027-01-15 21:00+06', 1, '00000000-0000-4000-8000-0000000011e2', null, null, '00000000-0000-4000-8000-0000000011d2'), 'booked', 'back-to-back bookings are fine');
+select is(pg_temp.book('b20', pg_temp.at('20:00'), 1, '00000000-0000-4000-8000-0000000011e2', null, null, '00000000-0000-4000-8000-0000000011d2'), 'taken', 'B cannot book the same slot');
+select is(pg_temp.book('b19', pg_temp.at('19:00'), 1, '00000000-0000-4000-8000-0000000011e2', null, null, '00000000-0000-4000-8000-0000000011d2'), 'taken', 'nor a slot held by open play');
+select is(pg_temp.book('b21', pg_temp.at('21:00'), 1, '00000000-0000-4000-8000-0000000011e2', null, null, '00000000-0000-4000-8000-0000000011d2'), 'booked', 'back-to-back bookings are fine');
 
 -- Walk-ins
-select is(pg_temp.book('w22', '2027-01-15 22:00+06', 1, null, 'Karim', '+8801712345678', '00000000-0000-4000-8000-0000000011d3'), 'booked', 'staff book a walk-in by name and phone');
+select is(pg_temp.book('w22', pg_temp.at('22:00'), 1, null, 'Karim', '+8801712345678', '00000000-0000-4000-8000-0000000011d3'), 'booked', 'staff book a walk-in by name and phone');
 select is((select count(*)::int from public.notifications where payload->>'booking_id' = (select id::text from b where label = 'w22')), 0, 'a walk-in gets no notification');
 select throws_ok(
   $$ insert into public.resource_bookings (organization_id, resource_id, profile_id, guest_name, guest_phone, period, price_poisha)
      values ('00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011c0', '00000000-0000-4000-8000-0000000011e1',
-             'Karim', '+8801712345678', tstzrange('2027-02-01 10:00+06', '2027-02-01 11:00+06'), 0) $$,
+             'Karim', '+8801712345678', tstzrange(pg_temp.at('10:00') + interval '17 days', pg_temp.at('11:00') + interval '17 days'), 0) $$,
   '23514', null, 'a booking is for a player or a walk-in, not both'
 );
 select throws_ok(
   $$ insert into public.resource_bookings (organization_id, resource_id, guest_name, period, price_poisha)
      values ('00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011c0', 'Karim',
-             tstzrange('2027-02-01 10:00+06', '2027-02-01 11:00+06'), 0) $$,
+             tstzrange(pg_temp.at('10:00') + interval '17 days', pg_temp.at('11:00') + interval '17 days'), 0) $$,
   '23514', null, 'a walk-in needs a phone as well as a name'
 );
 
 -- The upcoming-bookings limit (2 at this venue)
-select is(pg_temp.book('a17', '2027-01-15 17:00+06', 1, '00000000-0000-4000-8000-0000000011e1', null, null, '00000000-0000-4000-8000-0000000011d1'), 'booked', 'A takes a second booking');
-select is(pg_temp.book('a16', '2027-01-15 16:00+06', 1, '00000000-0000-4000-8000-0000000011e1', null, null, '00000000-0000-4000-8000-0000000011d1'), 'limit_reached', 'A cannot hold a third');
-select is(pg_temp.book('w16', '2027-01-15 16:00+06', 1, null, 'Nila', '+8801812345678', '00000000-0000-4000-8000-0000000011d3'), 'booked', 'walk-ins do not count toward anyone''s limit');
+select is(pg_temp.book('a17', pg_temp.at('17:00'), 1, '00000000-0000-4000-8000-0000000011e1', null, null, '00000000-0000-4000-8000-0000000011d1'), 'booked', 'A takes a second booking');
+select is(pg_temp.book('a16', pg_temp.at('16:00'), 1, '00000000-0000-4000-8000-0000000011e1', null, null, '00000000-0000-4000-8000-0000000011d1'), 'limit_reached', 'A cannot hold a third');
+select is(pg_temp.book('w16', pg_temp.at('16:00'), 1, null, 'Nila', '+8801812345678', '00000000-0000-4000-8000-0000000011d3'), 'booked', 'walk-ins do not count toward anyone''s limit');
 
 -- Invalid requests
-select is(pg_temp.book('x1', '2027-01-15 12:00+06', 5, '00000000-0000-4000-8000-0000000011e2', null, null, '00000000-0000-4000-8000-0000000011d2'), 'invalid', 'at most 4 slots at once');
-select is(pg_temp.book('x2', '2027-01-15 12:00+06', 1, '00000000-0000-4000-8000-0000000011e2', null, null, '00000000-0000-4000-8000-0000000011d2',
+select is(pg_temp.book('x1', pg_temp.at('12:00'), 5, '00000000-0000-4000-8000-0000000011e2', null, null, '00000000-0000-4000-8000-0000000011d2'), 'invalid', 'at most 4 slots at once');
+select is(pg_temp.book('x2', pg_temp.at('12:00'), 1, '00000000-0000-4000-8000-0000000011e2', null, null, '00000000-0000-4000-8000-0000000011d2',
                        res => '00000000-0000-4000-8000-0000000011c9'), 'invalid', 'another venue''s pitch is refused');
-select is(pg_temp.book('x3', '2027-01-15 12:00+06', 1, null, null, null, '00000000-0000-4000-8000-0000000011d3'), 'invalid', 'a booking needs a player or a walk-in');
+select is(pg_temp.book('x3', pg_temp.at('12:00'), 1, null, null, null, '00000000-0000-4000-8000-0000000011d3'), 'invalid', 'a booking needs a player or a walk-in');
 
 -- Notifications
 select is(
   (select payload - 'booking_id' from public.notifications where kind = 'booking_confirmed' and payload->>'booking_id' = (select id::text from b where label = 'a20')),
-  jsonb_build_object('resource_name', 'Pitch 1', 'starts_at', '2027-01-15 20:00+06'::timestamptz, 'ends_at', '2027-01-15 21:00+06'::timestamptz, 'price_poisha', 250000),
+  jsonb_build_object('resource_name', 'Pitch 1', 'starts_at', pg_temp.at('20:00'), 'ends_at', pg_temp.at('21:00'), 'price_poisha', 250000),
   'A is told the booking is confirmed (space, time and price)'
 );
 select is(
@@ -88,7 +94,7 @@ select is(
 -- Cancelling
 select is(public.cancel_resource_booking((select id from b where label = 'a20'), '00000000-0000-4000-8000-0000000011d1'), 'cancelled', 'A cancels the 8pm booking');
 select is((select count(*)::int from public.resource_reservations where source = 'booking' and source_id = (select id from b where label = 'a20')), 0, 'which frees the pitch');
-select is(pg_temp.book('b20b', '2027-01-15 20:00+06', 1, '00000000-0000-4000-8000-0000000011e2', null, null, '00000000-0000-4000-8000-0000000011d2'), 'booked', 'so B can book 8pm now');
+select is(pg_temp.book('b20b', pg_temp.at('20:00'), 1, '00000000-0000-4000-8000-0000000011e2', null, null, '00000000-0000-4000-8000-0000000011d2'), 'booked', 'so B can book 8pm now');
 select is(public.cancel_resource_booking((select id from b where label = 'a20'), '00000000-0000-4000-8000-0000000011d1'), 'not_cancellable', 'cancelling twice is refused');
 select is((select payload->>'by_venue' from public.notifications where kind = 'booking_cancelled' and payload->>'booking_id' = (select id::text from b where label = 'a20')), 'false', 'A''s own cancellation is not by the venue');
 select is(public.cancel_resource_booking((select id from b where label = 'a17'), '00000000-0000-4000-8000-0000000011d3'), 'cancelled', 'staff cancel A''s 5pm booking');
@@ -117,7 +123,7 @@ select is(
   (select count(*)::int from b where status = 'booked'), 'staff see every booking at their venue, walk-ins included'
 );
 select throws_ok(
-  $$ select * from public.book_resource('00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011c0', '2027-01-16 10:00+06', 1,
+  $$ select * from public.book_resource('00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011c0', pg_temp.at('10:00') + interval '1 day', 1,
                                         '00000000-0000-4000-8000-0000000011e1', null, null, '00000000-0000-4000-8000-0000000011d1') $$,
   '42501', null, 'signed-in users cannot call book_resource directly'
 );
