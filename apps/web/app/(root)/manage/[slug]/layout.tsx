@@ -15,6 +15,7 @@ async function Nav({ params }: { params: Promise<{ slug: string }> }) {
   const links = [
     { href: "", label: m.manage.overview },
     { href: "/schedule", label: m.manage.schedule },
+    { href: "/bookings", label: m.manage.bookings },
     ...(role === "owner"
       ? [
           { href: "/branches", label: m.manage.branches },
