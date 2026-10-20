@@ -123,6 +123,8 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 
 ## 6. Known issues / gotchas
 
+- **React 19 clears form inputs after every form-action submission, errors included.** Our `ActionForm` (`components/forms/action-form.tsx`) submits through `onSubmit` + `startTransition` instead, so inputs survive validation errors and schedule clashes. Pass `resetOnSuccess` on "add" forms that should clear after a save. Keep this if you refactor the form.
+
 - **supabase-js + Cache Components: `await connection()` before creating the server client.** supabase-js reads `Date.now()` while loading the session. Next 16 rejects that during prerendering ("encountered the unstable value Date.now()"), and the page renders empty. `lib/supabase/server.ts` calls `await connection()` first. Keep that line.
 - **Stopping a background `next dev` task leaves the node process running.** It keeps port 3000 and serves stale modules (e.g. "m.onboarding is undefined" right after editing `messages/en.ts`). To fix it, kill whatever listens on 3000: PowerShell `Get-NetTCPConnection -LocalPort 3000 -State Listen | % { Stop-Process -Id $_.OwningProcess -Force }`, then restart.
 - **Playwright MCP can only upload files from inside the repo** (or `.playwright-mcp/`, which is gitignored), not from the system temp folder.

@@ -63,7 +63,7 @@ async function Resources({ params }: { params: Promise<{ slug: string }> }) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={saveResourceAction.bind(null, org.slug, null)} submitLabel={m.manage.add} className="sm:grid sm:grid-cols-5 sm:items-end">
+          <ActionForm action={saveResourceAction.bind(null, org.slug, null)} submitLabel={m.manage.add} resetOnSuccess className="sm:grid sm:grid-cols-5 sm:items-end">
             <SelectField name="branchId" label={m.manage.branch} options={(branches ?? []).map((b) => ({ value: b.id, label: b.name }))} />
             <Field name="name" label={m.manage.name} required />
             <SelectField name="kind" label={m.manage.kind} options={kindOptions} defaultValue={getPreset(org.businessType).resources[0]?.kind} />

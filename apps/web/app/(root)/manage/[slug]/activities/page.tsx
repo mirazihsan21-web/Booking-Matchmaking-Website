@@ -63,7 +63,7 @@ async function Activities({ params }: { params: Promise<{ slug: string }> }) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={saveActivityAction.bind(null, org.slug, null)} submitLabel={m.manage.add}>
+          <ActionForm action={saveActivityAction.bind(null, org.slug, null)} submitLabel={m.manage.add} resetOnSuccess>
             <ActivityFields />
           </ActionForm>
         </CardContent>

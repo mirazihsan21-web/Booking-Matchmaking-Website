@@ -67,7 +67,7 @@ async function Staff({ params }: { params: Promise<{ slug: string }> }) {
           <CardTitle>{m.manage.invite}</CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={inviteStaffAction.bind(null, org.slug)} submitLabel={m.manage.invite} className="sm:grid sm:grid-cols-3 sm:items-end">
+          <ActionForm action={inviteStaffAction.bind(null, org.slug)} submitLabel={m.manage.invite} resetOnSuccess className="sm:grid sm:grid-cols-3 sm:items-end">
             <Field name="email" label={m.manage.email} type="email" required />
             <SelectField name="role" label={m.manage.role} options={roleOptions} defaultValue="staff" />
           </ActionForm>
