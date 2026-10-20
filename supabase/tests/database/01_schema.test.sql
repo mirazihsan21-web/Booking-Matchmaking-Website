@@ -1,7 +1,7 @@
 -- Stage A schema shape and the invariants that live in constraints.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(57);
+select plan(58);
 
 select has_table('public', t, format('table %s exists', t))
 from unnest(array[
@@ -172,6 +172,7 @@ select has_column('public', 'open_play_sessions', 'matched_at', 'a session recor
 select has_column('public', 'bookings', 'team', 'a seat records its team');
 select enum_has_labels('public', 'booking_source', array['matched', 'waitlist', 'direct'],
   'a late request that took a free seat is a direct booking');
+select col_not_null('public', 'seat_offers', 'token_hash', 'every offer has a token hash');
 
 select * from finish();
 rollback;
