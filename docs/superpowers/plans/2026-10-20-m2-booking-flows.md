@@ -1,3 +1,5 @@
+> **Superseded (2026-10-20):** the project pivoted from a portfolio demo to a real multi-tenant platform. See `docs/superpowers/specs/2026-10-20-booking-platform-design.md`. Kept for history; M1 work described here is merged and still in use.
+
 # M2 Booking Flows: Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

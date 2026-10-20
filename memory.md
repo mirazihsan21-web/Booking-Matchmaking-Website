@@ -8,25 +8,48 @@ Newest entries go at the top of each log section.
 
 ## 1. What this is
 
-- Portfolio project #5 from `Agency_Portfolio_Projects.pdf` (Console Log Studio, 14 Oct 2026).
-- It is a **showcase demo, not a SaaS**. It proves the agency can build booking systems (restaurants, gyms, clinics, coworking).
-- **Board-game café skin** ("Meeple House"):
-  - Players set availability, favourite games and skill (1–5).
-  - The engine forms balanced tables.
-  - Cancellations are refilled from the waitlist by SMS.
-  - Owners see revenue analytics.
-- **Demo moment:** simulate 40 players (32 seats, so a waitlist is guaranteed), cancel one, and watch the seat refill over (simulated) SMS.
+**Since 2026-10-20 this is a REAL product, not a demo.** It's a shared, multi-tenant booking & matchmaking platform for **board-game cafés, futsal/turf/court venues and gaming lounges in Bangladesh**.
+
+Venues sign up themselves, each on its own subdomain. Each venue can:
+- configure branches, resources, activities and a schedule;
+- take whole-resource bookings and paid open-play seats, where the engine forms fair groups or two balanced teams;
+- keep seats full through the waitlist.
+
+The agency re-skins it per business type through presets.
+
+**User decisions (2026-10-20):**
+
+| Topic | Decision |
+|---|---|
+| Tenancy | One shared multi-tenant platform |
+| Onboarding | Self-serve |
+| Market | Bangladesh: BDT stored as **poisha**, `Asia/Dhaka` |
+| Login | Google + email magic link (no phone OTP) |
+| Payments | **bKash direct**, paid into **each venue's own merchant account** (the platform never holds money) |
+| Launch must-haves | Real player accounts and online payments |
+
+**Not in the first release:** SMS, Bangla UI, subscription billing for venues, custom domains.
+
+**History:** it started as portfolio project #5 from `Agency_Portfolio_Projects.pdf`, a board-game café demo ("Meeple House"). M1 (engine, sim, schema, RLS, booking RPCs) was built for that demo and carries over into the platform.
 
 ## 2. Key documents
 
 | Doc | Path |
 |---|---|
-| Design spec (the authority) | `docs/superpowers/specs/2026-10-20-booking-matchmaking-design.md` |
-| M1 plan (foundation + engine) | `docs/superpowers/plans/2026-10-20-m1-foundation-and-engine.md` |
+| **Platform spec (the authority)** | `docs/superpowers/specs/2026-10-20-booking-platform-design.md` |
+| Demo spec (superseded, history) | `docs/superpowers/specs/2026-10-20-booking-matchmaking-design.md` |
+| M1 plan (done, merged) | `docs/superpowers/plans/2026-10-20-m1-foundation-and-engine.md` |
+| M2 demo plan (superseded, never built) | `docs/superpowers/plans/2026-10-20-m2-booking-flows.md`. Its research is still useful: SSR auth code, Data API grants, Cache Components rules, pg_cron + pg_net + Vault |
 | Execution ledger (scratch, git-ignored) | `.superpowers/sdd/<plan-name>/progress.md` |
 | Original brief | `Agency_Portfolio_Projects.pdf` (deliberately **not** committed) |
 
-Milestones: **M1** foundation + engine → **M2** booking flows → **M3** demo experience → **M4** analytics + ship.
+**Stages:**
+- **A** — platform foundation: tenancy, generic model, auth, onboarding, admin, player profiles, `splitTeams`
+- **B** — booking & matchmaking
+- **C** — bKash payments
+- **D** — analytics & operations
+- **E** — launch hardening
+- **Later** — SMS, Bangla UI, PWA, billing, custom domains
 
 ## 3. Environment & setup gotchas (Windows dev box)
 
@@ -132,6 +155,8 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 - The swap search already re-scores only the two groups a swap touches (delta scoring). For much bigger venues, the next win is replacing the linear `seatings.find(...)` scans in the greedy `seatPass` with per-game open-group queues.
 
 ## 8. Change log
+
+- **2026-10-20: Pivot to a real product.** The user wants a real, re-skinnable, multi-tenant booking & matchmaking platform for BD cafés, turfs and gaming lounges. The new spec `2026-10-20-booking-platform-design.md` supersedes the demo spec and the M2 demo plan. Next up is Stage A (platform foundation).
 
 - **2026-10-20: M1 complete and merged to `main`** (fast-forward; branch `m1-foundation` deleted). Merged `main` re-verified: install, typecheck, unit, pgTAP and race tests all green. Final test counts:
   - Unit and property tests: engine 41, sim 23, web 7.
