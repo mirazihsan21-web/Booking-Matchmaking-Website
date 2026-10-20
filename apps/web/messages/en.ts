@@ -79,6 +79,7 @@ export const en = {
     saved: 'Saved.',
     deleted: 'Deleted.',
     lastBranch: "A venue needs at least one branch, so this one can't be deleted.",
+    branchInUse: "This branch has bookings or sessions, so it can't be deleted. Deactivate its spaces instead.",
     branch: 'Branch',
     kind: 'Kind',
     capacity: 'Capacity',
