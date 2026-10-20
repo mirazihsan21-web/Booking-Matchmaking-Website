@@ -54,7 +54,9 @@ export async function deliverPendingEmails(
       });
       await sender.send({ to, ...email });
       await finish(row.id, 'sent');
-    } catch {
+    } catch (error) {
+      // Retried by a later tick until the third attempt (finish_email); log why it failed.
+      console.error(`email for notification ${row.id} failed:`, error);
       await finish(row.id, 'failed');
     }
   }
