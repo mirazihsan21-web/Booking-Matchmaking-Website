@@ -76,6 +76,7 @@ export async function deleteBranchAction(slug: string, branchId: string, _state:
   const { count } = await supabase.from("branches").select("id", { count: "exact", head: true }).eq("organization_id", org.id);
   if ((count ?? 0) <= 1) return { ok: false, message: m.manage.lastBranch };
   const { error } = await supabase.from("branches").delete().eq("id", branchId).eq("organization_id", org.id);
+  if (error?.code === "23503") return { ok: false, message: m.manage.branchInUse };
   if (error) return fail(error);
   refresh();
   return { ok: true, message: m.manage.deleted };
