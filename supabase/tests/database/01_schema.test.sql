@@ -1,7 +1,7 @@
 -- Stage A schema shape and the invariants that live in constraints.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(49);
+select plan(51);
 
 select has_table('public', t, format('table %s exists', t))
 from unnest(array[
@@ -98,6 +98,16 @@ select throws_ok(
 select throws_ok(
   $$ insert into public.organizations (slug, name, business_type) values ('xn--dhanmondi', 'Lookalike', 'turf') $$,
   '23514', null, 'a punycode (xn--) slug is rejected'
+);
+select throws_ok(
+  $$ insert into public.organizations (slug, name, business_type, match_cutoff_minutes, cancel_cutoff_minutes)
+     values ('pgtap-cutoffs', 'Cutoffs', 'turf', 120, 120) $$,
+  '23514', null, 'matching must come before the cancellation cut-off'
+);
+select throws_ok(
+  $$ insert into public.resources (organization_id, branch_id, name, kind, capacity, slot_minutes)
+     values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Odd', 'pitch', 14, 50) $$,
+  '23514', null, 'slot length is a multiple of 15 minutes'
 );
 
 -- Seat invariants (carried over from M1)

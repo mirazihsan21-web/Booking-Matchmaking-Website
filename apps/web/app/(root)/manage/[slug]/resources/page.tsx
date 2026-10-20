@@ -22,7 +22,7 @@ async function Resources({ params }: { params: Promise<{ slug: string }> }) {
     supabase.from("branches").select("id, name").eq("organization_id", org.id).order("created_at"),
     supabase
       .from("resources")
-      .select("id, branch_id, name, kind, capacity, price_per_hour_poisha, active")
+      .select("id, branch_id, name, kind, capacity, price_per_hour_poisha, slot_minutes, active")
       .eq("organization_id", org.id)
       .order("name"),
   ]);
@@ -39,15 +39,18 @@ async function Resources({ params }: { params: Promise<{ slug: string }> }) {
               {!r.active && <Badge variant="secondary">{m.manage.inactive}</Badge>}
               <span className="text-sm font-normal text-foreground/60">
                 {r.price_per_hour_poisha === null ? m.manage.noPrice : `${formatBdt(r.price_per_hour_poisha)} ${m.manage.perHour}`}
+                {" · "}
+                {m.manage.slots(r.slot_minutes)}
               </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <ActionForm action={saveResourceAction.bind(null, org.slug, r.id)} submitLabel={m.manage.save} className="sm:grid sm:grid-cols-4 sm:items-end">
+            <ActionForm action={saveResourceAction.bind(null, org.slug, r.id)} submitLabel={m.manage.save} className="sm:grid sm:grid-cols-5 sm:items-end">
               <Field name="name" label={m.manage.name} defaultValue={r.name} required />
               <SelectField name="kind" label={m.manage.kind} options={kindOptions} defaultValue={r.kind} />
               <Field name="capacity" label={m.manage.capacity} type="number" min={1} max={30} defaultValue={r.capacity} />
               <Field name="price" label={m.manage.pricePerHour} inputMode="decimal" defaultValue={taka(r.price_per_hour_poisha)} />
+              <Field name="slotMinutes" label={m.manage.slotMinutes} type="number" min={15} max={240} step={15} defaultValue={r.slot_minutes} />
             </ActionForm>
             <ActionButton
               action={setResourceActiveAction.bind(null, org.slug, r.id, !r.active)}
@@ -63,12 +66,13 @@ async function Resources({ params }: { params: Promise<{ slug: string }> }) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={saveResourceAction.bind(null, org.slug, null)} submitLabel={m.manage.add} resetOnSuccess className="sm:grid sm:grid-cols-5 sm:items-end">
+          <ActionForm action={saveResourceAction.bind(null, org.slug, null)} submitLabel={m.manage.add} resetOnSuccess className="sm:grid sm:grid-cols-6 sm:items-end">
             <SelectField name="branchId" label={m.manage.branch} options={(branches ?? []).map((b) => ({ value: b.id, label: b.name }))} />
             <Field name="name" label={m.manage.name} required />
             <SelectField name="kind" label={m.manage.kind} options={kindOptions} defaultValue={getPreset(org.businessType).resources[0]?.kind} />
             <Field name="capacity" label={m.manage.capacity} type="number" min={1} max={30} defaultValue={4} />
             <Field name="price" label={m.manage.pricePerHour} inputMode="decimal" />
+            <Field name="slotMinutes" label={m.manage.slotMinutes} type="number" min={15} max={240} step={15} defaultValue={60} />
           </ActionForm>
         </CardContent>
       </Card>

@@ -74,6 +74,7 @@ export async function createOrganization(
           kind: r.kind,
           capacity: r.capacity,
           price_per_hour_poisha: r.pricePerHourPoisha,
+          slot_minutes: r.slotMinutes,
         })),
       ),
     );
