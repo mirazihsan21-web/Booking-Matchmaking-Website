@@ -13,7 +13,8 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
-    "test:race": "vitest run supabase/tests/race"
+    "test:race": "vitest run supabase/tests/race",
+    "db:lint": "supabase db advisors --local --type all --fail-on warn"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
