@@ -1,11 +1,16 @@
-import type { Skin } from '@/skins';
+/** Colours for the platform's own pages (marketing, sign-in, onboarding, owner admin). */
+export const PLATFORM_PALETTE = { primary: '#0F172A', accent: '#38BDF8' } as const;
 
-/** Skin palette → the shadcn CSS variables it overrides (applied inline on <html>). */
-export function skinToCssVars(skin: Skin): Record<string, string> {
+const HEX = /^#[0-9A-Fa-f]{6}$/;
+
+/** A venue's brand colours → the shadcn CSS variables they override. Invalid colours fall back. */
+export function brandingToCssVars(
+  branding: { primary?: string; accent?: string },
+  fallback: { primary: string; accent: string },
+): Record<string, string> {
+  const pick = (value: string | undefined, otherwise: string) => (value && HEX.test(value) ? value : otherwise);
   return {
-    '--primary': skin.palette.primary,
-    '--accent': skin.palette.accent,
-    '--background': skin.palette.background,
-    '--foreground': skin.palette.foreground,
+    '--primary': pick(branding.primary, fallback.primary),
+    '--accent': pick(branding.accent, fallback.accent),
   };
 }

@@ -143,6 +143,8 @@ supabase/           migrations (schema → RLS → RPCs) + pgTAP tests + race te
 
 ## 7. Upgrade ideas / future work
 
+- **Product name still to be decided.** The UI uses the working name "Booking & Matchmaking" from `apps/web/messages/en.ts` (`m.platform.name`). Change it there once the user picks a name, and set the root domain in `NEXT_PUBLIC_ROOT_DOMAIN`.
+
 **Deferred minor findings from the M1 review**, each worth a test plus a fix when the area is touched next:
 - **Cross-venue references.** `groups.session_id/table_id/game_id`, `bookings.group_id`, `player_games.game_id` and the like aren't tied to the row's `venue_id`. Example: an owner could make a group pointing at another venue's session. Fix with composite foreign keys on `(venue_id, id)`.
 - **Owner can attach any login.** `players_owner_all` lets an owner insert a player row with `user_id` set to *any* login. Players can also set `phone` to any number, which only matters once real Twilio sending is wider than presenter mode.
