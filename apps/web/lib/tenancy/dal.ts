@@ -13,6 +13,7 @@ export interface ManagedOrganization {
   name: string;
   status: 'onboarding' | 'live' | 'suspended';
   businessType: BusinessType;
+  timezone: string;
   branding: { logo_path?: string; primary?: string; accent?: string };
 }
 
@@ -27,7 +28,7 @@ export const requireOrgRole = cache(
     const supabase = await createClient();
     const { data: org } = await supabase
       .from('organizations')
-      .select('id, slug, name, status, business_type, branding')
+      .select('id, slug, name, status, business_type, timezone, branding')
       .eq('slug', slug)
       .maybeSingle();
     if (!org) notFound();
@@ -47,6 +48,7 @@ export const requireOrgRole = cache(
         name: org.name,
         status: org.status,
         businessType: org.business_type as BusinessType,
+        timezone: org.timezone,
         branding: (org.branding ?? {}) as ManagedOrganization['branding'],
       },
     };

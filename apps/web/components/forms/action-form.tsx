@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useActionState, useContext, type ReactNode } from "react";
+import { createContext, startTransition, useActionState, useContext, useEffect, useRef, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,24 +13,43 @@ export type FormAction = (state: FormState, formData: FormData) => Promise<FormS
 const FormStateContext = createContext<FormState>(null);
 export const useFormState = () => useContext(FormStateContext);
 
-/** A form wired to a server action with useActionState; fields read their errors from context. */
+/**
+ * A form wired to a server action with useActionState; fields read their errors from context.
+ * Submits through onSubmit so React does NOT clear the inputs afterwards (its default for form
+ * actions) — otherwise a validation error or schedule clash would wipe what the person typed.
+ * `resetOnSuccess` clears the form after a successful save (for "add" forms).
+ */
 export function ActionForm({
   action,
   submitLabel,
   children,
   className,
   variant = "default",
+  resetOnSuccess = false,
 }: {
   action: FormAction;
   submitLabel: string;
   children?: ReactNode;
   className?: string;
   variant?: "default" | "outline" | "destructive" | "ghost";
+  resetOnSuccess?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (resetOnSuccess && state?.ok) formRef.current?.reset();
+  }, [state, resetOnSuccess]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    startTransition(() => formAction(data));
+  }
+
   return (
     <FormStateContext value={state}>
-      <form action={formAction} className={cn("flex flex-col gap-3", className)}>
+      <form ref={formRef} action={formAction} onSubmit={submit} className={cn("flex flex-col gap-3", className)}>
         {children}
         <div className="flex items-center gap-3">
           <Button type="submit" variant={variant} disabled={pending}>

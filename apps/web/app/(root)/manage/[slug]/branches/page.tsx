@@ -40,7 +40,7 @@ async function Branches({ params }: { params: Promise<{ slug: string }> }) {
           <CardTitle>{m.manage.addBranch}</CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={saveBranchAction.bind(null, org.slug, null)} submitLabel={m.manage.add}>
+          <ActionForm action={saveBranchAction.bind(null, org.slug, null)} submitLabel={m.manage.add} resetOnSuccess>
             <Field name="name" label={m.manage.name} required />
             <Field name="address" label={m.manage.address} />
             <OpeningHoursEditor value={DEFAULT_OPENING_HOURS} />
