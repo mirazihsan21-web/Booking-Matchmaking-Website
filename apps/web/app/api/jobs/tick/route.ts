@@ -12,6 +12,6 @@ export async function POST(request: Request) {
   if (!authorizeJob(request.headers.get("authorization"), process.env.JOB_SECRET)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  const report = await runTick({ db: createServiceClient(), sender: createEmailSender(process.env) });
+  const report = await runTick({ db: createServiceClient(), createSender: () => createEmailSender(process.env) });
   return NextResponse.json(report);
 }
