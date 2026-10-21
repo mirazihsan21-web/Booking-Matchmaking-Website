@@ -10,7 +10,8 @@
     "test": "vitest run",
     "typecheck": "next typegen && tsc --noEmit",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "env:local": "node scripts/write-env-local.mjs"
+    "env:local": "node scripts/write-env-local.mjs",
+    "env:hosted": "node scripts/write-env-hosted.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
