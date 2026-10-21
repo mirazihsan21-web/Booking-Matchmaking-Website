@@ -220,6 +220,8 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 
 ## 6. Known issues / gotchas
 
+- **Two Claude sessions in one folder share one checkout.** On 2026-10-21 another session switched this folder to a new branch (`gmail-smtp`) and committed there, and my next commit landed on that branch by accident. Before committing, check `git branch --show-current` and `git status`. When another session's uncommitted edits are present, move a commit with a temporary `git worktree` + `cherry-pick` rather than switching branches or stashing their work.
+
 - **Seeding users straight into `auth.users` breaks Supabase Auth unless the token columns are `''`.** Rows with NULL `confirmation_token`, `recovery_token`, `email_change*`, `phone_change*` or `reauthentication_token` make GoTrue's user listing fail ("Database error finding users" — `invites.test.ts` went red) and `getUserById` return nothing (their emails get `skipped`). Create test users with `auth.admin.createUser`, or set those columns to `''` when inserting by SQL.
 - **After a reboot, start Docker Desktop, then `pnpm exec supabase start`.** The local data survives; Docker doesn't start on its own here.
 
@@ -318,6 +320,10 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 
 ## 8. Change log
 
+- **2026-10-21: Gmail sending support kept on `main`.**
+  - What it adds: `EMAIL_TRANSPORT=smtp` takes an optional `SMTP_USER` / `SMTP_PASS` (e.g. Gmail: `smtp.gmail.com`, port 465, an App Password; `EMAIL_FROM` must be the Gmail address). Port 465 uses TLS from the start; other ports upgrade with STARTTLS. `smtpOptions()` is in `lib/email/sender.ts`, and `pnpm env:hosted` keeps `SMTP_USER`, `SMTP_PASS` and `RESEND_API_KEY` when they're set.
+  - Where it came from: another Claude session wrote it on a `gmail-smtp` branch in this same folder, then put the files back on disk uncommitted. At the user's choice I cherry-picked it onto `main` and deleted the branch.
+  - Not configured: Gmail's 2-Step Verification wouldn't turn on for the user's account, so there's no App Password yet.
 - **2026-10-21: Google sign-in on the hosted project; the one-brand direction confirmed.**
   - **Google OAuth:**
     - Google Cloud project `booking-and-matchmaking-web`, owned by the user's "S" Google account. The `mirazihsan21` account has no access to it, which caused a "missing permissions" page.
