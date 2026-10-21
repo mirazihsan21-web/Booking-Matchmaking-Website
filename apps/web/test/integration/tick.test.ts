@@ -142,6 +142,35 @@ describe('runTick', () => {
     expect(must(await db.from('open_play_sessions').select('status').eq('id', started).single()).status).toBe('closed');
   });
 
+  it('offers a free seat whose hand-off was lost to a waiting player', async () => {
+    // As if offerNext failed after a cancel: seat 7 is free, nobody holds an offer, Tick is waiting.
+    const sessionId = await session(50, 'matched');
+    const group = must(await db.from('groups').insert({ organization_id: orgId, session_id: sessionId, resource_id: pitchId, activity_id: activityId, capacity: 10 }).select('id').single());
+    const seats = [1, 2, 3, 4, 5, 6, 8, 9, 10];
+    must(
+      await db.from('bookings').insert(
+        seats.map((seatNo, i) => ({ organization_id: orgId, session_id: sessionId, group_id: group.id, profile_id: squadProfiles[i], seat_no: seatNo, price_poisha: 30000, team: seatNo <= 5 ? 1 : 2 })),
+      ),
+    );
+    const entry = must(await db.from('waitlist_entries').insert({ organization_id: orgId, session_id: sessionId, profile_id: profileId, queue_position: 1 }).select('id').single());
+
+    await runTick({ db, createSender: () => recordingSender() });
+    const offer = must(await db.from('seat_offers').select('seat_no').eq('waitlist_entry_id', entry.id).eq('status', 'pending').single());
+    expect(offer.seat_no).toBe(7);
+  });
+
+  it('does not let sessions that cannot fill crowd out one that can', async () => {
+    for (let i = 0; i < 11; i += 1) {
+      const thin = await session(1 + i / 100);
+      for (const id of squadProfiles.slice(0, 3)) must(await db.rpc('request_seat', { p_session_id: thin, p_profile_id: id }));
+    }
+    const fillable = await session(4);
+    await squadRequests(fillable);
+
+    const report = await runTick({ db, createSender: () => recordingSender() });
+    expect(report.matched).toContain(fillable);
+  });
+
   it('keeps matching when email is not configured', async () => {
     const due = await session(2);
     await squadRequests(due);

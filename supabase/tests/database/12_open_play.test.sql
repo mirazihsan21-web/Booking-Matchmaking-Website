@@ -5,7 +5,7 @@
 -- S4 already started; S5 open (no_groups / invalid_match); S0 matched three days ago (priority rule).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(34);
+select plan(35);
 
 create function pg_temp.p(n int) returns uuid language sql as $$
   select ('00000000-0000-4000-8000-0000001201' || lpad(to_hex(n), 2, '0'))::uuid;
@@ -145,6 +145,8 @@ select is(public.request_seat(pg_temp.s(2), pg_temp.p(15)), 'seated', 'a player 
 select is((select team from public.bookings where session_id = pg_temp.s(2) and profile_id = pg_temp.p(15) and status = 'confirmed'),
   null::smallint, 'a free-for-all seat has no team');
 select is(public.request_seat(pg_temp.s(2), pg_temp.p(16)), 'waitlisted', 'a free seat at a game the player did not pick is not taken');
+select is(public.request_seat(pg_temp.s(2), pg_temp.p(20)), 'seated',
+  'a free seat nobody waiting wants goes to the next player who does');
 
 -- ── grants ──────────────────────────────────────────────────────────────────
 set local role authenticated;

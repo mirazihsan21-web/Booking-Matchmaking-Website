@@ -81,8 +81,9 @@ Then:
   `/manage/<slug>/sessions/<id>`, where they see requests, teams with skill totals, the waitlist and live offers.
 - A cancelled seat goes to the waiting player who fits that table best. They get a bell notification and an
   email with a one-time **Take the seat** link (`/offers/<token>`, no sign-in; only a hash of the token is
-  stored). Unanswered offers expire after the branch's offer time and pass on; at the start the session closes
-  and anyone still waiting hears there was no seat.
+  stored). Unanswered offers expire after the branch's offer time and pass on; a free seat whose hand-off
+  failed is offered by the next tick; at the start the session closes and anyone still waiting hears there was
+  no seat.
 
 Staff invites arrive in Mailpit too. Their template lives in `supabase/templates/invite.html`; copy it to the
 hosted project's "Invite user" email template when you deploy.
@@ -103,7 +104,7 @@ pnpm typecheck           # every package (web runs `next typegen` first)
 pnpm test                # engine, sim and web unit/property tests
 pnpm test:integration    # web against the local Supabase (real auth users, RLS)
 pnpm db:test             # pgTAP: schema, RLS, grants, RPCs, cross-venue references, history, outbox, jobs, bookings, open play
-pnpm test:race           # two-connection races: accepting an offer, booking the same slot, beating the limit
+pnpm test:race           # two-connection races: accepting an offer, booking the same slot, beating the limit, accept vs cancel session
 pnpm db:lint             # Supabase security/performance advisors, fails on warnings
 pnpm db:reset            # re-apply all migrations to a clean local DB
 pnpm env:local           # regenerate apps/web/.env.local + the Vault job secrets (then restart the dev server)
@@ -120,5 +121,5 @@ Hard numbers for the case study, re-measured as features land.
 | Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
 | Engine tests (incl. property tests) | 51 | `pnpm --filter @bm/engine test` |
 | Web unit tests | 205 | `pnpm --filter web test` |
-| Web integration tests (real Supabase, Realtime, Mailpit) | 82 | `pnpm test:integration` |
-| Database assertions | 285 pgTAP checks + 3 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
+| Web integration tests (real Supabase, Realtime, Mailpit) | 84 | `pnpm test:integration` |
+| Database assertions | 286 pgTAP checks + 4 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
