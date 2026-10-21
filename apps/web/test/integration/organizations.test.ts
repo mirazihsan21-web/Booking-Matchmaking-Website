@@ -45,7 +45,7 @@ describe('createOrganization', () => {
     expect(resources!.find((r) => r.name === 'Pitch 1')).toMatchObject({ kind: 'pitch', capacity: 14, price_per_hour_poisha: 250000 });
 
     const { data: activities } = await db.from('activities').select('name, team_mode, team_size').eq('organization_id', organizationId);
-    expect(activities!.map((a) => a.name).sort()).toEqual(['5-a-side futsal', '7-a-side', 'Badminton doubles']);
+    expect(activities!.map((a) => a.name).sort()).toEqual(['5-a-side futsal', '7-a-side football', 'Badminton doubles']);
   });
 
   it('normalises the slug', async () => {

@@ -74,7 +74,7 @@ A preset gives an organization its words, default palette, starter activities an
 |---|---|---|---|
 | Words: resource / activity / session / participant | table / game / game night / player | pitch / format / open match / player | zone / game / squad session / gamer |
 | Starter resources | Tables 1–5 (cap 4), Tables 6–7 (cap 6) | Pitch 1, Pitch 2 (cap 14, **BDT 2,500/h**); Badminton Court 1 (cap 4, BDT 600/h) | PC Zone A, PC Zone B (cap 10, BDT 1,500/h); Console Pods 1–2 (cap 4, BDT 400/h) |
-| Starter activities | The 8 M1 games (`team_mode none`) | 5-a-side futsal (`two_teams`, 5); 7-a-side (`two_teams`, 7); Badminton doubles (`two_teams`, 2) | Valorant 5v5 (`two_teams`, 5); CS2 5v5 (`two_teams`, 5); EA FC 1v1 (`two_teams`, 1); PUBG squad (`none`, 2–4) |
+| Starter activities | The 8 M1 games (`team_mode none`) | 5-a-side futsal (`two_teams`, 5); 7-a-side football (`two_teams`, 7); Badminton doubles (`two_teams`, 2) | Valorant 5v5 (`two_teams`, 5); CS2 5v5 (`two_teams`, 5); EA FC 1v1 (`two_teams`, 1); PUBG squad (`none`, 2–4) |
 | Default open-play seat price | BDT 200 | BDT 300 | BDT 150 |
 
 ## 5. Matchmaking engine (additions)
