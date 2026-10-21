@@ -59,6 +59,29 @@ Then:
    (the user must have signed in once). With `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SECRET_KEY`
    set in the shell, the same command targets a hosted project instead.
 
+### Using the hosted Supabase project
+
+The app can run against the hosted project (`rhycdpswtiitjhzoczfq`) instead of the local stack:
+
+```bash
+pnpm exec supabase login                                     # once, with the account that owns the project
+pnpm exec supabase link --project-ref rhycdpswtiitjhzoczfq   # once
+pnpm exec supabase db push                                   # apply new migrations to the hosted database
+pnpm env:hosted                                              # .env.local → hosted (keys read from the CLI, never printed)
+pnpm env:local                                               # .env.local → back to the local stack
+```
+
+- **Tests always use the local stack** (`db:test`, `db:reset` and `db:lint` say `--local`): they create and
+  delete users and venues. Keep `pnpm db:start` running.
+- While the local stack runs, its 10-second job keeps calling the dev server, which then works on the hosted
+  database; app emails still land in the local Mailpit. The hosted database's own job is idle until the app
+  is deployed (it can't reach `localhost`).
+- In the dashboard (Authentication → URL Configuration) set the Site URL to `http://localhost:3000` and add
+  `http://localhost:3000/**` and `http://*.localhost:3000/**` to the redirect URLs. Keep "Confirm email" on.
+- Supabase's built-in email only reaches your project team's addresses, a few per hour. Players need a custom
+  SMTP provider (e.g. Resend) or Google sign-in. Staff invites also need `supabase/templates/invite.html`
+  copied into the "Invite user" template.
+
 ### Bookings, notifications and the job tick
 
 - Players book a space at `http://<slug>.localhost:3000/book` (after creating a profile at `/me`), see their
