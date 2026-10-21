@@ -67,23 +67,24 @@ reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000e0a2","role":"authenticated"}';
 select throws_ok(
-  $$ insert into public.seat_requests (organization_id, session_id, profile_id)
-     values ('00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000f004', '00000000-0000-4000-8000-00000000e005') $$,
-  '23503', null, 'a player cannot request a seat in another venue''s session'
-);
-select throws_ok(
   $$ insert into public.profile_activities (organization_id, profile_id, activity_id, rank)
      values ('00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e005', '00000000-0000-4000-8000-00000000f003', 1) $$,
   '23503', null, 'a player cannot favourite another venue''s activity'
 );
+reset role;
+
+-- Server-side paths (service role / RPCs) are held to the same rule. Seat requests are written only
+-- by the server (Stage B2 revoked players' insert).
+select throws_ok(
+  $$ insert into public.seat_requests (organization_id, session_id, profile_id)
+     values ('00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000f004', '00000000-0000-4000-8000-00000000e005') $$,
+  '23503', null, 'a seat request cannot point at another venue''s session'
+);
 select lives_ok(
   $$ insert into public.seat_requests (organization_id, session_id, profile_id)
      values ('00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e004', '00000000-0000-4000-8000-00000000e005') $$,
-  'a player can still request a seat in their own venue''s session'
+  'a seat request in the venue''s own session is fine'
 );
-reset role;
-
--- Server-side paths (service role / RPCs) are held to the same rule
 select throws_ok(
   $$ insert into public.groups (organization_id, session_id, resource_id, activity_id, capacity)
      values ('00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000f004',

@@ -11,12 +11,13 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
-    "db:reset": "supabase db reset",
-    "db:test": "supabase test db",
+    "db:reset": "supabase db reset --local",
+    "db:test": "supabase test db --local",
     "test:race": "vitest run supabase/tests/race",
     "db:lint": "supabase db advisors --local --type all --fail-on warn",
     "test:integration": "pnpm --filter web test:integration",
     "env:local": "pnpm --filter web env:local",
+    "env:hosted": "pnpm --filter web env:hosted",
     "admin:grant": "node apps/web/scripts/grant-platform-admin.mjs"
   },
   "devDependencies": {

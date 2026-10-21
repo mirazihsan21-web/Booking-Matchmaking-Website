@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { ActionButton, ActionForm, Field, FieldError, SelectField } from "@/components/forms/action-form";
 import { Badge } from "@/components/ui/badge";
@@ -43,8 +44,11 @@ async function Schedule({ params }: { params: Promise<{ slug: string }> }) {
             const where = (s.open_play_session_resources as unknown as Array<{ resources: { name: string } }>).map((r) => r.resources.name).join(", ");
             return (
               <div key={s.id} className="flex flex-wrap items-center gap-3 border-b border-border pb-2 text-sm last:border-0">
-                <span className="w-40 font-medium">{formatNight(s.starts_at, org.timezone)}</span>
+                <Link href={`/manage/${org.slug}/sessions/${s.id}`} className="w-40 font-medium text-primary hover:underline">
+                  {formatNight(s.starts_at, org.timezone)}
+                </Link>
                 <span>{activity}</span>
+                {s.status !== "open" && <Badge>{m.staffSession.status[s.status] ?? s.status}</Badge>}
                 <span className="text-foreground/60">{where}</span>
                 <Badge variant="outline">{formatBdt(s.seat_price_poisha)}</Badge>
                 <ActionButton action={cancelSessionAction.bind(null, org.slug, s.id)} label={m.schedule.cancel} variant="ghost" />

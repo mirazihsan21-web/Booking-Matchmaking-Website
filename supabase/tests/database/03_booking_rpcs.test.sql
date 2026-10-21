@@ -75,7 +75,8 @@ select is((select count(*)::int from public.bookings
   'the waitlisted player now holds seat 1 at the session price');
 select is((select status::text from public.waitlist_entries where id = '00000000-0000-4000-8000-0000000003a5'), 'promoted',
   'the entry is promoted');
-select ok((select (payload ->> 'seconds_since_cancel')::int >= 0 from public.events where type = 'seat_filled'),
+select ok((select (payload ->> 'seconds_since_cancel')::int >= 0 from public.events
+           where type = 'seat_filled' and session_id = '00000000-0000-4000-8000-0000000000e1'),
   'a seat_filled event records the refill time');
 select is(public.accept_offer((select id from public.seat_offers where waitlist_entry_id = '00000000-0000-4000-8000-0000000003a5')),
   'already_accepted', 'a duplicate YES is a no-op');
