@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatNight } from "@/lib/format";
 import { formatBdt } from "@/lib/money";
+import { seatsLeft } from "@/lib/open-play/open-play";
 import type { OpeningHours, Weekday } from "@/lib/opening-hours";
+import { createServiceClient } from "@/lib/service-client";
 import { createClient } from "@/lib/supabase/server";
 import { getLiveOrganization } from "@/lib/tenancy/org";
 import { logoUrl } from "@/lib/tenancy/urls";
@@ -32,11 +34,13 @@ async function VenueHome({ params }: { params: Promise<{ slug: string }> }) {
       .from("open_play_sessions")
       .select("id, starts_at, seat_price_poisha, activities(name)")
       .eq("organization_id", org.id)
-      .eq("status", "open")
+      .in("status", ["open", "matched"])
       .gte("starts_at", now.toISOString())
       .lt("starts_at", fortnight.toISOString())
       .order("starts_at"),
   ]);
+  // Counts only, from the service client: players never read other players' requests.
+  const left = await seatsLeft(createServiceClient(), { organizationId: org.id, sessionIds: (sessions ?? []).map((s) => s.id) });
   const logo = logoUrl(org.branding.logo_path);
 
   return (
@@ -59,12 +63,17 @@ async function VenueHome({ params }: { params: Promise<{ slug: string }> }) {
         ) : (
           <ul className="flex flex-col gap-2">
             {sessions!.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border px-4 py-3">
-                <span className="w-40 font-medium">{formatNight(s.starts_at, org.timezone)}</span>
-                <span>{(s.activities as unknown as { name: string } | null)?.name ?? m.tenant.anyActivity}</span>
-                <Badge variant="secondary" className="ml-auto">
-                  {formatBdt(s.seat_price_poisha)} {m.tenant.perSeat}
-                </Badge>
+              <li key={s.id}>
+                <Link href={`/sessions/${s.id}`} className="flex flex-wrap items-center gap-3 rounded-lg border border-border px-4 py-3 hover:border-primary">
+                  <span className="w-40 font-medium">{formatNight(s.starts_at, org.timezone)}</span>
+                  <span>{(s.activities as unknown as { name: string } | null)?.name ?? m.tenant.anyActivity}</span>
+                  <span className="ml-auto flex flex-wrap gap-2">
+                    <Badge variant="outline">{(left.get(s.id) ?? 0) > 0 ? m.openPlay.seatsLeft(left.get(s.id)!) : m.openPlay.full}</Badge>
+                    <Badge variant="secondary">
+                      {formatBdt(s.seat_price_poisha)} {m.tenant.perSeat}
+                    </Badge>
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>
