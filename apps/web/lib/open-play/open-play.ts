@@ -286,7 +286,7 @@ export async function cancelSeat(
   const { data: freed, error: cancelError } = await db.rpc('cancel_booking', { p_booking_id: input.bookingId, p_by_venue: input.actor.kind === 'staff' });
   if (cancelError) throw cancelError;
   if (!(freed as unknown[]).length) return 'closed';
-  await offerNext(db, { groupId: booking.group_id, seatNo: booking.seat_no });
+  await handOn(db, booking.group_id, booking.seat_no);
   return 'cancelled';
 }
 
@@ -300,9 +300,21 @@ export async function respondToOffer(db: SupabaseClient, input: { offerId: strin
   if (rpcError) throw rpcError;
   const outcome = data as RespondOutcome;
   if ((input.response === 'decline' && outcome === 'declined') || outcome === 'already_booked') {
-    await offerNext(db, { groupId: offer.group_id, seatNo: offer.seat_no });
+    await handOn(db, offer.group_id, offer.seat_no);
   }
   return outcome;
+}
+
+/**
+ * Offers a just-freed seat on. The cancel or decline has already committed, so a failure here is only
+ * logged: the player still gets their answer, and the tick's refill step offers the seat next time.
+ */
+async function handOn(db: SupabaseClient, groupId: string, seatNo: number): Promise<void> {
+  try {
+    await offerNext(db, { groupId, seatNo });
+  } catch (error) {
+    console.error(`offering seat ${seatNo} of group ${groupId} failed; the tick will retry:`, error);
+  }
 }
 
 /**
