@@ -57,6 +57,8 @@ const lines = [
   keep('SMTP_HOST', '127.0.0.1'),
   keep('SMTP_PORT', '54325'),
   keep('EMAIL_FROM', 'Booking & Matchmaking <bookings@localhost>'),
+  // Optional: a mail-server login (Gmail) and a Resend key, kept only when already set.
+  ...['SMTP_USER', 'SMTP_PASS', 'RESEND_API_KEY'].filter((name) => current[name]).map((name) => `${name}=${current[name]}`),
 ];
 writeFileSync(target, lines.join('\n') + '\n');
 console.log(`wrote ${target} for the hosted project ${ref} (restart the dev server)`);
