@@ -18,20 +18,38 @@ function required(env: Record<string, string | undefined>, name: string): string
 }
 
 /**
+ * SMTP connection settings: `SMTP_HOST` / `SMTP_PORT`, plus `SMTP_USER` / `SMTP_PASS` for a server that
+ * needs a login (e.g. Gmail with an App Password: smtp.gmail.com, port 465). Port 465 is TLS from the
+ * start; other ports (587, Mailpit's 54325) upgrade with STARTTLS when the server offers it.
+ */
+export function smtpOptions(env: Record<string, string | undefined>): {
+  host: string;
+  port: number;
+  secure: boolean;
+  auth?: { user: string; pass: string };
+} {
+  const host = required(env, 'SMTP_HOST');
+  const port = Number(required(env, 'SMTP_PORT'));
+  const options = { host, port, secure: port === 465 };
+  if (!env.SMTP_USER && !env.SMTP_PASS) return options;
+  return { ...options, auth: { user: required(env, 'SMTP_USER'), pass: required(env, 'SMTP_PASS') } };
+}
+
+/**
  * The sender the job tick uses, from environment variables:
- * - `EMAIL_TRANSPORT=smtp` with `SMTP_HOST` / `SMTP_PORT` (Mailpit locally on 54325);
- * - `EMAIL_TRANSPORT=resend` with `RESEND_API_KEY` (production, Stage E).
- * Both need `EMAIL_FROM`. Misconfiguration throws at creation, naming the missing variable.
+ * - `EMAIL_TRANSPORT=smtp` with `smtpOptions` (Mailpit locally on 54325, or Gmail);
+ * - `EMAIL_TRANSPORT=resend` with `RESEND_API_KEY` (needs a verified domain).
+ * Both need `EMAIL_FROM` (for Gmail, the Gmail address itself). Misconfiguration throws at creation,
+ * naming the missing variable.
  */
 export function createEmailSender(env: Record<string, string | undefined>): EmailSender {
   const transport = env.EMAIL_TRANSPORT;
   if (transport !== 'smtp' && transport !== 'resend') throw new Error('EMAIL_TRANSPORT must be "smtp" or "resend"');
 
   if (transport === 'smtp') {
-    const host = required(env, 'SMTP_HOST');
-    const port = Number(required(env, 'SMTP_PORT'));
+    const options = smtpOptions(env);
     const from = required(env, 'EMAIL_FROM');
-    const mailer = nodemailer.createTransport({ host, port, secure: false });
+    const mailer = nodemailer.createTransport(options);
     return {
       async send(message) {
         await mailer.sendMail({ from, ...message });
