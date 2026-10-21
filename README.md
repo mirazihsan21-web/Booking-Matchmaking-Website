@@ -4,7 +4,8 @@ A multi-tenant booking and matchmaking platform for **board-game cafés, futsal/
 gaming lounges in Bangladesh**, built by Console Log Studio. Venues sign themselves up, get their own
 subdomain in their own colours, set up branches, spaces, activities and an open-play schedule, and
 players create a profile per venue. A matching engine forms fair groups (or two balanced teams) and
-keeps a fair waitlist. Bookings, matchmaking and bKash payments land in Stages B and C.
+keeps a fair waitlist. Players book whole spaces or join open play, where the engine forms the groups
+and teams at the venue's cut-off and offers cancelled seats to the waitlist. bKash payments land in Stage C.
 
 "Booking & Matchmaking" is a working name (see `m.platform.name` in `apps/web/messages/en.ts`).
 
@@ -70,6 +71,19 @@ Then:
 - Owners set the booking rules in **Settings → Bookings**: how far ahead players can book, the cancellation
   and matching cut-offs, and how many upcoming bookings one player may hold. Each space has a slot length.
 
+### Open play: requests, matching and seat offers
+
+- Players open a session from the venue page (`/sessions/<id>`), press **Request a seat**, and later see
+  their table or team with the other players' display names. Seats are cancelled there or at `/me/bookings`.
+- At the venue's match cut-off (default 6 hours before the start) the tick runs the engine over the requests:
+  groups, and two balanced teams for team games. Everyone hears where they stand. With too few players the
+  session stays open and matching retries until the start. Staff can also press **Match now** on
+  `/manage/<slug>/sessions/<id>`, where they see requests, teams with skill totals, the waitlist and live offers.
+- A cancelled seat goes to the waiting player who fits that table best. They get a bell notification and an
+  email with a one-time **Take the seat** link (`/offers/<token>`, no sign-in; only a hash of the token is
+  stored). Unanswered offers expire after the branch's offer time and pass on; at the start the session closes
+  and anyone still waiting hears there was no seat.
+
 Staff invites arrive in Mailpit too. Their template lives in `supabase/templates/invite.html`; copy it to the
 hosted project's "Invite user" email template when you deploy.
 
@@ -88,7 +102,7 @@ Email links work out of the box. For Google:
 pnpm typecheck           # every package (web runs `next typegen` first)
 pnpm test                # engine, sim and web unit/property tests
 pnpm test:integration    # web against the local Supabase (real auth users, RLS)
-pnpm db:test             # pgTAP: schema, RLS, grants, RPCs, cross-venue references, history, outbox, jobs, bookings
+pnpm db:test             # pgTAP: schema, RLS, grants, RPCs, cross-venue references, history, outbox, jobs, bookings, open play
 pnpm test:race           # two-connection races: accepting an offer, booking the same slot, beating the limit
 pnpm db:lint             # Supabase security/performance advisors, fails on warnings
 pnpm db:reset            # re-apply all migrations to a clean local DB
@@ -105,6 +119,6 @@ Hard numbers for the case study, re-measured as features land.
 |---|---|---|
 | Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
 | Engine tests (incl. property tests) | 51 | `pnpm --filter @bm/engine test` |
-| Web unit tests | 191 | `pnpm --filter web test` |
-| Web integration tests (real Supabase, Realtime, Mailpit) | 65 | `pnpm test:integration` |
-| Database assertions | 213 pgTAP checks + 3 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
+| Web unit tests | 205 | `pnpm --filter web test` |
+| Web integration tests (real Supabase, Realtime, Mailpit) | 82 | `pnpm test:integration` |
+| Database assertions | 285 pgTAP checks + 3 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
