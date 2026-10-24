@@ -17,6 +17,8 @@ const lines = [
   `SUPABASE_SECRET_KEY=${status.SECRET_KEY}`,
   'NEXT_PUBLIC_ROOT_DOMAIN=localhost:3000',
   'NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=false',
+  // The local demo brand (pnpm brand:setup --name "Demo Arena" --demo).
+  'BRAND_SLUG=demo-brand',
   `JOB_SECRET=${jobSecret}`,
   'EMAIL_TRANSPORT=smtp',
   'SMTP_HOST=127.0.0.1',

@@ -45,13 +45,26 @@ const current = existsSync(target)
     )
   : {};
 const keep = (name, fallback) => `${name}=${current[name] ?? fallback}`;
+// A brand set while already on hosted is kept; coming from local (demo-brand) it is the client's brand.
+const wasHosted = /^https:\/\/[a-z]{20}\.supabase\.co$/.test(current.NEXT_PUBLIC_SUPABASE_URL ?? '');
+const brandSlug = (wasHosted && current.BRAND_SLUG) || 'chattoturf';
+
+// The Google button follows whether Google sign-in is switched on for the hosted project.
+let googleEnabled = current.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED ?? 'false';
+try {
+  const res = await fetch(`https://${ref}.supabase.co/auth/v1/settings`, { headers: { apikey: publishable } });
+  if (res.ok) googleEnabled = String(Boolean((await res.json()).external?.google));
+} catch {
+  // offline: keep the current value
+}
 
 const lines = [
   `NEXT_PUBLIC_SUPABASE_URL=https://${ref}.supabase.co`,
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${publishable}`,
   `SUPABASE_SECRET_KEY=${secret}`,
   'NEXT_PUBLIC_ROOT_DOMAIN=localhost:3000',
-  keep('NEXT_PUBLIC_GOOGLE_AUTH_ENABLED', 'false'),
+  `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=${googleEnabled}`,
+  `BRAND_SLUG=${brandSlug}`,
   keep('JOB_SECRET', randomBytes(32).toString('hex')),
   keep('EMAIL_TRANSPORT', 'smtp'),
   keep('SMTP_HOST', '127.0.0.1'),
@@ -61,4 +74,4 @@ const lines = [
   ...['SMTP_USER', 'SMTP_PASS', 'RESEND_API_KEY'].filter((name) => current[name]).map((name) => `${name}=${current[name]}`),
 ];
 writeFileSync(target, lines.join('\n') + '\n');
-console.log(`wrote ${target} for the hosted project ${ref} (restart the dev server)`);
+console.log(`wrote ${target} for the hosted project ${ref}, brand ${brandSlug}, Google sign-in ${googleEnabled === 'true' ? 'on' : 'off'} (restart the dev server)`);
