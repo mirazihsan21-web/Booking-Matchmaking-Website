@@ -35,16 +35,17 @@ describe('createOrganization', () => {
     const { data: members } = await db.from('organization_members').select('user_id, role').eq('organization_id', organizationId);
     expect(members).toEqual([{ user_id: owner.id, role: 'owner' }]);
 
-    const { data: branches } = await db.from('branches').select('id, name').eq('organization_id', organizationId);
+    const { data: branches } = await db.from('sections').select('id, name, kind, slug, accent, position').eq('organization_id', organizationId);
     expect(branches).toHaveLength(1);
-    expect(branches![0]!.name).toBe('Dhanmondi Turf');
+    expect(branches![0]).toMatchObject({ name: 'Dhanmondi Turf', kind: 'turf', slug: 'turf', accent: '#15803D', position: 1 });
 
-    const { data: resources } = await db.from('resources').select('name, kind, capacity, price_per_hour_poisha, branch_id').eq('organization_id', organizationId);
+    const { data: resources } = await db.from('resources').select('name, kind, capacity, price_per_hour_poisha, section_id').eq('organization_id', organizationId);
     expect(resources).toHaveLength(3);
-    expect(resources!.every((r) => r.branch_id === branches![0]!.id)).toBe(true);
+    expect(resources!.every((r) => r.section_id === branches![0]!.id)).toBe(true);
     expect(resources!.find((r) => r.name === 'Pitch 1')).toMatchObject({ kind: 'pitch', capacity: 14, price_per_hour_poisha: 250000 });
 
-    const { data: activities } = await db.from('activities').select('name, team_mode, team_size').eq('organization_id', organizationId);
+    const { data: activities } = await db.from('activities').select('name, team_mode, team_size, section_id').eq('organization_id', organizationId);
+    expect(activities!.every((a) => a.section_id === branches![0]!.id)).toBe(true);
     expect(activities!.map((a) => a.name).sort()).toEqual(['5-a-side futsal', '7-a-side football', 'Badminton doubles']);
   });
 

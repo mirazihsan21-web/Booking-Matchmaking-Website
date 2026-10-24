@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { m } from '@/messages';
 import { fieldErrors, text, type FormResult } from './result';
 
-/** A venue's booking rules (organizations columns; spec §2.2). Cut-offs are stored in minutes. */
+/** A section's booking rules (sections columns). Cut-offs are stored in minutes. */
 export interface BookingSettings {
   bookingHorizonDays: number;
   cancelCutoffMinutes: number;

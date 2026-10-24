@@ -6,6 +6,7 @@ import { formatNight } from "@/lib/format";
 import { formatBdt } from "@/lib/money";
 import { seatsLeft } from "@/lib/open-play/open-play";
 import type { OpeningHours, Weekday } from "@/lib/opening-hours";
+import { loadSections } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { createClient } from "@/lib/supabase/server";
 import { getLiveOrganization } from "@/lib/tenancy/org";
@@ -27,8 +28,8 @@ async function VenueHome({ params }: { params: Promise<{ slug: string }> }) {
   const supabase = await createClient();
   const now = new Date();
   const fortnight = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-  const [{ data: branches }, { data: activities }, { data: sessions }] = await Promise.all([
-    supabase.from("branches").select("id, name, address, opening_hours").eq("organization_id", org.id).order("created_at"),
+  const [sections, { data: activities }, { data: sessions }] = await Promise.all([
+    loadSections(supabase, org.id),
     supabase.from("activities").select("id, name, team_mode, team_size, min_players, max_players").eq("organization_id", org.id).eq("active", true).order("name"),
     supabase
       .from("open_play_sessions")
@@ -91,15 +92,15 @@ async function VenueHome({ params }: { params: Promise<{ slug: string }> }) {
         </div>
       </section>
 
+      {org.address && <p className="text-sm text-foreground/70">{org.address}</p>}
       <section className="grid gap-3 sm:grid-cols-2">
-        {(branches ?? []).map((b) => (
-          <Card key={b.id}>
+        {sections.map((s) => (
+          <Card key={s.id}>
             <CardHeader>
-              <CardTitle>{b.name}</CardTitle>
+              <CardTitle>{s.name}</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-1 text-sm text-foreground/70">
-              {b.address && <span>{b.address}</span>}
-              <span>{todaysHours(b.opening_hours as OpeningHours, org.timezone)}</span>
+              <span>{todaysHours(s.openingHours, org.timezone)}</span>
             </CardContent>
           </Card>
         ))}

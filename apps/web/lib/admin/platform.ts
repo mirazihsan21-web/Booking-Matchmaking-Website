@@ -41,7 +41,7 @@ export async function listOrganizations(db: SupabaseClient, limit = 200): Promis
         id: org.id,
         slug: org.slug,
         name: org.name,
-        businessType: org.business_type as BusinessType,
+        businessType: (org.business_type ?? 'turf') as BusinessType,
         status: org.status,
         createdAt: org.created_at,
         ownerEmail,

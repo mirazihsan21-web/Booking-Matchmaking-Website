@@ -13,7 +13,7 @@ let keen: TestUser;
 let quiet: TestUser;
 let keenProfile: string;
 let quietProfile: string;
-let branchId: string;
+let sectionId: string;
 let pitchId: string;
 let activityId: string;
 
@@ -44,7 +44,7 @@ async function offerFor(profileId: string): Promise<{ offerId: string; notificat
   const at = (ms: number) => new Date(Date.now() + ms).toISOString();
   const { data: session, error } = await db
     .from('open_play_sessions')
-    .insert({ organization_id: orgId, branch_id: branchId, activity_id: activityId, starts_at: at(2 * 86_400_000), ends_at: at(2 * 86_400_000 + 3_600_000), seat_price_poisha: 30000, status: 'matched' })
+    .insert({ organization_id: orgId, section_id: sectionId, activity_id: activityId, starts_at: at(2 * 86_400_000), ends_at: at(2 * 86_400_000 + 3_600_000), seat_price_poisha: 30000, status: 'matched' })
     .select('id')
     .single();
   if (error) throw error;
@@ -71,20 +71,20 @@ beforeAll(async () => {
   const { data: profiles, error: profileError } = await db
     .from('player_profiles')
     .insert([
-      { organization_id: orgId, user_id: keen.id, display_name: 'Keen', skill: 3, email_opt_in: true },
-      { organization_id: orgId, user_id: quiet.id, display_name: 'Quiet', skill: 3, email_opt_in: false },
+      { organization_id: orgId, user_id: keen.id, display_name: 'Keen', email_opt_in: true },
+      { organization_id: orgId, user_id: quiet.id, display_name: 'Quiet', email_opt_in: false },
     ])
     .select('id, user_id');
   if (profileError) throw profileError;
   keenProfile = profiles.find((p) => p.user_id === keen.id)!.id;
   quietProfile = profiles.find((p) => p.user_id === quiet.id)!.id;
-  const { data: branch } = await db.from('branches').insert({ organization_id: orgId, name: 'Main' }).select('id').single();
-  branchId = branch!.id;
-  const { data: pitch } = await db.from('resources').insert({ organization_id: orgId, branch_id: branchId, name: 'Pitch 1', kind: 'pitch', capacity: 14 }).select('id').single();
+  const { data: branch } = await db.from('sections').insert({ organization_id: orgId, name: 'Main', kind: 'turf', slug: 'main' }).select('id').single();
+  sectionId = branch!.id;
+  const { data: pitch } = await db.from('resources').insert({ organization_id: orgId, section_id: sectionId, name: 'Pitch 1', kind: 'pitch', capacity: 14 }).select('id').single();
   pitchId = pitch!.id;
   const { data: activity } = await db
     .from('activities')
-    .insert({ organization_id: orgId, name: '5-a-side', min_players: 10, max_players: 10, duration_min: 60, team_mode: 'two_teams', team_size: 5 })
+    .insert({ organization_id: orgId, section_id: sectionId, name: '5-a-side', min_players: 10, max_players: 10, duration_min: 60, team_mode: 'two_teams', team_size: 5 })
     .select('id')
     .single();
   activityId = activity!.id;

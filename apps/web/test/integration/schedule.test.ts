@@ -8,13 +8,13 @@ import { createTestUser, deleteTestUser, serviceDb, type TestUser } from './help
 const db = serviceDb();
 let owner: TestUser;
 let orgId: string;
-let branchId: string;
+let sectionId: string;
 let pitch1: string;
 let fiveASide: string;
 
 const base = () => ({
   organizationId: orgId,
-  branchId,
+  sectionId,
   activityId: fiveASide,
   resourceIds: [pitch1],
   durationMin: 60,
@@ -33,7 +33,7 @@ beforeAll(async () => {
   const created = await createOrganization(db, { userId: owner.id, businessType: 'turf', name: 'Schedule Turf', slug: `sched-${randomUUID().slice(0, 6)}` });
   if (created.status !== 'created') throw new Error(created.status);
   orgId = created.organizationId;
-  branchId = (await db.from('branches').select('id').eq('organization_id', orgId).single()).data!.id;
+  sectionId = (await db.from('sections').select('id').eq('organization_id', orgId).single()).data!.id;
   pitch1 = (await db.from('resources').select('id').eq('organization_id', orgId).eq('name', 'Pitch 1').single()).data!.id;
   fiveASide = (await db.from('activities').select('id').eq('organization_id', orgId).eq('name', '5-a-side futsal').single()).data!.id;
 });
@@ -79,6 +79,13 @@ describe('scheduleOpenPlay (Review Focus 4)', () => {
 
   it('reports another venue’s resource as invalid', async () => {
     const result = await scheduleOpenPlay(db, { ...base(), resourceIds: [randomUUID()], first: { date: '2027-05-07', time: '20:00' }, weeks: 1 });
+    expect(result).toEqual({ status: 'invalid' });
+  });
+
+  it("refuses a space from another section", async () => {
+    const { data: cafeId } = await db.rpc('add_section', { p_organization_id: orgId, p_kind: 'boardgame_cafe', p_name: 'Café' });
+    const { data: table } = await db.from('resources').insert({ organization_id: orgId, section_id: cafeId, name: 'Table 1', kind: 'table', capacity: 4 }).select('id').single();
+    const result = await scheduleOpenPlay(db, { ...base(), resourceIds: [pitch1, table!.id], first: { date: '2027-03-05', time: '20:00' }, weeks: 1 });
     expect(result).toEqual({ status: 'invalid' });
   });
 

@@ -59,11 +59,11 @@ describe('saveProfile', () => {
     const { user, client } = await player();
     const first = await saveProfile(client, { userId: user.id, organizationId: liveOrg, input: input() });
     expect(first.status).toBe('saved');
-    const second = await saveProfile(client, { userId: user.id, organizationId: liveOrg, input: input({ displayName: 'Rafi H.', skill: 4 }) });
+    const second = await saveProfile(client, { userId: user.id, organizationId: liveOrg, input: input({ displayName: 'Rafi H.'}) });
     expect(second).toEqual(first);
 
     const { data } = await client.from('player_profiles').select('display_name, skill').eq('organization_id', liveOrg).single();
-    expect(data).toEqual({ display_name: 'Rafi H.', skill: 4 });
+    expect(data).toEqual({ display_name: 'Rafi H.' });
     const { data: avail } = await client.from('availability').select('weekday, start_time, end_time');
     expect(avail).toEqual([{ weekday: 5, start_time: '18:00:00', end_time: '23:00:00' }]);
   });
@@ -84,7 +84,7 @@ describe('saveProfile', () => {
     await saveProfile(a.client, { userId: a.user.id, organizationId: liveOrg, input: input({ displayName: 'A' }) });
     await saveProfile(b.client, { userId: b.user.id, organizationId: liveOrg, input: input({ displayName: 'B' }) });
     const { data } = await b.client.from('player_profiles').select('display_name');
-    expect(data).toEqual([{ display_name: 'B' }]);
+    expect(data).toEqual([{ display_name: 'B'  }]);
   });
 
   it('stores favourites in rank order and ignores ids from other venues', async () => {

@@ -1,8 +1,9 @@
 import { Suspense } from "react";
-import { ActionButton, ActionForm } from "@/components/forms/action-form";
+import { ActionButton, ActionForm, SelectField } from "@/components/forms/action-form";
 import { ActivityFields } from "@/components/manage/activity-fields";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { loadSections } from "@/lib/sections/sections";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrgRole } from "@/lib/tenancy/dal";
 import { m } from "@/messages";
@@ -14,11 +15,15 @@ async function Activities({ params }: { params: Promise<{ slug: string }> }) {
   const { org } = await requireOrgRole(slug, "owner");
   const { labels } = getPreset(org.businessType);
   const supabase = await createClient();
-  const { data: activities } = await supabase
-    .from("activities")
-    .select("id, name, team_mode, team_size, min_players, max_players, duration_min, active")
-    .eq("organization_id", org.id)
-    .order("name");
+  const [sections, { data: activities }] = await Promise.all([
+    loadSections(supabase, org.id),
+    supabase
+      .from("activities")
+      .select("id, section_id, name, team_mode, team_size, min_players, max_players, duration_min, active")
+      .eq("organization_id", org.id)
+      .order("name"),
+  ]);
+  const sectionName = new Map(sections.map((s) => [s.id, s.name]));
 
   return (
     <div className="flex flex-col gap-4">
@@ -27,6 +32,7 @@ async function Activities({ params }: { params: Promise<{ slug: string }> }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               {a.name}
+              <Badge variant="outline">{sectionName.get(a.section_id)}</Badge>
               <Badge variant="outline">
                 {a.team_mode === "two_teams" ? m.manage.versus(a.team_size!) : m.manage.players(a.min_players, a.max_players)}
               </Badge>
@@ -64,6 +70,7 @@ async function Activities({ params }: { params: Promise<{ slug: string }> }) {
         </CardHeader>
         <CardContent>
           <ActionForm action={saveActivityAction.bind(null, org.slug, null)} submitLabel={m.manage.add} resetOnSuccess>
+            <SelectField name="sectionId" label={m.manage.section} options={sections.map((s) => ({ value: s.id, label: s.name }))} />
             <ActivityFields />
           </ActionForm>
         </CardContent>

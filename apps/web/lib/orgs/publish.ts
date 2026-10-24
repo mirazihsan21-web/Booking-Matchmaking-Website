@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type PublishResult =
   | { status: 'live' }
-  | { status: 'not_ready'; missing: Array<'branch' | 'resource' | 'activity'> }
+  | { status: 'not_ready'; missing: Array<'section' | 'resource' | 'activity'> }
   | { status: 'suspended' };
 
 async function count(db: SupabaseClient, table: string, organizationId: string, activeOnly: boolean): Promise<number> {
@@ -23,8 +23,8 @@ export async function publishOrganization(db: SupabaseClient, organizationId: st
   if (org.status === 'suspended') return { status: 'suspended' };
   if (org.status === 'live') return { status: 'live' };
 
-  const missing: Array<'branch' | 'resource' | 'activity'> = [];
-  if ((await count(db, 'branches', organizationId, false)) === 0) missing.push('branch');
+  const missing: Array<'section' | 'resource' | 'activity'> = [];
+  if ((await count(db, 'sections', organizationId, false)) === 0) missing.push('section');
   if ((await count(db, 'resources', organizationId, true)) === 0) missing.push('resource');
   if ((await count(db, 'activities', organizationId, true)) === 0) missing.push('activity');
   if (missing.length) return { status: 'not_ready', missing };
