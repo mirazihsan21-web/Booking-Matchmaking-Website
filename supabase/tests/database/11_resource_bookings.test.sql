@@ -24,6 +24,9 @@ values ('00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000
 insert into public.sections (id, organization_id, name, kind, slug, max_upcoming_bookings) values
   ('00000000-0000-4000-8000-0000000011b0', '00000000-0000-4000-8000-0000000011a0', 'Main', 'turf', 'main', 2),
   ('00000000-0000-4000-8000-0000000011b9', '00000000-0000-4000-8000-0000000011a9', 'X main', 'turf', 'x-main', 2);
+-- Staff S runs this section (staff read bookings through their sections).
+insert into public.section_staff (organization_id, section_id, user_id)
+values ('00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011b0', '00000000-0000-4000-8000-0000000011d3');
 insert into public.resources (id, organization_id, section_id, name, kind, capacity, price_per_hour_poisha, slot_minutes) values
   ('00000000-0000-4000-8000-0000000011c0', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011b0', 'Pitch 1', 'pitch', 14, 250000, 60),
   ('00000000-0000-4000-8000-0000000011c9', '00000000-0000-4000-8000-0000000011a9', '00000000-0000-4000-8000-0000000011b9', 'Pitch X', 'pitch', 14, 250000, 60);

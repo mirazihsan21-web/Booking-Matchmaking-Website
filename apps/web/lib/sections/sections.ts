@@ -103,3 +103,19 @@ export async function sectionOfSession(db: SupabaseClient, sessionId: string): P
   const row = (data as { sections: SectionRow | null } | null)?.sections;
   return row ? toSection(row) : null;
 }
+
+/** The section id of a space booking. */
+export async function sectionIdOfSpaceBooking(db: SupabaseClient, bookingId: string): Promise<string | null> {
+  if (!UUID.test(bookingId)) return null;
+  const { data, error } = await db.from('resource_bookings').select('resources(section_id)').eq('id', bookingId).maybeSingle();
+  if (error) throw error;
+  return (data as { resources: { section_id: string } | null } | null)?.resources?.section_id ?? null;
+}
+
+/** The section id of an open-play seat. */
+export async function sectionIdOfSeat(db: SupabaseClient, bookingId: string): Promise<string | null> {
+  if (!UUID.test(bookingId)) return null;
+  const { data, error } = await db.from('bookings').select('open_play_sessions(section_id)').eq('id', bookingId).maybeSingle();
+  if (error) throw error;
+  return (data as { open_play_sessions: { section_id: string } | null } | null)?.open_play_sessions?.section_id ?? null;
+}

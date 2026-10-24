@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { formatNight, formatShortTime } from "@/lib/format";
 import { formatBdt } from "@/lib/money";
 import { staffSessionView } from "@/lib/open-play/open-play";
+import { sectionOfSession } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
-import { requireOrgRole } from "@/lib/tenancy/dal";
+import { requireSectionStaff } from "@/lib/tenancy/dal";
 import { m } from "@/messages";
 import { cancelSessionAction } from "../../schedule/actions";
 import { matchNowAction, staffCancelSeatAction } from "./actions";
@@ -16,8 +17,11 @@ import { matchNowAction, staffCancelSeatAction } from "./actions";
 /** One open-play session for staff: requests, Match now, the teams, the waitlist and live offers. */
 async function StaffSession({ params }: { params: Promise<{ slug: string; id: string }> }) {
   const { slug, id } = await params;
-  const { org } = await requireOrgRole(slug, "staff");
-  const view = await staffSessionView(createServiceClient(), { organizationId: org.id, sessionId: id });
+  const db = createServiceClient();
+  const section = await sectionOfSession(db, id);
+  if (!section) notFound();
+  const { org } = await requireSectionStaff(slug, section.id);
+  const view = await staffSessionView(db, { organizationId: org.id, sessionId: id });
   if (!view) notFound();
   const { session } = view;
   const tz = org.timezone;
