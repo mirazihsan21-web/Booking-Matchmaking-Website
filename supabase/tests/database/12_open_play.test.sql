@@ -26,16 +26,20 @@ insert into public.resources (id, organization_id, section_id, name, kind, capac
   ('00000000-0000-4000-8000-0000000012c1', '00000000-0000-4000-8000-0000000012a0', '00000000-0000-4000-8000-0000000012b0', 'Pitch 1', 'pitch', 14),
   ('00000000-0000-4000-8000-0000000012c2', '00000000-0000-4000-8000-0000000012a0', '00000000-0000-4000-8000-0000000012b0', 'Pitch 2', 'pitch', 14),
   ('00000000-0000-4000-8000-0000000012c3', '00000000-0000-4000-8000-0000000012a0', '00000000-0000-4000-8000-0000000012b0', 'Table 1', 'table', 4);
-insert into public.activities (id, organization_id, name, min_players, max_players, duration_min, team_mode, team_size) values
-  ('00000000-0000-4000-8000-0000000012d1', '00000000-0000-4000-8000-0000000012a0', '5-a-side', 10, 10, 60, 'two_teams', 5),
-  ('00000000-0000-4000-8000-0000000012d2', '00000000-0000-4000-8000-0000000012a0', 'Catan', 3, 4, 90, 'none', null),
-  ('00000000-0000-4000-8000-0000000012d3', '00000000-0000-4000-8000-0000000012a0', 'Azul', 2, 4, 45, 'none', null);
-insert into public.player_profiles (id, organization_id, user_id, display_name, skill)
+insert into public.activities (id, organization_id, section_id, name, min_players, max_players, duration_min, team_mode, team_size) values
+  ('00000000-0000-4000-8000-0000000012d1', '00000000-0000-4000-8000-0000000012a0', '00000000-0000-4000-8000-0000000012b0', '5-a-side', 10, 10, 60, 'two_teams', 5),
+  ('00000000-0000-4000-8000-0000000012d2', '00000000-0000-4000-8000-0000000012a0', '00000000-0000-4000-8000-0000000012b0', 'Catan', 3, 4, 90, 'none', null),
+  ('00000000-0000-4000-8000-0000000012d3', '00000000-0000-4000-8000-0000000012a0', '00000000-0000-4000-8000-0000000012b0', 'Azul', 2, 4, 45, 'none', null);
+insert into public.player_profiles (id, organization_id, user_id, display_name)
 select pg_temp.p(n), '00000000-0000-4000-8000-0000000012a0',
-       ('00000000-0000-4000-8000-0000001200' || lpad(to_hex(n), 2, '0'))::uuid, 'P' || n, 1 + n % 5
+       ('00000000-0000-4000-8000-0000001200' || lpad(to_hex(n), 2, '0'))::uuid, 'P' || n
 from generate_series(1, 21) n;
-insert into public.player_profiles (id, organization_id, user_id, display_name, skill)
-values (pg_temp.p(30), '00000000-0000-4000-8000-0000000012a9', '00000000-0000-4000-8000-00000012001e', 'X', 3);
+insert into public.player_profiles (id, organization_id, user_id, display_name)
+values (pg_temp.p(30), '00000000-0000-4000-8000-0000000012a9', '00000000-0000-4000-8000-00000012001e', 'X');
+-- Every player rates the one section; skills spread 1–5 as before.
+insert into public.profile_section_skills (organization_id, profile_id, section_id, skill)
+select '00000000-0000-4000-8000-0000000012a0', pg_temp.p(n), '00000000-0000-4000-8000-0000000012b0', 1 + n % 5
+from generate_series(1, 21) n;
 insert into public.profile_activities (organization_id, profile_id, activity_id, rank)
 values ('00000000-0000-4000-8000-0000000012a0', pg_temp.p(16), '00000000-0000-4000-8000-0000000012d3', 1);
 

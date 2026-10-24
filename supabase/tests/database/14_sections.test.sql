@@ -44,8 +44,8 @@ select throws_ok(format($$ update public.sections set accent = 'green' where id 
 insert into public.resources (id, organization_id, section_id, name, kind, capacity, price_per_hour_poisha) values
   ('00000000-0000-4000-8000-0000000014c1', '00000000-0000-4000-8000-0000000014a0', pg_temp.section('turf'), 'Pitch 1', 'pitch', 14, 250000),
   ('00000000-0000-4000-8000-0000000014c2', '00000000-0000-4000-8000-0000000014a0', pg_temp.section('cafe'), 'Table 1', 'table', 4, 50000);
-insert into public.player_profiles (id, organization_id, user_id, display_name, skill)
-values ('00000000-0000-4000-8000-0000000014e1', '00000000-0000-4000-8000-0000000014a0', '00000000-0000-4000-8000-0000000014d1', 'P', 3);
+insert into public.player_profiles (id, organization_id, user_id, display_name)
+values ('00000000-0000-4000-8000-0000000014e1', '00000000-0000-4000-8000-0000000014a0', '00000000-0000-4000-8000-0000000014d1', 'P');
 -- Both limits are 1, so the café booking only succeeds if the turf booking isn't counted against it.
 update public.sections set max_upcoming_bookings = 1 where id in (pg_temp.section('turf'), pg_temp.section('cafe'));
 
@@ -72,8 +72,8 @@ select ok((select not (payload ? 'branch_name') and not (payload ? 'multi_branch
 
 -- ── the section's offer time ────────────────────────────────────────────────
 update public.sections set offer_ttl_seconds = 600 where id = pg_temp.section('turf');
-insert into public.activities (id, organization_id, name, min_players, max_players, duration_min)
-values ('00000000-0000-4000-8000-0000000014f1', '00000000-0000-4000-8000-0000000014a0', 'Futsal', 2, 4, 60);
+insert into public.activities (id, organization_id, section_id, name, min_players, max_players, duration_min)
+values ('00000000-0000-4000-8000-0000000014f1', '00000000-0000-4000-8000-0000000014a0', pg_temp.section('turf'), 'Futsal', 2, 4, 60);
 insert into public.open_play_sessions (id, organization_id, section_id, activity_id, starts_at, ends_at, seat_price_poisha, status)
 values ('00000000-0000-4000-8000-000000001401', '00000000-0000-4000-8000-0000000014a0', pg_temp.section('turf'),
         '00000000-0000-4000-8000-0000000014f1', now() + interval '2 days', now() + interval '2 days 1 hour', 30000, 'matched');

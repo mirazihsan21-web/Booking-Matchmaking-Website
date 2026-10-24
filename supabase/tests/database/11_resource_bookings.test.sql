@@ -27,9 +27,9 @@ insert into public.sections (id, organization_id, name, kind, slug, max_upcoming
 insert into public.resources (id, organization_id, section_id, name, kind, capacity, price_per_hour_poisha, slot_minutes) values
   ('00000000-0000-4000-8000-0000000011c0', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011b0', 'Pitch 1', 'pitch', 14, 250000, 60),
   ('00000000-0000-4000-8000-0000000011c9', '00000000-0000-4000-8000-0000000011a9', '00000000-0000-4000-8000-0000000011b9', 'Pitch X', 'pitch', 14, 250000, 60);
-insert into public.player_profiles (id, organization_id, user_id, display_name, skill) values
-  ('00000000-0000-4000-8000-0000000011e1', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011d1', 'A', 3),
-  ('00000000-0000-4000-8000-0000000011e2', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011d2', 'B', 3);
+insert into public.player_profiles (id, organization_id, user_id, display_name) values
+  ('00000000-0000-4000-8000-0000000011e1', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011d1', 'A'),
+  ('00000000-0000-4000-8000-0000000011e2', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011d2', 'B');
 insert into public.open_play_sessions (id, organization_id, section_id, starts_at, ends_at, seat_price_poisha)
 values ('00000000-0000-4000-8000-0000000011f0', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011b0',
         pg_temp.at('19:00'), pg_temp.at('20:00'), 30000);

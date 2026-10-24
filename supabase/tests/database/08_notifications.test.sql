@@ -12,9 +12,9 @@ insert into public.organizations (id, slug, name, business_type, status)
 values ('00000000-0000-4000-8000-0000000008a0', 'notif-org-n', 'Org N', 'turf', 'live');
 insert into public.organization_members (organization_id, user_id, role)
 values ('00000000-0000-4000-8000-0000000008a0', '00000000-0000-4000-8000-0000000008b3', 'staff');
-insert into public.player_profiles (id, organization_id, user_id, display_name, skill) values
-  ('00000000-0000-4000-8000-0000000008c1', '00000000-0000-4000-8000-0000000008a0', '00000000-0000-4000-8000-0000000008b1', 'P', 3),
-  ('00000000-0000-4000-8000-0000000008c2', '00000000-0000-4000-8000-0000000008a0', '00000000-0000-4000-8000-0000000008b2', 'Q', 3);
+insert into public.player_profiles (id, organization_id, user_id, display_name) values
+  ('00000000-0000-4000-8000-0000000008c1', '00000000-0000-4000-8000-0000000008a0', '00000000-0000-4000-8000-0000000008b1', 'P'),
+  ('00000000-0000-4000-8000-0000000008c2', '00000000-0000-4000-8000-0000000008a0', '00000000-0000-4000-8000-0000000008b2', 'Q');
 insert into public.notifications (id, organization_id, profile_id, kind, payload, link)
 values ('00000000-0000-4000-8000-0000000008d1', '00000000-0000-4000-8000-0000000008a0', '00000000-0000-4000-8000-0000000008c1',
         'booking_confirmed', '{"resource_name":"Pitch 1"}', '/me/bookings');
