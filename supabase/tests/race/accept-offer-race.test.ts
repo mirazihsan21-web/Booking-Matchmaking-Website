@@ -37,9 +37,9 @@ beforeAll(async () => {
     `insert into public.organizations (id, slug, name, business_type, created_by) values ($1, $2, 'Race Café', 'boardgame_cafe', $3)`,
     [ids.org, `race-${ids.org.slice(0, 8)}`, ids.owner],
   );
-  await run(`insert into public.branches (id, organization_id, name) values ($1, $2, 'Main')`, [ids.branch, ids.org]);
+  await run(`insert into public.sections (id, organization_id, name, kind, slug) values ($1, $2, 'Main', 'turf', 'main')`, [ids.branch, ids.org]);
   await run(
-    `insert into public.resources (id, organization_id, branch_id, name, kind, capacity) values ($1, $2, $3, 'Table 1', 'table', 4)`,
+    `insert into public.resources (id, organization_id, section_id, name, kind, capacity) values ($1, $2, $3, 'Table 1', 'table', 4)`,
     [ids.resource, ids.org, ids.branch],
   );
   await run(
@@ -47,7 +47,7 @@ beforeAll(async () => {
     [ids.activity, ids.org],
   );
   await run(
-    `insert into public.open_play_sessions (id, organization_id, branch_id, starts_at, ends_at, seat_price_poisha)
+    `insert into public.open_play_sessions (id, organization_id, section_id, starts_at, ends_at, seat_price_poisha)
      values ($1, $2, $3, now() + interval '1 day', now() + interval '1 day 4 hours', 80000)`,
     [ids.session, ids.org, ids.branch],
   );

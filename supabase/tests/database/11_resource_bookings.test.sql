@@ -16,21 +16,21 @@ insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-0000000011d1', 'rb-a@test.local'),
   ('00000000-0000-4000-8000-0000000011d2', 'rb-b@test.local'),
   ('00000000-0000-4000-8000-0000000011d3', 'rb-s@test.local');
-insert into public.organizations (id, slug, name, business_type, status, max_upcoming_bookings) values
-  ('00000000-0000-4000-8000-0000000011a0', 'rb-org-p', 'Org R', 'turf', 'live', 2),
-  ('00000000-0000-4000-8000-0000000011a9', 'rb-org-x', 'Org X', 'turf', 'live', 2);
+insert into public.organizations (id, slug, name, business_type, status) values
+  ('00000000-0000-4000-8000-0000000011a0', 'rb-org-p', 'Org R', 'turf', 'live'),
+  ('00000000-0000-4000-8000-0000000011a9', 'rb-org-x', 'Org X', 'turf', 'live');
 insert into public.organization_members (organization_id, user_id, role)
 values ('00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011d3', 'staff');
-insert into public.branches (id, organization_id, name) values
-  ('00000000-0000-4000-8000-0000000011b0', '00000000-0000-4000-8000-0000000011a0', 'Main'),
-  ('00000000-0000-4000-8000-0000000011b9', '00000000-0000-4000-8000-0000000011a9', 'X main');
-insert into public.resources (id, organization_id, branch_id, name, kind, capacity, price_per_hour_poisha, slot_minutes) values
+insert into public.sections (id, organization_id, name, kind, slug, max_upcoming_bookings) values
+  ('00000000-0000-4000-8000-0000000011b0', '00000000-0000-4000-8000-0000000011a0', 'Main', 'turf', 'main', 2),
+  ('00000000-0000-4000-8000-0000000011b9', '00000000-0000-4000-8000-0000000011a9', 'X main', 'turf', 'x-main', 2);
+insert into public.resources (id, organization_id, section_id, name, kind, capacity, price_per_hour_poisha, slot_minutes) values
   ('00000000-0000-4000-8000-0000000011c0', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011b0', 'Pitch 1', 'pitch', 14, 250000, 60),
   ('00000000-0000-4000-8000-0000000011c9', '00000000-0000-4000-8000-0000000011a9', '00000000-0000-4000-8000-0000000011b9', 'Pitch X', 'pitch', 14, 250000, 60);
 insert into public.player_profiles (id, organization_id, user_id, display_name, skill) values
   ('00000000-0000-4000-8000-0000000011e1', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011d1', 'A', 3),
   ('00000000-0000-4000-8000-0000000011e2', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011d2', 'B', 3);
-insert into public.open_play_sessions (id, organization_id, branch_id, starts_at, ends_at, seat_price_poisha)
+insert into public.open_play_sessions (id, organization_id, section_id, starts_at, ends_at, seat_price_poisha)
 values ('00000000-0000-4000-8000-0000000011f0', '00000000-0000-4000-8000-0000000011a0', '00000000-0000-4000-8000-0000000011b0',
         pg_temp.at('19:00'), pg_temp.at('20:00'), 30000);
 insert into public.resource_reservations (organization_id, resource_id, period, source, source_id)
@@ -83,8 +83,8 @@ select is(pg_temp.book('x3', pg_temp.at('12:00'), 1, null, null, null, '00000000
 -- Notifications
 select is(
   (select payload - 'booking_id' from public.notifications where kind = 'booking_confirmed' and payload->>'booking_id' = (select id::text from b where label = 'a20')),
-  jsonb_build_object('resource_name', 'Pitch 1', 'branch_name', 'Main', 'multi_branch', false, 'starts_at', pg_temp.at('20:00'), 'ends_at', pg_temp.at('21:00'), 'price_poisha', 250000),
-  'A is told the booking is confirmed (space, branch, time and price)'
+  jsonb_build_object('resource_name', 'Pitch 1', 'section_name', 'Main', 'starts_at', pg_temp.at('20:00'), 'ends_at', pg_temp.at('21:00'), 'price_poisha', 250000),
+  'A is told the booking is confirmed (space, section, time and price)'
 );
 select is(
   (select link || '/' || email_status from public.notifications where payload->>'booking_id' = (select id::text from b where label = 'a20')),

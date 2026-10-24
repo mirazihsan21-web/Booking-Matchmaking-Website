@@ -11,13 +11,13 @@ select ('00000000-0000-4000-8000-0000000005d' || n)::uuid, 'player-' || n || '@t
 from unnest(array['1', '2', '3', '4', '5', '6', '7', '8', '9', 'a']) as n;
 insert into public.organizations (id, slug, name, business_type, created_by)
 values ('00000000-0000-4000-8000-0000000000a1', 'test-cafe', 'Test Café', 'boardgame_cafe', '00000000-0000-4000-8000-000000000001');
-insert into public.branches (id, organization_id, name, offer_ttl_seconds)
-values ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000000a1', 'Main', 900);
-insert into public.resources (id, organization_id, branch_id, name, kind, capacity)
+insert into public.sections (id, organization_id, name, kind, slug, offer_ttl_seconds)
+values ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000000a1', 'Main', 'turf', 'main', 900);
+insert into public.resources (id, organization_id, section_id, name, kind, capacity)
 values ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Table 1', 'table', 4);
 insert into public.activities (id, organization_id, name, min_players, max_players, duration_min)
 values ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000a1', 'Azul', 2, 4, 40);
-insert into public.open_play_sessions (id, organization_id, branch_id, starts_at, ends_at, seat_price_poisha)
+insert into public.open_play_sessions (id, organization_id, section_id, starts_at, ends_at, seat_price_poisha)
 values ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2',
         now() + interval '1 day', now() + interval '1 day 4 hours', 80000);
 insert into public.groups (id, organization_id, session_id, resource_id, activity_id, capacity)

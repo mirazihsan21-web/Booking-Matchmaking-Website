@@ -33,8 +33,8 @@ beforeAll(async () => {
     `race-${ids.org.slice(0, 8)}`,
     ids.owner,
   ]);
-  await run(`insert into public.branches (id, organization_id, name) values ($1, $2, 'Main')`, [ids.branch, ids.org]);
-  await run(`insert into public.resources (id, organization_id, branch_id, name, kind, capacity) values ($1, $2, $3, 'Table 1', 'table', 4)`, [
+  await run(`insert into public.sections (id, organization_id, name, kind, slug) values ($1, $2, 'Main', 'turf', 'main')`, [ids.branch, ids.org]);
+  await run(`insert into public.resources (id, organization_id, section_id, name, kind, capacity) values ($1, $2, $3, 'Table 1', 'table', 4)`, [
     ids.resource,
     ids.org,
     ids.branch,
@@ -44,7 +44,7 @@ beforeAll(async () => {
     ids.org,
   ]);
   await run(
-    `insert into public.open_play_sessions (id, organization_id, branch_id, starts_at, ends_at, seat_price_poisha, status)
+    `insert into public.open_play_sessions (id, organization_id, section_id, starts_at, ends_at, seat_price_poisha, status)
      values ($1, $2, $3, now() + interval '1 day', now() + interval '1 day 4 hours', 80000, 'matched')`,
     [ids.session, ids.org, ids.branch],
   );

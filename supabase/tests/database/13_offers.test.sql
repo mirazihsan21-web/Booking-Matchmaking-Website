@@ -29,9 +29,9 @@ select ('00000000-0000-4000-8000-0000001300' || lpad(to_hex(n), 2, '0'))::uuid, 
 from generate_series(1, 21) n;
 insert into public.organizations (id, slug, name, business_type, status)
 values ('00000000-0000-4000-8000-0000000013a0', 'of-org-o', 'Org O', 'turf', 'live');
-insert into public.branches (id, organization_id, name, offer_ttl_seconds)
-values ('00000000-0000-4000-8000-0000000013b0', '00000000-0000-4000-8000-0000000013a0', 'Main', 900);
-insert into public.resources (id, organization_id, branch_id, name, kind, capacity)
+insert into public.sections (id, organization_id, name, kind, slug, offer_ttl_seconds)
+values ('00000000-0000-4000-8000-0000000013b0', '00000000-0000-4000-8000-0000000013a0', 'Main', 'turf', 'main', 900);
+insert into public.resources (id, organization_id, section_id, name, kind, capacity)
 values ('00000000-0000-4000-8000-0000000013c1', '00000000-0000-4000-8000-0000000013a0', '00000000-0000-4000-8000-0000000013b0', 'Pitch 1', 'pitch', 14);
 insert into public.activities (id, organization_id, name, min_players, max_players, duration_min, team_mode, team_size)
 values ('00000000-0000-4000-8000-0000000013d1', '00000000-0000-4000-8000-0000000013a0', '5-a-side', 10, 10, 60, 'two_teams', 5);
@@ -40,7 +40,7 @@ select pg_temp.p(n), '00000000-0000-4000-8000-0000000013a0',
        ('00000000-0000-4000-8000-0000001300' || lpad(to_hex(n), 2, '0'))::uuid, 'P' || n, 3
 from generate_series(1, 21) n;
 
-insert into public.open_play_sessions (id, organization_id, branch_id, activity_id, starts_at, ends_at, seat_price_poisha, status)
+insert into public.open_play_sessions (id, organization_id, section_id, activity_id, starts_at, ends_at, seat_price_poisha, status)
 select pg_temp.s(n), '00000000-0000-4000-8000-0000000013a0', '00000000-0000-4000-8000-0000000013b0',
        '00000000-0000-4000-8000-0000000013d1', now() + starts, now() + starts + interval '1 hour', 30000, st::public.session_status
 from (values (1, interval '2 days', 'matched'), (2, interval '5 minutes', 'matched'), (3, interval '2 days', 'closed'),

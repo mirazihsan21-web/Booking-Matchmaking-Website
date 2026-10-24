@@ -48,12 +48,12 @@ beforeAll(async () => {
   const run = (sql: string, params: unknown[]) => setup.query(sql, params);
   await run(`insert into auth.users (id, email) values ($1, $2), ($3, $4)`, [ids.user1, `${ids.user1}@race.test`, ids.user2, `${ids.user2}@race.test`]);
   await run(
-    `insert into public.organizations (id, slug, name, business_type, status, max_upcoming_bookings) values ($1, $2, 'Race Turf', 'turf', 'live', 1)`,
+    `insert into public.organizations (id, slug, name, business_type, status) values ($1, $2, 'Race Turf', 'turf', 'live')`,
     [ids.org, `race-${ids.org.slice(0, 8)}`],
   );
-  await run(`insert into public.branches (id, organization_id, name) values ($1, $2, 'Main')`, [ids.branch, ids.org]);
+  await run(`insert into public.sections (id, organization_id, name, kind, slug, max_upcoming_bookings) values ($1, $2, 'Main', 'turf', 'main', 1)`, [ids.branch, ids.org]);
   await run(
-    `insert into public.resources (id, organization_id, branch_id, name, kind, capacity, price_per_hour_poisha) values ($1, $2, $3, 'Pitch 1', 'pitch', 14, 250000)`,
+    `insert into public.resources (id, organization_id, section_id, name, kind, capacity, price_per_hour_poisha) values ($1, $2, $3, 'Pitch 1', 'pitch', 14, 250000)`,
     [ids.pitch, ids.org, ids.branch],
   );
   await run(

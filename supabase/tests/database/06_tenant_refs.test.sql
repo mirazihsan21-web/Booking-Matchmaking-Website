@@ -29,18 +29,18 @@ insert into public.organizations (id, slug, name, business_type, status) values
   ('00000000-0000-4000-8000-00000000f000', 'refs-org-q', 'Org Q', 'turf', 'live');
 insert into public.organization_members (organization_id, user_id, role)
 values ('00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e0a1', 'owner');
-insert into public.branches (id, organization_id, name) values
-  ('00000000-0000-4000-8000-00000000e001', '00000000-0000-4000-8000-00000000e000', 'P main'),
-  ('00000000-0000-4000-8000-00000000e00b', '00000000-0000-4000-8000-00000000e000', 'P annex'),
-  ('00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f000', 'Q main');
-insert into public.resources (id, organization_id, branch_id, name, kind, capacity) values
+insert into public.sections (id, organization_id, name, kind, slug) values
+  ('00000000-0000-4000-8000-00000000e001', '00000000-0000-4000-8000-00000000e000', 'P main', 'turf', 'p-main'),
+  ('00000000-0000-4000-8000-00000000e00b', '00000000-0000-4000-8000-00000000e000', 'P annex', 'turf', 'p-annex'),
+  ('00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f000', 'Q main', 'turf', 'q-main');
+insert into public.resources (id, organization_id, section_id, name, kind, capacity) values
   ('00000000-0000-4000-8000-00000000e002', '00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e001', 'P pitch', 'pitch', 14),
   ('00000000-0000-4000-8000-00000000e00c', '00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e00b', 'P annex pitch', 'pitch', 14),
   ('00000000-0000-4000-8000-00000000f002', '00000000-0000-4000-8000-00000000f000', '00000000-0000-4000-8000-00000000f001', 'Q pitch', 'pitch', 14);
 insert into public.activities (id, organization_id, name, min_players, max_players, duration_min, team_mode, team_size) values
   ('00000000-0000-4000-8000-00000000e003', '00000000-0000-4000-8000-00000000e000', '5-a-side', 10, 10, 60, 'two_teams', 5),
   ('00000000-0000-4000-8000-00000000f003', '00000000-0000-4000-8000-00000000f000', '5-a-side', 10, 10, 60, 'two_teams', 5);
-insert into public.open_play_sessions (id, organization_id, branch_id, activity_id, starts_at, ends_at, seat_price_poisha) values
+insert into public.open_play_sessions (id, organization_id, section_id, activity_id, starts_at, ends_at, seat_price_poisha) values
   ('00000000-0000-4000-8000-00000000e004', '00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e001',
    '00000000-0000-4000-8000-00000000e003', now() + interval '1 day', now() + interval '1 day 1 hour', 30000),
   ('00000000-0000-4000-8000-00000000f004', '00000000-0000-4000-8000-00000000f000', '00000000-0000-4000-8000-00000000f001',
@@ -52,12 +52,12 @@ values ('00000000-0000-4000-8000-00000000e005', '00000000-0000-4000-8000-0000000
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000e0a1","role":"authenticated"}';
 select throws_ok(
-  $$ insert into public.resources (organization_id, branch_id, name, kind, capacity)
+  $$ insert into public.resources (organization_id, section_id, name, kind, capacity)
      values ('00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000f001', 'Sneaky', 'pitch', 14) $$,
   '23503', null, 'an owner cannot add a resource under another venue''s branch'
 );
 select lives_ok(
-  $$ insert into public.resources (organization_id, branch_id, name, kind, capacity)
+  $$ insert into public.resources (organization_id, section_id, name, kind, capacity)
      values ('00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e001', 'Pitch 2', 'pitch', 14) $$,
   'an owner can still add a resource under their own branch'
 );
@@ -93,7 +93,7 @@ select throws_ok(
 );
 
 -- Delete behaviour is unchanged
-delete from public.branches where id = '00000000-0000-4000-8000-00000000e00b';
+delete from public.sections where id = '00000000-0000-4000-8000-00000000e00b';
 select is((select count(*)::int from public.resources where id = '00000000-0000-4000-8000-00000000e00c'), 0,
   'deleting a branch still deletes its resources');
 insert into public.notifications (organization_id, profile_id, kind, link)
