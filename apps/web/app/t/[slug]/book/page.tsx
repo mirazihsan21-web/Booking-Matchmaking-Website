@@ -7,7 +7,7 @@ import { spaceDay } from "@/lib/bookings/bookings";
 import { addDays, currentBusinessDate, parseDateParam } from "@/lib/bookings/slots";
 import { formatDay, formatShortTime } from "@/lib/format";
 import { formatBdt } from "@/lib/money";
-import type { OpeningHours } from "@/lib/opening-hours";
+import { loadSections } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { getPlayer } from "@/lib/tenancy/player";
 import { m } from "@/messages";
@@ -39,28 +39,27 @@ async function Book({ params, searchParams }: { params: Promise<{ slug: string }
 
   const { org } = player;
   const db = createServiceClient();
-  const [{ data: rules }, { data: allSpaces }, { data: allBranches }] = await Promise.all([
-    db.from("organizations").select("booking_horizon_days").eq("id", org.id).single(),
-    db.from("resources").select("id, name, slot_minutes, price_per_hour_poisha, branch_id").eq("organization_id", org.id).eq("active", true).order("name"),
-    db.from("branches").select("id, name, opening_hours").eq("organization_id", org.id).order("created_at"),
+  const [{ data: allSpaces }, allSections] = await Promise.all([
+    db.from("resources").select("id, name, slot_minutes, price_per_hour_poisha, section_id").eq("organization_id", org.id).eq("active", true).order("name"),
+    loadSections(db, org.id),
   ]);
-  const branches = (allBranches ?? []).filter((b) => (allSpaces ?? []).some((s) => s.branch_id === b.id));
-  if (branches.length === 0) return <p className="text-foreground/60">{m.bookings.unavailable}</p>;
+  const sections = allSections.filter((sec) => (allSpaces ?? []).some((s) => s.section_id === sec.id));
+  if (sections.length === 0) return <p className="text-foreground/60">{m.bookings.unavailable}</p>;
 
-  // Branch first (when there are several), then a space there. Junk or foreign ?branch=/?resource=
-  // and junk or out-of-window ?date= fall back to the first branch, its first space, and today.
+  // Section first (when there are several), then a space there. Junk or foreign ?section=/?resource=
+  // and junk or out-of-window ?date= fall back to the first section, its first space, and today.
   const askedSpace = (allSpaces ?? []).find((s) => s.id === one(query.resource));
-  const branch = branches.find((b) => b.id === one(query.branch)) ?? branches.find((b) => b.id === askedSpace?.branch_id) ?? branches[0]!;
-  const spaces = (allSpaces ?? []).filter((s) => s.branch_id === branch.id);
+  const section = sections.find((s) => s.id === one(query.section)) ?? sections.find((s) => s.id === askedSpace?.section_id) ?? sections[0]!;
+  const spaces = (allSpaces ?? []).filter((s) => s.section_id === section.id);
   const space = spaces.find((s) => s.id === askedSpace?.id) ?? spaces[0]!;
   // After midnight at a late-night venue, "today" is still last night's business day.
-  const today = currentBusinessDate(branch.opening_hours as OpeningHours, new Date(), org.timezone);
-  const lastDay = addDays(today, rules?.booking_horizon_days ?? 14);
+  const today = currentBusinessDate(section.openingHours, new Date(), org.timezone);
+  const lastDay = addDays(today, section.rules.bookingHorizonDays);
   const asked = parseDateParam(one(query.date), today);
   const date = asked < today || asked > lastDay ? today : asked;
   const day = await spaceDay(db, { organizationId: org.id, resourceId: space.id, date, withNames: false });
 
-  const link = (d: string) => `/book?branch=${branch.id}&resource=${space.id}&date=${d}`;
+  const link = (d: string) => `/book?section=${section.id}&resource=${space.id}&date=${d}`;
   const price = space.price_per_hour_poisha === null ? m.bookings.priceAtVenue : m.bookings.perSlot(formatBdt(Math.round((space.price_per_hour_poisha * space.slot_minutes) / 60)));
 
   return (
@@ -70,13 +69,13 @@ async function Book({ params, searchParams }: { params: Promise<{ slug: string }
         <p className="text-foreground/70">{m.bookings.intro}</p>
       </div>
       <form action="/book" method="get" className="flex flex-wrap items-end gap-3">
-        {branches.length > 1 && (
+        {sections.length > 1 && (
           <label className="flex flex-col gap-1.5 text-sm font-medium">
-            {m.bookings.branch}
-            <select name="branch" defaultValue={branch.id} className="h-9 rounded-lg border border-input bg-transparent px-2">
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
+            {m.bookings.section}
+            <select name="section" defaultValue={section.id} className="h-9 rounded-lg border border-input bg-transparent px-2">
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
                 </option>
               ))}
             </select>
@@ -105,7 +104,7 @@ async function Book({ params, searchParams }: { params: Promise<{ slug: string }
           {date > today ? <Link href={link(addDays(date, -1))} className="text-sm hover:underline">{m.bookings.previousDay}</Link> : <span />}
           <h2 className="text-lg font-semibold">
             {space.name}
-            {branches.length > 1 && ` (${branch.name})`} · {formatDay(date)}
+            {sections.length > 1 && ` (${section.name})`} · {formatDay(date)}
           </h2>
           {date < lastDay ? <Link href={link(addDays(date, 1))} className="text-sm hover:underline">{m.bookings.nextDay}</Link> : <span />}
         </div>

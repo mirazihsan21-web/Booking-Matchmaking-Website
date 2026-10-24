@@ -18,10 +18,11 @@ describe('renderNotification', () => {
     );
   });
 
-  it('names the branch when the venue has more than one', () => {
-    expect(renderNotification({ kind: 'booking_confirmed', payload: { ...when, branch_name: 'Gulshan', multi_branch: true, price_poisha: 0 } }, zone).body).toBe(
-      'Pitch 1 (Gulshan), Fri 23 Oct, 8pm–9pm. Pay at the venue.',
+  it('names the section the space is in', () => {
+    expect(renderNotification({ kind: 'booking_confirmed', payload: { ...when, section_name: 'Turf', price_poisha: 0 } }, zone).body).toBe(
+      'Pitch 1 (Turf), Fri 23 Oct, 8pm–9pm. Pay at the venue.',
     );
+    // Rows written before sections have no section_name.
     expect(renderNotification({ kind: 'booking_cancelled', payload: { ...when, branch_name: 'Main', multi_branch: false } }, zone).body).toBe('Pitch 1, Fri 23 Oct, 8pm–9pm.');
   });
 
@@ -45,8 +46,8 @@ describe('renderNotification for open play', () => {
       body: '5-a-side futsal, Fri 23 Oct, 8pm–9pm. Pitch 1, Team 1. Pay ৳300 at the venue.',
     });
     expect(render('seat_confirmed', { ...session, team: null, price_poisha: 30000 }).body).toBe('5-a-side futsal, Fri 23 Oct, 8pm–9pm. Pitch 1. Pay ৳300 at the venue.');
-    expect(render('seat_confirmed', { ...session, team: 2, branch_name: 'Gulshan', multi_branch: true, price_poisha: 0 }).body).toBe(
-      '5-a-side futsal, Fri 23 Oct, 8pm–9pm. Pitch 1 (Gulshan), Team 2. Pay at the venue.',
+    expect(render('seat_confirmed', { ...session, team: 2, section_name: 'Turf', price_poisha: 0 }).body).toBe(
+      '5-a-side futsal, Fri 23 Oct, 8pm–9pm. Pitch 1 (Turf), Team 2. Pay at the venue.',
     );
   });
 

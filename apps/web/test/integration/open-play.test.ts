@@ -54,27 +54,27 @@ beforeAll(async () => {
     await db.from('organizations').insert({ slug: `op-${randomUUID().slice(0, 8)}`, name: 'Open Play Turf', business_type: 'turf', status: 'live' }).select('id').single(),
   );
   orgId = org.id;
-  const branch = must(await db.from('branches').insert({ organization_id: orgId, name: 'Main' }).select('id').single());
+  const branch = must(await db.from('sections').insert({ organization_id: orgId, name: 'Main', kind: 'turf', slug: 'main' }).select('id').single());
   const pitches = must(
     await db
       .from('resources')
       .insert([
-        { organization_id: orgId, branch_id: branch.id, name: 'Pitch 1', kind: 'pitch', capacity: 14 },
-        { organization_id: orgId, branch_id: branch.id, name: 'Pitch 2', kind: 'pitch', capacity: 14 },
+        { organization_id: orgId, section_id: branch.id, name: 'Pitch 1', kind: 'pitch', capacity: 14 },
+        { organization_id: orgId, section_id: branch.id, name: 'Pitch 2', kind: 'pitch', capacity: 14 },
       ])
       .select('id'),
   );
   const activity = must(
     await db
       .from('activities')
-      .insert({ organization_id: orgId, name: '5-a-side', min_players: 10, max_players: 10, duration_min: 60, team_mode: 'two_teams', team_size: 5 })
+      .insert({ organization_id: orgId, section_id: branch.id, name: '5-a-side', min_players: 10, max_players: 10, duration_min: 60, team_mode: 'two_teams', team_size: 5 })
       .select('id')
       .single(),
   );
   const profiles = must(
     await db
       .from('player_profiles')
-      .insert(users.map((u, i) => ({ organization_id: orgId, user_id: u.id, display_name: `P${i + 1}`, skill: 1 + (i % 5), phone: `+88017110000${String(i + 10)}` })))
+      .insert(users.map((u, i) => ({ organization_id: orgId, user_id: u.id, display_name: `P${i + 1 }`, phone: `+88017110000${String(i + 10)}` })))
       .select('id, display_name'),
   );
   for (const row of profiles) p[Number(row.display_name.slice(1))] = row.id;
@@ -83,8 +83,8 @@ beforeAll(async () => {
     await db
       .from('open_play_sessions')
       .insert([
-        { organization_id: orgId, branch_id: branch.id, activity_id: activity.id, starts_at: at(2 * 86_400_000), ends_at: at(2 * 86_400_000 + 3_600_000), seat_price_poisha: 30000 },
-        { organization_id: orgId, branch_id: branch.id, activity_id: activity.id, starts_at: at(3 * 3_600_000), ends_at: at(4 * 3_600_000), seat_price_poisha: 30000 },
+        { organization_id: orgId, section_id: branch.id, activity_id: activity.id, starts_at: at(2 * 86_400_000), ends_at: at(2 * 86_400_000 + 3_600_000), seat_price_poisha: 30000 },
+        { organization_id: orgId, section_id: branch.id, activity_id: activity.id, starts_at: at(3 * 3_600_000), ends_at: at(4 * 3_600_000), seat_price_poisha: 30000 },
       ])
       .select('id, starts_at')
       .order('starts_at', { ascending: false }),

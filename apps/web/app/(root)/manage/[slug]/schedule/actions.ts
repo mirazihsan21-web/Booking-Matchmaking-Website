@@ -4,15 +4,15 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import type { FormState } from "@/components/forms/action-form";
 import { bdtToPoisha } from "@/lib/money";
-import type { OpeningHours } from "@/lib/opening-hours";
 import { cancelOpenPlay, scheduleOpenPlay } from "@/lib/schedule/schedule";
+import { loadSection } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrgRole } from "@/lib/tenancy/dal";
 import { m } from "@/messages";
 
 const schema = z.object({
-  branchId: z.uuid(m.forms.choose),
+  sectionId: z.uuid(m.forms.choose),
   activityId: z.union([z.uuid(), z.literal("")]),
   resourceIds: z.array(z.uuid()).min(1, m.schedule.pickResource),
   date: z.iso.date(m.schedule.pickDate),
@@ -26,7 +26,7 @@ const schema = z.object({
 export async function scheduleAction(slug: string, _state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrgRole(slug, "staff");
   const parsed = schema.safeParse({
-    branchId: form.get("branchId"),
+    sectionId: form.get("sectionId"),
     activityId: form.get("activityId") ?? "",
     resourceIds: form.getAll("resourceIds"),
     date: form.get("date"),
@@ -41,12 +41,12 @@ export async function scheduleAction(slug: string, _state: FormState, form: Form
   const v = parsed.data;
 
   const supabase = await createClient();
-  const { data: branch } = await supabase.from("branches").select("opening_hours").eq("id", v.branchId).eq("organization_id", org.id).maybeSingle();
-  if (!branch) return { ok: false, errors: { branchId: m.forms.choose } };
+  const section = await loadSection(supabase, { organizationId: org.id, sectionId: v.sectionId });
+  if (!section) return { ok: false, errors: { sectionId: m.forms.choose } };
 
   const result = await scheduleOpenPlay(createServiceClient(), {
     organizationId: org.id,
-    branchId: v.branchId,
+    sectionId: section.id,
     activityId: v.activityId || null,
     resourceIds: v.resourceIds,
     first: { date: v.date, time: v.time },
@@ -54,7 +54,7 @@ export async function scheduleAction(slug: string, _state: FormState, form: Form
     durationMin: v.durationMin,
     seatPricePoisha: bdtToPoisha(v.seatPrice)!,
     timeZone: org.timezone,
-    openingHours: branch.opening_hours as OpeningHours,
+    openingHours: section.openingHours,
   });
   refresh();
   switch (result.status) {

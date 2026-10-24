@@ -17,7 +17,7 @@ async function Overview({ params }: { params: Promise<{ slug: string }> }) {
     return (await q).count ?? 0;
   };
   const stats = [
-    { label: m.manage.counts.branches, value: await count("branches") },
+    { label: m.manage.counts.sections, value: await count("sections") },
     { label: m.manage.counts.resources, value: await count("resources", { active: true }) },
     { label: m.manage.counts.activities, value: await count("activities", { active: true }) },
     { label: m.manage.counts.sessions, value: await count("open_play_sessions", { upcoming: true }) },

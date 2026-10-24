@@ -6,7 +6,7 @@ export type Weekday = (typeof WEEKDAYS)[number];
 /** Keys "0"–"6" (0 = Sunday). [open, close] local times; close ≤ open means closing after midnight. null = closed. */
 export type OpeningHours = Record<Weekday, [string, string] | null>;
 
-/** Matches the database default for branches.opening_hours. */
+/** Matches the database default for sections.opening_hours. */
 export const DEFAULT_OPENING_HOURS: OpeningHours = {
   '0': ['10:00', '23:00'],
   '1': ['10:00', '23:00'],

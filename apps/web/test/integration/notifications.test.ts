@@ -67,8 +67,8 @@ beforeAll(async () => {
   const { data: profiles, error: profileError } = await db
     .from('player_profiles')
     .insert([
-      { organization_id: orgId, user_id: p.id, display_name: 'P', skill: 3 },
-      { organization_id: orgId, user_id: q.id, display_name: 'Q', skill: 3 },
+      { organization_id: orgId, user_id: p.id, display_name: 'P' },
+      { organization_id: orgId, user_id: q.id, display_name: 'Q' },
     ])
     .select('id, user_id');
   if (profileError) throw profileError;

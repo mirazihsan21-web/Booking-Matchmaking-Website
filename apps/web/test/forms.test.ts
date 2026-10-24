@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseActivityForm } from '../lib/forms/activity';
-import { parseBranchForm } from '../lib/forms/branch';
 import { parseResourceForm } from '../lib/forms/resource';
+import { parseSectionForm } from '../lib/forms/section';
 import { DEFAULT_OPENING_HOURS, parseOpeningHours } from '../lib/opening-hours';
 
 function form(fields: Record<string, string>): FormData {
@@ -35,11 +35,27 @@ describe('parseOpeningHours', () => {
   });
 });
 
-describe('parseBranchForm', () => {
-  it('needs a name', () => {
-    const result = parseBranchForm(form({ name: ' ', address: '', ...allDays('10:00', '23:00') }));
+describe('parseSectionForm', () => {
+  const rules = { horizonDays: '3', cancelCutoffHours: '1', matchCutoffHours: '4', maxUpcoming: '2' };
+
+  it('reads the name, hours and booking rules (cut-offs typed in hours, kept in minutes)', () => {
+    expect(parseSectionForm(form({ name: 'Board-game café', ...allDays('10:00', '23:00'), ...rules }))).toEqual({
+      ok: true,
+      value: {
+        name: 'Board-game café',
+        openingHours: DEFAULT_OPENING_HOURS,
+        bookingHorizonDays: 3,
+        cancelCutoffMinutes: 60,
+        matchCutoffMinutes: 240,
+        maxUpcomingBookings: 2,
+      },
+    });
+  });
+
+  it('reports a missing name and bad rules together', () => {
+    const result = parseSectionForm(form({ name: ' ', ...allDays('10:00', '23:00'), ...rules, horizonDays: '0' }));
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors).toHaveProperty('name');
+    if (!result.ok) expect(Object.keys(result.errors).sort()).toEqual(['horizonDays', 'name']);
   });
 });
 

@@ -4,9 +4,8 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import type { FormState } from "@/components/forms/action-form";
 import { parseActivityForm } from "@/lib/forms/activity";
-import { parseBookingSettingsForm } from "@/lib/forms/booking-settings";
-import { parseBranchForm } from "@/lib/forms/branch";
 import { parseResourceForm } from "@/lib/forms/resource";
+import { parseSectionForm } from "@/lib/forms/section";
 import { cancelInvite, inviteMember } from "@/lib/orgs/invites";
 import { changeRole, removeMember } from "@/lib/orgs/members";
 import { publishOrganization } from "@/lib/orgs/publish";
@@ -32,6 +31,7 @@ export async function publishAction(slug: string, _state: FormState, _form: Form
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 const settingsSchema = z.object({
   name: z.string().trim().min(2, m.forms.required).max(80, m.forms.tooLong),
+  address: z.string().trim().max(200, m.forms.tooLong),
   primary: z.string().regex(HEX, m.manage.colourFormat),
   accent: z.string().regex(HEX, m.manage.colourFormat),
   logo_path: z.string().max(200),
@@ -39,68 +39,81 @@ const settingsSchema = z.object({
 
 export async function saveSettingsAction(slug: string, _state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrgRole(slug, "owner");
-  const parsed = settingsSchema.safeParse(Object.fromEntries(["name", "primary", "accent", "logo_path"].map((k) => [k, String(form.get(k) ?? "")])));
+  const parsed = settingsSchema.safeParse(Object.fromEntries(["name", "address", "primary", "accent", "logo_path"].map((k) => [k, String(form.get(k) ?? "")])));
   if (!parsed.success) {
     return { ok: false, errors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
   }
-  const { name, primary, accent, logo_path } = parsed.data;
+  const { name, address, primary, accent, logo_path } = parsed.data;
   // Logos only ever live in this organization's own folder.
   const logo = logo_path.startsWith(`${org.id}/`) ? logo_path : org.branding.logo_path;
   const supabase = await createClient();
   const { error } = await supabase
     .from("organizations")
-    .update({ name, branding: { ...org.branding, primary, accent, ...(logo ? { logo_path: logo } : {}) } })
+    .update({ name, ...(form.has("address") ? { address } : {}), branding: { ...org.branding, primary, accent, ...(logo ? { logo_path: logo } : {}) } })
     .eq("id", org.id);
   if (error) return fail(error);
   refresh();
   return saved;
 }
 
-// ── Branches ─────────────────────────────────────────────────────────────────
-export async function saveBookingSettingsAction(slug: string, _state: FormState, form: FormData): Promise<FormState> {
+// ── Sections ─────────────────────────────────────────────────────────────────
+export async function saveSectionAction(slug: string, sectionId: string, _state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrgRole(slug, "owner");
-  const parsed = parseBookingSettingsForm(form);
+  const parsed = parseSectionForm(form);
   if (!parsed.ok) return { ok: false, errors: parsed.errors };
   const v = parsed.value;
   const supabase = await createClient();
   const { error } = await supabase
-    .from("organizations")
+    .from("sections")
     .update({
+      name: v.name,
+      opening_hours: v.openingHours,
       booking_horizon_days: v.bookingHorizonDays,
       cancel_cutoff_minutes: v.cancelCutoffMinutes,
       match_cutoff_minutes: v.matchCutoffMinutes,
       max_upcoming_bookings: v.maxUpcomingBookings,
     })
-    .eq("id", org.id);
+    .eq("id", sectionId)
+    .eq("organization_id", org.id);
   if (error) return fail(error);
   refresh();
   return saved;
 }
 
-export async function saveBranchAction(slug: string, branchId: string | null, _state: FormState, form: FormData): Promise<FormState> {
+const addSectionSchema = z.object({
+  kind: z.enum(["turf", "boardgame_cafe", "gaming_lounge"], { error: m.forms.choose }),
+  name: z.string().trim().min(1, m.forms.required).max(80, m.forms.tooLong),
+});
+
+/** A new section of a kind; add_section picks its web address, accent and place in the list. */
+export async function addSectionAction(slug: string, _state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrgRole(slug, "owner");
-  const parsed = parseBranchForm(form);
-  if (!parsed.ok) return { ok: false, errors: parsed.errors };
-  const row = { name: parsed.value.name, address: parsed.value.address, opening_hours: parsed.value.openingHours };
-  const supabase = await createClient();
-  const { error } = branchId
-    ? await supabase.from("branches").update(row).eq("id", branchId).eq("organization_id", org.id)
-    : await supabase.from("branches").insert({ ...row, organization_id: org.id });
+  const parsed = addSectionSchema.safeParse({ kind: form.get("kind"), name: String(form.get("name") ?? "") });
+  if (!parsed.success) return { ok: false, errors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
+  // add_section is service-role only; the owner check above is the gate.
+  const { error } = await createServiceClient().rpc("add_section", { p_organization_id: org.id, p_kind: parsed.data.kind, p_name: parsed.data.name });
   if (error) return fail(error);
   refresh();
   return saved;
 }
 
-export async function deleteBranchAction(slug: string, branchId: string, _state: FormState, _form: FormData): Promise<FormState> {
+export async function deleteSectionAction(slug: string, sectionId: string, _state: FormState, _form: FormData): Promise<FormState> {
   const { org } = await requireOrgRole(slug, "owner");
   const supabase = await createClient();
-  const { count } = await supabase.from("branches").select("id", { count: "exact", head: true }).eq("organization_id", org.id);
-  if ((count ?? 0) <= 1) return { ok: false, message: m.manage.lastBranch };
-  const { error } = await supabase.from("branches").delete().eq("id", branchId).eq("organization_id", org.id);
-  if (error?.code === "23503") return { ok: false, message: m.manage.branchInUse };
+  const { count } = await supabase.from("sections").select("id", { count: "exact", head: true }).eq("organization_id", org.id);
+  if ((count ?? 0) <= 1) return { ok: false, message: m.manage.lastSection };
+  const { error } = await supabase.from("sections").delete().eq("id", sectionId).eq("organization_id", org.id);
+  if (error?.code === "23503") return { ok: false, message: m.manage.sectionInUse };
   if (error) return fail(error);
   refresh();
   return { ok: true, message: m.manage.deleted };
+}
+
+/** The section id from a form, if it is one of this organization's sections. */
+async function ownSection(supabase: Awaited<ReturnType<typeof createClient>>, organizationId: string, form: FormData): Promise<string | null> {
+  const sectionId = String(form.get("sectionId") ?? "");
+  const { data } = await supabase.from("sections").select("id").eq("id", sectionId).eq("organization_id", organizationId).maybeSingle();
+  return data?.id ?? null;
 }
 
 // ── Resources ────────────────────────────────────────────────────────────────
@@ -120,11 +133,10 @@ export async function saveResourceAction(slug: string, resourceId: string | null
     const { error } = await supabase.from("resources").update(row).eq("id", resourceId).eq("organization_id", org.id);
     if (error) return fail(error);
   } else {
-    // RLS checks the organization; also make sure the branch is this organization's.
-    const branchId = String(form.get("branchId") ?? "");
-    const { data: branch } = await supabase.from("branches").select("id").eq("id", branchId).eq("organization_id", org.id).maybeSingle();
-    if (!branch) return { ok: false, errors: { branchId: m.forms.choose } };
-    const { error } = await supabase.from("resources").insert({ ...row, organization_id: org.id, branch_id: branch.id });
+    // RLS checks the organization; also make sure the section is this organization's.
+    const sectionId = await ownSection(supabase, org.id, form);
+    if (!sectionId) return { ok: false, errors: { sectionId: m.forms.choose } };
+    const { error } = await supabase.from("resources").insert({ ...row, organization_id: org.id, section_id: sectionId });
     if (error) return fail(error);
   }
   refresh();
@@ -155,10 +167,16 @@ export async function saveActivityAction(slug: string, activityId: string | null
     duration_min: v.durationMin,
   };
   const supabase = await createClient();
-  const { error } = activityId
-    ? await supabase.from("activities").update(row).eq("id", activityId).eq("organization_id", org.id)
-    : await supabase.from("activities").insert({ ...row, organization_id: org.id });
-  if (error) return fail(error);
+  if (activityId) {
+    const { error } = await supabase.from("activities").update(row).eq("id", activityId).eq("organization_id", org.id);
+    if (error) return fail(error);
+  } else {
+    // A new game belongs to one section (its favourites, ratings and matching are that section's).
+    const sectionId = await ownSection(supabase, org.id, form);
+    if (!sectionId) return { ok: false, errors: { sectionId: m.forms.choose } };
+    const { error } = await supabase.from("activities").insert({ ...row, organization_id: org.id, section_id: sectionId });
+    if (error) return fail(error);
+  }
   refresh();
   return saved;
 }

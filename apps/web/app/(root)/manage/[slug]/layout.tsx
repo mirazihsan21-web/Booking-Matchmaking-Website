@@ -18,7 +18,7 @@ async function Nav({ params }: { params: Promise<{ slug: string }> }) {
     { href: "/bookings", label: m.manage.bookings },
     ...(role === "owner"
       ? [
-          { href: "/branches", label: m.manage.branches },
+          { href: "/sections", label: m.manage.sections },
           { href: "/resources", label: cap(labels.resourcePlural) },
           { href: "/activities", label: cap(labels.activityPlural) },
           { href: "/staff", label: m.manage.staff },

@@ -25,7 +25,7 @@ export async function checkSlug(db: SupabaseClient, input: string): Promise<Slug
 
 /**
  * Creates a venue from its business-type preset: the organization (status onboarding, preset colours),
- * the owner membership, a first branch named after the venue, the preset resources on that branch and
+ * the owner membership, a first section named after the venue, the preset resources in that section and
  * the preset activities. Runs with the service client after the caller is signed in. If anything after
  * the organization row fails, the organization is deleted (cascade) and the error rethrown.
  */
@@ -62,14 +62,13 @@ export async function createOrganization(
       return result;
     };
     must(await db.from('organization_members').insert({ organization_id: org.id, user_id: input.userId, role: 'owner' }));
-    const { data: branch } = must(
-      await db.from('branches').insert({ organization_id: org.id, name }).select('id').single(),
-    );
+    // The venue's first section is of its business type (slug, accent and position from add_section).
+    const { data: sectionId } = must(await db.rpc('add_section', { p_organization_id: org.id, p_kind: input.businessType, p_name: name }));
     must(
       await db.from('resources').insert(
         preset.resources.map((r) => ({
           organization_id: org.id,
-          branch_id: branch!.id,
+          section_id: sectionId as string,
           name: r.name,
           kind: r.kind,
           capacity: r.capacity,
@@ -82,6 +81,7 @@ export async function createOrganization(
       await db.from('activities').insert(
         preset.activities.map((a) => ({
           organization_id: org.id,
+          section_id: sectionId as string,
           name: a.name,
           min_players: a.minPlayers,
           max_players: a.maxPlayers,

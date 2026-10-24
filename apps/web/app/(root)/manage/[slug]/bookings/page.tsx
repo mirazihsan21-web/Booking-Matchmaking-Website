@@ -3,10 +3,10 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionButton, ActionForm, Field, SelectField } from "@/components/forms/action-form";
 import { Badge } from "@/components/ui/badge";
-import { branchDay, type SlotBooking, type SpaceDay } from "@/lib/bookings/bookings";
+import { sectionDay, type SlotBooking, type SpaceDay } from "@/lib/bookings/bookings";
 import { addDays, currentBusinessDate, parseDateParam } from "@/lib/bookings/slots";
 import { formatDay, formatShortTime } from "@/lib/format";
-import type { OpeningHours } from "@/lib/opening-hours";
+import { loadSections } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrgRole } from "@/lib/tenancy/dal";
@@ -113,36 +113,36 @@ async function Bookings({ params, searchParams }: { params: Promise<{ slug: stri
   const query = await searchParams;
   const { org } = await requireOrgRole(slug, "staff");
   const supabase = await createClient();
-  const { data: branches } = await supabase.from("branches").select("id, name, opening_hours").eq("organization_id", org.id).order("created_at");
-  if (!branches || branches.length === 0) notFound();
+  const sections = await loadSections(supabase, org.id);
+  if (sections.length === 0) notFound();
 
-  const asked = one(query.branch);
-  const branch = asked === undefined ? branches[0]! : branches.find((b) => b.id === asked);
-  if (!branch) notFound();
+  const asked = one(query.section);
+  const section = asked === undefined ? sections[0]! : sections.find((s) => s.id === asked);
+  if (!section) notFound();
   const now = new Date();
   // After midnight at a late-night venue, "today" is still last night's business day.
-  const today = currentBusinessDate(branch.opening_hours as OpeningHours, now, org.timezone);
+  const today = currentBusinessDate(section.openingHours, now, org.timezone);
   const date = parseDateParam(one(query.date), today);
-  const days = await branchDay(createServiceClient(), { organizationId: org.id, branchId: branch.id, date, now });
+  const days = await sectionDay(createServiceClient(), { organizationId: org.id, sectionId: section.id, date, now });
   if (!days) notFound();
-  const link = (d: string) => `/manage/${org.slug}/bookings?branch=${branch.id}&date=${d}`;
+  const link = (d: string) => `/manage/${org.slug}/bookings?section=${section.id}&date=${d}`;
 
   return (
     <div className="flex flex-col gap-6">
       <form method="get" className="flex flex-wrap items-end gap-3">
-        {branches.length > 1 && (
+        {sections.length > 1 && (
           <label className="flex flex-col gap-1.5 text-sm font-medium">
-            {m.staffBookings.branch}
-            <select name="branch" defaultValue={branch.id} className="h-9 rounded-lg border border-input bg-transparent px-2">
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
+            {m.staffBookings.section}
+            <select name="section" defaultValue={section.id} className="h-9 rounded-lg border border-input bg-transparent px-2">
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
                 </option>
               ))}
             </select>
           </label>
         )}
-        {branches.length === 1 && <input type="hidden" name="branch" value={branch.id} />}
+        {sections.length === 1 && <input type="hidden" name="section" value={section.id} />}
         <input type="date" name="date" defaultValue={date} aria-label={m.bookings.day} className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm" />
         <button type="submit" className="h-9 rounded-lg border border-border px-4 text-sm hover:bg-foreground/5">
           {m.staffBookings.show}
@@ -153,7 +153,7 @@ async function Bookings({ params, searchParams }: { params: Promise<{ slug: stri
           {m.staffBookings.previousDay}
         </Link>
         <h2 className="text-lg font-semibold">
-          {branch.name} · {formatDay(date)}
+          {section.name} · {formatDay(date)}
         </h2>
         <Link href={link(addDays(date, 1))} className="text-sm hover:underline">
           {m.staffBookings.nextDay}

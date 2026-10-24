@@ -5,7 +5,7 @@ import { weeklyStarts, withinOpeningHours } from './time';
 
 export interface ScheduleInput {
   organizationId: string;
-  branchId: string;
+  sectionId: string;
   activityId: string | null;
   resourceIds: string[];
   first: { date: string; time: string };
@@ -36,7 +36,7 @@ export async function scheduleOpenPlay(db: SupabaseClient, input: ScheduleInput)
 
   const { data, error } = await db.rpc('schedule_open_play', {
     p_organization_id: input.organizationId,
-    p_branch_id: input.branchId,
+    p_section_id: input.sectionId,
     p_activity_id: input.activityId,
     p_resource_ids: input.resourceIds,
     p_starts_at: starts.map((s) => s.toISOString()),

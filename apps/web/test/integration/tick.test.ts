@@ -8,7 +8,7 @@ import { createTestUser, deleteTestUser, serviceDb, type TestUser } from './help
 // runTick works on every venue in the database, so assertions look only at this file's rows.
 const db = serviceDb();
 let orgId: string;
-let branchId: string;
+let sectionId: string;
 let pitchId: string;
 let activityId: string;
 let player: TestUser;
@@ -31,7 +31,7 @@ async function session(startsInHours: number, status = 'open'): Promise<string> 
   const row = must(
     await db
       .from('open_play_sessions')
-      .insert({ organization_id: orgId, branch_id: branchId, activity_id: activityId, starts_at: inHours(startsInHours), ends_at: inHours(startsInHours + 1), seat_price_poisha: 30000, status })
+      .insert({ organization_id: orgId, section_id: sectionId, activity_id: activityId, starts_at: inHours(startsInHours), ends_at: inHours(startsInHours + 1), seat_price_poisha: 30000, status })
       .select('id')
       .single(),
   );
@@ -49,20 +49,20 @@ beforeAll(async () => {
   orgId = must(
     await db.from('organizations').insert({ slug: `tick-${randomUUID().slice(0, 8)}`, name: 'Tick Turf', business_type: 'turf', status: 'live' }).select('id').single(),
   ).id;
-  branchId = must(await db.from('branches').insert({ organization_id: orgId, name: 'Main' }).select('id').single()).id;
-  pitchId = must(await db.from('resources').insert({ organization_id: orgId, branch_id: branchId, name: 'Pitch 1', kind: 'pitch', capacity: 14 }).select('id').single()).id;
+  sectionId = must(await db.from('sections').insert({ organization_id: orgId, name: 'Main', kind: 'turf', slug: 'main' }).select('id').single()).id;
+  pitchId = must(await db.from('resources').insert({ organization_id: orgId, section_id: sectionId, name: 'Pitch 1', kind: 'pitch', capacity: 14 }).select('id').single()).id;
   activityId = must(
     await db
       .from('activities')
-      .insert({ organization_id: orgId, name: '5-a-side', min_players: 10, max_players: 10, duration_min: 60, team_mode: 'two_teams', team_size: 5 })
+      .insert({ organization_id: orgId, section_id: sectionId, name: '5-a-side', min_players: 10, max_players: 10, duration_min: 60, team_mode: 'two_teams', team_size: 5 })
       .select('id')
       .single(),
   ).id;
-  profileId = must(await db.from('player_profiles').insert({ organization_id: orgId, user_id: player.id, display_name: 'Tick', skill: 3 }).select('id').single()).id;
+  profileId = must(await db.from('player_profiles').insert({ organization_id: orgId, user_id: player.id, display_name: 'Tick' }).select('id').single()).id;
   const rows = must(
     await db
       .from('player_profiles')
-      .insert(squad.map((u, i) => ({ organization_id: orgId, user_id: u.id, display_name: `T${i + 1}`, skill: 1 + (i % 5) })))
+      .insert(squad.map((u, i) => ({ organization_id: orgId, user_id: u.id, display_name: `T${i + 1 }`})))
       .select('id'),
   );
   squadProfiles.push(...rows.map((r) => r.id));

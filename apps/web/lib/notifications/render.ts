@@ -16,10 +16,10 @@ export type NotificationKind =
 
 const str = (value: unknown) => (typeof value === 'string' ? value : '');
 
-/** "Pitch 1", or "Pitch 1 (Gulshan)" when the venue has several branches. */
+/** "Pitch 1 (Turf)": the space and its section (rows from before sections have no section name). */
 function space(payload: Record<string, unknown>): string {
-  const branch = payload.multi_branch && str(payload.branch_name) ? ` (${str(payload.branch_name)})` : '';
-  return `${str(payload.resource_name)}${branch}`;
+  const section = str(payload.section_name) ? ` (${str(payload.section_name)})` : '';
+  return `${str(payload.resource_name)}${section}`;
 }
 
 /** "Fri 23 Oct, 8pm–9pm" in the venue's time zone. */

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { bookSpace, branchDay, cancelSpaceBooking, listMyBookings, setSpaceBookingStatus, spaceDay } from '@/lib/bookings/bookings';
+import { bookSpace, sectionDay, cancelSpaceBooking, listMyBookings, setSpaceBookingStatus, spaceDay } from '@/lib/bookings/bookings';
 import { createTestUser, deleteTestUser, serviceDb, type TestUser } from './helpers';
 
 // A fresh venue (Dhaka time, defaults: 14-day window, 2-hour cancel cut-off; limit raised to 10 so it
@@ -18,6 +18,7 @@ let mainBranch: string;
 let pitch1: string;
 let pitch2: string;
 let zoneL: string;
+let tableC: string; // in the Café section
 const users: TestUser[] = [];
 let staffUser: TestUser;
 let a: string; // profiles
@@ -35,7 +36,7 @@ beforeAll(async () => {
   const org = must(
     await db
       .from('organizations')
-      .insert({ slug: `bk-${randomUUID().slice(0, 8)}`, name: 'Booking Turf', business_type: 'turf', status: 'live', max_upcoming_bookings: 10 })
+      .insert({ slug: `bk-${randomUUID().slice(0, 8)}`, name: 'Booking Turf', business_type: 'turf', status: 'live' })
       .select('id')
       .single(),
   );
@@ -43,34 +44,48 @@ beforeAll(async () => {
   must(await db.from('organization_members').insert({ organization_id: orgId, user_id: us.id, role: 'staff' }));
   const branches = must(
     await db
-      .from('branches')
+      .from('sections')
       .insert([
-        { organization_id: orgId, name: 'Main', opening_hours: hours('10:00', '23:00') },
-        { organization_id: orgId, name: 'Late', opening_hours: hours('14:00', '02:00') },
-      ])
+        { organization_id: orgId, name: 'Main', kind: 'turf', slug: 'main', max_upcoming_bookings: 10, opening_hours: hours('10:00', '23:00') },
+        { organization_id: orgId, name: 'Late', kind: 'gaming_lounge', slug: 'late', max_upcoming_bookings: 10, opening_hours: hours('14:00', '02:00') },
+        // The café books only 3 days ahead and can be cancelled until 30 minutes before.
+        {
+          organization_id: orgId,
+          name: 'Café',
+          kind: 'boardgame_cafe',
+          slug: 'cafe',
+          max_upcoming_bookings: 10,
+          booking_horizon_days: 3,
+          cancel_cutoff_minutes: 30,
+          opening_hours: hours('10:00', '23:00'),
+        },
+      ], { defaultToNull: false }) // rows without a rule keep the column default
       .select('id, name'),
   );
   mainBranch = branches.find((x) => x.name === 'Main')!.id;
   const lateBranch = branches.find((x) => x.name === 'Late')!.id;
+  const cafe = branches.find((x) => x.name === 'Café')!.id;
   const resources = must(
     await db
       .from('resources')
       .insert([
-        { organization_id: orgId, branch_id: mainBranch, name: 'Pitch 1', kind: 'pitch', capacity: 14, price_per_hour_poisha: 250000 },
-        { organization_id: orgId, branch_id: mainBranch, name: 'Pitch 2', kind: 'pitch', capacity: 14, price_per_hour_poisha: 250000 },
-        { organization_id: orgId, branch_id: lateBranch, name: 'Zone L', kind: 'zone', capacity: 10, price_per_hour_poisha: 150000 },
+        { organization_id: orgId, section_id: mainBranch, name: 'Pitch 1', kind: 'pitch', capacity: 14, price_per_hour_poisha: 250000 },
+        { organization_id: orgId, section_id: mainBranch, name: 'Pitch 2', kind: 'pitch', capacity: 14, price_per_hour_poisha: 250000 },
+        { organization_id: orgId, section_id: lateBranch, name: 'Zone L', kind: 'zone', capacity: 10, price_per_hour_poisha: 150000 },
+        { organization_id: orgId, section_id: cafe, name: 'Table C', kind: 'table', capacity: 4, price_per_hour_poisha: 50000 },
       ])
       .select('id, name'),
   );
   pitch1 = resources.find((r) => r.name === 'Pitch 1')!.id;
   pitch2 = resources.find((r) => r.name === 'Pitch 2')!.id;
   zoneL = resources.find((r) => r.name === 'Zone L')!.id;
+  tableC = resources.find((r) => r.name === 'Table C')!.id;
   const profiles = must(
     await db
       .from('player_profiles')
       .insert([
-        { organization_id: orgId, user_id: ua.id, display_name: 'Ayesha', skill: 3 },
-        { organization_id: orgId, user_id: ub.id, display_name: 'Bilal', skill: 3 },
+        { organization_id: orgId, user_id: ua.id, display_name: 'Ayesha' },
+        { organization_id: orgId, user_id: ub.id, display_name: 'Bilal' },
       ])
       .select('id, user_id'),
   );
@@ -78,9 +93,9 @@ beforeAll(async () => {
   b = profiles.find((p) => p.user_id === ub.id)!.id;
 
   const other = must(await db.from('organizations').insert({ slug: `bkx-${randomUUID().slice(0, 8)}`, name: 'Other', business_type: 'turf', status: 'live' }).select('id').single());
-  const otherBranch = must(await db.from('branches').insert({ organization_id: other.id, name: 'X' }).select('id').single());
+  const otherBranch = must(await db.from('sections').insert({ organization_id: other.id, name: 'X', kind: 'turf', slug: 'turf' }).select('id').single());
   otherOrgPitch = must(
-    await db.from('resources').insert({ organization_id: other.id, branch_id: otherBranch.id, name: 'X1', kind: 'pitch', capacity: 14 }).select('id').single(),
+    await db.from('resources').insert({ organization_id: other.id, section_id: otherBranch.id, name: 'X1', kind: 'pitch', capacity: 14 }).select('id').single(),
   ).id;
 });
 
@@ -134,6 +149,12 @@ describe('bookSpace', () => {
     expect((await asStaff(far)).status).toBe('booked');
   });
 
+  it("uses each section's own booking window", async () => {
+    const fiveDaysOn = new Date('2026-10-25T14:00:00Z'); // Sun 8pm
+    expect(await asPlayer(b, users[1]!.id, fiveDaysOn, tableC)).toEqual({ status: 'invalid', reason: 'beyond_horizon' }); // café: 3 days
+    expect((await asPlayer(b, users[1]!.id, fiveDaysOn, pitch2)).status).toBe('booked'); // turf: 14 days
+  });
+
   it('lets staff record a walk-in for the slot that is on now, but not players', async () => {
     const six = new Date('2026-10-23T12:00:00Z'); // Fri 6pm
     const sixTen = new Date('2026-10-23T12:10:00Z');
@@ -170,7 +191,7 @@ describe('day views', () => {
   });
 
   it('shows staff the names, and the phone of a walk-in', async () => {
-    const days = await branchDay(db, { organizationId: orgId, branchId: mainBranch, date: '2026-10-23', now });
+    const days = await sectionDay(db, { organizationId: orgId, sectionId: mainBranch, date: '2026-10-23', now });
     const pitch = days!.find((d) => d.resource.id === pitch1)!;
     expect(pitch.slots.find((s) => s.start.getTime() === FRI_8PM.getTime())!.bookings).toMatchObject([{ name: 'Ayesha', phone: null }]);
     expect(pitch.slots.find((s) => s.start.getTime() === FRI_9PM.getTime())!.bookings).toMatchObject([{ name: 'Karim', phone: '+8801712345678' }]);
@@ -179,7 +200,7 @@ describe('day views', () => {
   it("returns nothing for another venue's space or a malformed id (Review Focus 1)", async () => {
     expect(await spaceDay(db, { organizationId: orgId, resourceId: otherOrgPitch, date: '2026-10-23', withNames: false, now })).toBeNull();
     expect(await spaceDay(db, { organizationId: orgId, resourceId: 'not-a-uuid', date: '2026-10-23', withNames: false, now })).toBeNull();
-    expect(await branchDay(db, { organizationId: orgId, branchId: 'not-a-uuid', date: '2026-10-23', now })).toBeNull();
+    expect(await sectionDay(db, { organizationId: orgId, sectionId: 'not-a-uuid', date: '2026-10-23', now })).toBeNull();
   });
 });
 
@@ -194,6 +215,15 @@ describe('cancelling', () => {
     expect(await cancelSpaceBooking(db, { organizationId: orgId, bookingId: id, actor: { kind: 'player', profileId: a }, cancelledBy: users[0]!.id, now: at(3) })).toBe(
       'not_cancellable',
     ); // second click (Review Focus 5)
+  });
+
+  it("uses the booking's own section for the cut-off", async () => {
+    const result = await asPlayer(b, users[1]!.id, new Date('2026-10-23T14:00:00Z'), tableC); // Fri 8pm at the café
+    if (result.status !== 'booked') throw new Error(result.status);
+    const hourBefore = new Date('2026-10-23T13:00:00Z');
+    expect(await cancelSpaceBooking(db, { organizationId: orgId, bookingId: result.bookingId, actor: { kind: 'player', profileId: b }, cancelledBy: users[1]!.id, now: hourBefore })).toBe(
+      'cancelled',
+    ); // the café's cut-off is 30 minutes; the turf's 2 hours would refuse
   });
 
   it("does not let a player cancel someone else's booking", async () => {
@@ -262,7 +292,7 @@ describe('my bookings', () => {
     const upcoming = (await listMyBookings(db, { organizationId: orgId, profileId: a, now })).upcoming;
     const order = upcoming.map((x) => x.startsAt);
     expect([...order].sort()).toEqual(order);
-    expect(upcoming.find((x) => x.resourceName === 'Zone L')?.branchName).toBe('Late'); // two branches: each booking says where
+    expect(upcoming.find((x) => x.resourceName === 'Zone L')?.sectionName).toBe('Late'); // two branches: each booking says where
   });
 });
 
@@ -270,14 +300,14 @@ describe('staff day view keeps every booking (Review Focus 3, staff side)', () =
   it('shows bookings after the slot length changes, hours shorten, the day closes or the space is deactivated', async () => {
     const { data: created, error } = await db
       .from('resources')
-      .insert({ organization_id: orgId, branch_id: mainBranch, name: 'Pitch 3', kind: 'pitch', capacity: 14 })
+      .insert({ organization_id: orgId, section_id: mainBranch, name: 'Pitch 3', kind: 'pitch', capacity: 14 })
       .select('id')
       .single();
     if (error) throw error;
     const pitch3 = created.id;
     for (const start of [FRI_8PM, FRI_9PM]) expect((await asStaff(start, pitch3)).status).toBe('booked');
-    const view = async () => (await branchDay(db, { organizationId: orgId, branchId: mainBranch, date: '2026-10-23', now }))!.find((d) => d.resource.id === pitch3)!;
-    const { data: branch } = await db.from('branches').select('opening_hours').eq('id', mainBranch).single();
+    const view = async () => (await sectionDay(db, { organizationId: orgId, sectionId: mainBranch, date: '2026-10-23', now }))!.find((d) => d.resource.id === pitch3)!;
+    const { data: branch } = await db.from('sections').select('opening_hours').eq('id', mainBranch).single();
     const hours = branch!.opening_hours as Record<string, unknown>;
 
     // Two 60-minute bookings under one 120-minute slot: both are listed.
@@ -286,11 +316,11 @@ describe('staff day view keeps every booking (Review Focus 3, staff side)', () =
 
     // Fridays shortened to 10:00–21:00: the 9pm booking is off the grid but still shown.
     await db.from('resources').update({ slot_minutes: 60 }).eq('id', pitch3);
-    await db.from('branches').update({ opening_hours: { ...hours, '5': ['10:00', '21:00'] } }).eq('id', mainBranch);
+    await db.from('sections').update({ opening_hours: { ...hours, '5': ['10:00', '21:00'] } }).eq('id', mainBranch);
     expect((await view()).extra!.map((b) => b.start.getTime())).toEqual([FRI_9PM.getTime()]);
 
     // Closed on Fridays: both bookings are still shown.
-    await db.from('branches').update({ opening_hours: { ...hours, '5': null } }).eq('id', mainBranch);
+    await db.from('sections').update({ opening_hours: { ...hours, '5': null } }).eq('id', mainBranch);
     expect((await view()).extra).toHaveLength(2);
 
     // The space is deactivated: it stays in the staff view while it has bookings that day.
@@ -299,6 +329,6 @@ describe('staff day view keeps every booking (Review Focus 3, staff side)', () =
     expect(inactive.resource.active).toBe(false);
     expect(inactive.extra).toHaveLength(2);
 
-    await db.from('branches').update({ opening_hours: hours }).eq('id', mainBranch);
+    await db.from('sections').update({ opening_hours: hours }).eq('id', mainBranch);
   });
 });

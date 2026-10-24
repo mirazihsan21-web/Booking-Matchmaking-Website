@@ -85,7 +85,7 @@ async function venueFor(db: SupabaseClient, cache: Map<string, Venue | null>, or
             name: data.name,
             slug: data.slug,
             timezone: data.timezone,
-            primary: (data.branding as { primary?: string } | null)?.primary ?? getPreset(data.business_type).palette.primary,
+            primary: (data.branding as { primary?: string } | null)?.primary ?? getPreset(data.business_type ?? 'turf').palette.primary,
           }
         : null,
     );

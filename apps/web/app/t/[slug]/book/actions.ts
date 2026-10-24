@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import type { FormState } from "@/components/forms/action-form";
 import { bookSpace } from "@/lib/bookings/bookings";
+import { sectionOfResource } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { getPlayer } from "@/lib/tenancy/player";
 import { m } from "@/messages";
@@ -36,8 +37,8 @@ export async function bookSpaceAction(slug: string, resourceId: string, _state: 
     case "already_yours":
       return { ok: false, message: m.bookings.alreadyYours };
     case "limit_reached": {
-      const { data } = await db.from("organizations").select("max_upcoming_bookings").eq("id", player.org.id).single();
-      return { ok: false, message: m.bookings.limitReached(data?.max_upcoming_bookings ?? 0) };
+      const section = await sectionOfResource(db, resourceId);
+      return { ok: false, message: m.bookings.limitReached(section?.rules.maxUpcomingBookings ?? 0) };
     }
     case "invalid":
       return { ok: false, message: m.bookings.invalid[result.reason] };

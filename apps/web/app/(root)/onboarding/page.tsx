@@ -2,19 +2,19 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ActionButton, ActionForm, Field } from "@/components/forms/action-form";
 import { LogoUploader } from "@/components/manage/logo-uploader";
-import { OpeningHoursEditor } from "@/components/manage/opening-hours-editor";
+import { SectionFields } from "@/components/manage/section-fields";
 import { NameAndSlug } from "@/components/onboarding/name-and-slug";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/dal";
 import { formatBdt } from "@/lib/money";
-import type { OpeningHours } from "@/lib/opening-hours";
+import { loadSections } from "@/lib/sections/sections";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrgRole } from "@/lib/tenancy/dal";
 import { logoUrl, tenantUrl } from "@/lib/tenancy/urls";
 import { m } from "@/messages";
 import { PRESETS, getPreset, type BusinessType } from "@/presets";
-import { publishAction, saveBranchAction, saveSettingsAction } from "../manage/[slug]/actions";
+import { publishAction, saveSectionAction, saveSettingsAction } from "../manage/[slug]/actions";
 import { createOrganizationAction } from "./actions";
 
 const STEPS = ["type", "name", "branding", "branch", "review", "publish"] as const;
@@ -84,11 +84,14 @@ async function ExistingVenue({ slug, step }: { slug: string; step: Step }) {
   const supabase = await createClient();
 
   if (step === "branding") {
+    const { data: venue } = await supabase.from("organizations").select("address").eq("id", org.id).single();
+    const address = venue?.address;
     return (
       <Card>
         <CardContent className="flex flex-col gap-4 pt-6">
           <ActionForm action={saveSettingsAction.bind(null, org.slug)} submitLabel={m.manage.save}>
             <input type="hidden" name="name" value={org.name} />
+            <Field name="address" label={m.manage.address} defaultValue={address ?? ""} />
             <div className="grid grid-cols-2 gap-3">
               <Field name="primary" label={m.manage.primaryColour} type="color" defaultValue={org.branding.primary ?? preset.palette.primary} />
               <Field name="accent" label={m.manage.accentColour} type="color" defaultValue={org.branding.accent ?? preset.palette.accent} />
@@ -102,21 +105,13 @@ async function ExistingVenue({ slug, step }: { slug: string; step: Step }) {
   }
 
   if (step === "branch") {
-    const { data: branch } = await supabase
-      .from("branches")
-      .select("id, name, address, opening_hours")
-      .eq("organization_id", org.id)
-      .order("created_at")
-      .limit(1)
-      .single();
+    const [section] = await loadSections(supabase, org.id);
     return (
       <Card>
         <CardContent className="flex flex-col gap-4 pt-6">
-          {branch && (
-            <ActionForm action={saveBranchAction.bind(null, org.slug, branch.id)} submitLabel={m.manage.save}>
-              <Field name="name" label={m.manage.name} defaultValue={branch.name} required />
-              <Field name="address" label={m.manage.address} defaultValue={branch.address} />
-              <OpeningHoursEditor value={branch.opening_hours as OpeningHours} />
+          {section && (
+            <ActionForm action={saveSectionAction.bind(null, org.slug, section.id)} submitLabel={m.manage.save}>
+              <SectionFields section={section} />
             </ActionForm>
           )}
           {next(org.slug, "review")}

@@ -47,7 +47,7 @@ export const requireOrgRole = cache(
         slug: org.slug,
         name: org.name,
         status: org.status,
-        businessType: org.business_type as BusinessType,
+        businessType: (org.business_type ?? 'turf') as BusinessType,
         timezone: org.timezone,
         branding: (org.branding ?? {}) as ManagedOrganization['branding'],
       },

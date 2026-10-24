@@ -47,7 +47,7 @@ export interface SpaceDay {
 export interface MyBooking {
   id: string;
   resourceName: string;
-  branchName: string;
+  sectionName: string;
   startsAt: string;
   endsAt: string;
   pricePoisha: number;
@@ -73,20 +73,12 @@ const asRange = (from: Date, to: Date) => `[${from.toISOString()},${to.toISOStri
 interface Venue {
   status: string;
   timezone: string;
-  bookingHorizonDays: number;
-  cancelCutoffMinutes: number;
 }
 
 async function loadVenue(db: SupabaseClient, organizationId: string): Promise<Venue | null> {
   if (!UUID.test(organizationId)) return null;
-  const { data } = await db
-    .from('organizations')
-    .select('status, timezone, booking_horizon_days, cancel_cutoff_minutes')
-    .eq('id', organizationId)
-    .maybeSingle();
-  return data
-    ? { status: data.status, timezone: data.timezone, bookingHorizonDays: data.booking_horizon_days, cancelCutoffMinutes: data.cancel_cutoff_minutes }
-    : null;
+  const { data } = await db.from('organizations').select('status, timezone').eq('id', organizationId).maybeSingle();
+  return data ? { status: data.status, timezone: data.timezone } : null;
 }
 
 interface Space {
@@ -95,26 +87,31 @@ interface Space {
   slotMinutes: number;
   pricePerHourPoisha: number | null;
   active: boolean;
+  /** The space's section: its hours and booking rules apply. */
   hours: OpeningHours;
+  bookingHorizonDays: number;
+  cancelCutoffMinutes: number;
 }
 
 async function loadSpace(db: SupabaseClient, organizationId: string, resourceId: string): Promise<Space | null> {
   if (!UUID.test(resourceId)) return null;
   const { data } = await db
     .from('resources')
-    .select('id, name, slot_minutes, price_per_hour_poisha, active, branches(opening_hours)')
+    .select('id, name, slot_minutes, price_per_hour_poisha, active, sections(opening_hours, booking_horizon_days, cancel_cutoff_minutes)')
     .eq('id', resourceId)
     .eq('organization_id', organizationId)
     .maybeSingle();
   if (!data) return null;
-  const branch = data.branches as unknown as { opening_hours: OpeningHours } | null;
+  const section = data.sections as unknown as { opening_hours: OpeningHours; booking_horizon_days: number; cancel_cutoff_minutes: number } | null;
   return {
     id: data.id,
     name: data.name,
     slotMinutes: data.slot_minutes,
     pricePerHourPoisha: data.price_per_hour_poisha,
     active: data.active,
-    hours: branch?.opening_hours ?? ({} as OpeningHours),
+    hours: section?.opening_hours ?? ({} as OpeningHours),
+    bookingHorizonDays: section?.booking_horizon_days ?? 0,
+    cancelCutoffMinutes: section?.cancel_cutoff_minutes ?? 0,
   };
 }
 
@@ -130,7 +127,7 @@ export async function bookSpace(db: SupabaseClient, input: BookSpaceInput): Prom
     startsAt: input.startsAt,
     slots: input.slots,
     now,
-    horizonDays: input.actor === 'staff' ? null : venue.bookingHorizonDays,
+    horizonDays: input.actor === 'staff' ? null : space.bookingHorizonDays,
     allowInProgress: input.actor === 'staff', // a walk-in for the slot that is on now
   });
   if (!check.ok) return { status: 'invalid', reason: check.reason };
@@ -176,7 +173,7 @@ export async function cancelSpaceBooking(
   if (!UUID.test(input.bookingId)) return 'not_found';
   const { data: booking } = await db
     .from('resource_bookings')
-    .select('profile_id, period, status')
+    .select('profile_id, period, status, resources(sections(cancel_cutoff_minutes))')
     .eq('id', input.bookingId)
     .eq('organization_id', input.organizationId)
     .maybeSingle();
@@ -189,8 +186,8 @@ export async function cancelSpaceBooking(
   // Nobody cancels a booking that has already ended (staff mark attendance instead).
   if (now >= end) return 'too_late';
   if (input.actor.kind === 'player') {
-    const venue = await loadVenue(db, input.organizationId);
-    if (!venue || now.getTime() >= start.getTime() - venue.cancelCutoffMinutes * 60_000) return 'too_late';
+    const cutoff = (booking.resources as unknown as { sections: { cancel_cutoff_minutes: number } | null } | null)?.sections?.cancel_cutoff_minutes;
+    if (cutoff === undefined || now.getTime() >= start.getTime() - cutoff * 60_000) return 'too_late';
   }
 
   const { data, error } = await db.rpc('cancel_resource_booking', { p_booking_id: input.bookingId, p_cancelled_by: input.cancelledBy });
@@ -266,20 +263,20 @@ export async function spaceDay(
 }
 
 /**
- * The staff day view of a branch: every active space, plus any inactive space that still has bookings
- * that day (so staff can cancel them). Names included. Null for a foreign branch.
+ * The staff day view of a section: every active space, plus any inactive space that still has bookings
+ * that day (so staff can cancel them). Names included. Null for another brand's section.
  */
-export async function branchDay(
+export async function sectionDay(
   db: SupabaseClient,
-  input: { organizationId: string; branchId: string; date: string; now?: Date },
+  input: { organizationId: string; sectionId: string; date: string; now?: Date },
 ): Promise<SpaceDay[] | null> {
-  if (!UUID.test(input.branchId)) return null;
-  const { data: branch } = await db.from('branches').select('id').eq('id', input.branchId).eq('organization_id', input.organizationId).maybeSingle();
-  if (!branch) return null;
+  if (!UUID.test(input.sectionId)) return null;
+  const { data: section } = await db.from('sections').select('id').eq('id', input.sectionId).eq('organization_id', input.organizationId).maybeSingle();
+  if (!section) return null;
   const { data: spaces, error } = await db
     .from('resources')
     .select('id')
-    .eq('branch_id', input.branchId)
+    .eq('section_id', input.sectionId)
     .eq('organization_id', input.organizationId)
     .order('name');
   if (error) throw error;
@@ -296,20 +293,20 @@ export async function listMyBookings(
   input: { organizationId: string; profileId: string; now?: Date },
 ): Promise<{ upcoming: MyBooking[]; past: MyBooking[] }> {
   const now = input.now ?? new Date();
-  const venue = await loadVenue(db, input.organizationId);
   const { data, error } = await db
     .from('resource_bookings')
-    .select('id, period, price_poisha, status, resources(name, branches(name))')
+    .select('id, period, price_poisha, status, resources(name, sections(name, cancel_cutoff_minutes))')
     .eq('profile_id', input.profileId)
     .eq('organization_id', input.organizationId);
   if (error) throw error;
-  const cutoff = (venue?.cancelCutoffMinutes ?? 0) * 60_000;
   const all = data.map((b) => {
     const { start, end } = parseTstzRange(b.period);
+    const resource = b.resources as unknown as { name: string; sections: { name: string; cancel_cutoff_minutes: number } | null } | null;
+    const cutoff = (resource?.sections?.cancel_cutoff_minutes ?? 0) * 60_000;
     return {
       id: b.id,
-      resourceName: (b.resources as unknown as { name: string } | null)?.name ?? '',
-      branchName: (b.resources as unknown as { branches: { name: string } | null } | null)?.branches?.name ?? '',
+      resourceName: resource?.name ?? '',
+      sectionName: resource?.sections?.name ?? '',
       startsAt: start.toISOString(),
       endsAt: end.toISOString(),
       pricePoisha: b.price_poisha,

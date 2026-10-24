@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatNight } from "@/lib/format";
 import { formatBdt } from "@/lib/money";
+import { loadSections } from "@/lib/sections/sections";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrgRole } from "@/lib/tenancy/dal";
 import { m } from "@/messages";
@@ -16,10 +17,10 @@ async function Schedule({ params }: { params: Promise<{ slug: string }> }) {
   const { org } = await requireOrgRole(slug, "staff");
   const preset = getPreset(org.businessType);
   const supabase = await createClient();
-  const [{ data: branches }, { data: resources }, { data: activities }, { data: sessions }] = await Promise.all([
-    supabase.from("branches").select("id, name").eq("organization_id", org.id).order("created_at"),
-    supabase.from("resources").select("id, name, branch_id").eq("organization_id", org.id).eq("active", true).order("name"),
-    supabase.from("activities").select("id, name, duration_min").eq("organization_id", org.id).eq("active", true).order("name"),
+  const [sections, { data: resources }, { data: activities }, { data: sessions }] = await Promise.all([
+    loadSections(supabase, org.id),
+    supabase.from("resources").select("id, name, section_id").eq("organization_id", org.id).eq("active", true).order("name"),
+    supabase.from("activities").select("id, name, duration_min, section_id").eq("organization_id", org.id).eq("active", true).order("name"),
     supabase
       .from("open_play_sessions")
       .select("id, starts_at, seat_price_poisha, status, activities(name), open_play_session_resources(resources(name))")
@@ -29,7 +30,7 @@ async function Schedule({ params }: { params: Promise<{ slug: string }> }) {
       .order("starts_at")
       .limit(50),
   ]);
-  const branchName = new Map((branches ?? []).map((b) => [b.id, b.name]));
+  const sectionName = new Map(sections.map((s) => [s.id, s.name]));
 
   return (
     <div className="flex flex-col gap-6">
@@ -64,11 +65,11 @@ async function Schedule({ params }: { params: Promise<{ slug: string }> }) {
         <CardContent>
           <ActionForm action={scheduleAction.bind(null, org.slug)} submitLabel={m.schedule.submit}>
             <div className="grid gap-3 sm:grid-cols-2">
-              <SelectField name="branchId" label={m.manage.branch} options={(branches ?? []).map((b) => ({ value: b.id, label: b.name }))} />
+              <SelectField name="sectionId" label={m.manage.section} options={sections.map((s) => ({ value: s.id, label: s.name }))} />
               <SelectField
                 name="activityId"
                 label={preset.labels.activity}
-                options={[{ value: "", label: m.schedule.playersChoose }, ...(activities ?? []).map((a) => ({ value: a.id, label: a.name }))]}
+                options={[{ value: "", label: m.schedule.playersChoose }, ...(activities ?? []).map((a) => ({ value: a.id, label: `${a.name} (${sectionName.get(a.section_id)})` }))]}
               />
             </div>
             <fieldset className="flex flex-col gap-1.5">
@@ -77,7 +78,7 @@ async function Schedule({ params }: { params: Promise<{ slug: string }> }) {
                 {(resources ?? []).map((r) => (
                   <label key={r.id} className="flex items-center gap-1.5">
                     <input type="checkbox" name="resourceIds" value={r.id} />
-                    {r.name} <span className="text-foreground/50">({branchName.get(r.branch_id)})</span>
+                    {r.name} <span className="text-foreground/50">({sectionName.get(r.section_id)})</span>
                   </label>
                 ))}
               </div>
