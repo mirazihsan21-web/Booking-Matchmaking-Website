@@ -211,11 +211,13 @@ export async function inviteStaffAction(slug: string, _state: FormState, form: F
     organizationId: org.id,
     email: parsed.data.email,
     role: parsed.data.role,
+    sectionIds: form.getAll("sectionIds").map(String),
     invitedBy: user.id,
     redirectTo: rootUrl("/auth/callback?next=/manage"),
   });
   refresh();
   if (result.status === "already_member") return { ok: false, message: m.manage.alreadyMember };
+  if (result.status === "no_sections") return { ok: false, errors: { sectionIds: m.manage.pickSections } };
   return { ok: true, message: m.manage.invited(parsed.data.email.toLowerCase()) };
 }
 

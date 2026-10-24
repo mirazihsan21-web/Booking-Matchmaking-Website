@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { memberEmails } from './invites';
+import { addSectionStaff, memberEmails } from './invites';
 
 export type Role = 'owner' | 'staff';
 
@@ -26,11 +26,25 @@ async function isOnlyOwner(db: SupabaseClient, organizationId: string, userId: s
   return data.length === 1 && data[0]!.user_id === userId;
 }
 
-/** An organization must always keep at least one owner. */
+/**
+ * An organization must always keep at least one owner. An owner made staff keeps running every
+ * section (the owner can narrow that later); staff made owner lose their section rows (owners run all).
+ */
 export async function changeRole(db: SupabaseClient, organizationId: string, userId: string, role: Role): Promise<{ status: 'ok' } | { status: 'last_owner' }> {
   if (role === 'staff' && (await isOnlyOwner(db, organizationId, userId))) return { status: 'last_owner' };
+  const { data: before, error: readError } = await db.from('organization_members').select('role').eq('organization_id', organizationId).eq('user_id', userId).maybeSingle();
+  if (readError) throw readError;
+  if (!before || before.role === role) return { status: 'ok' };
   const { error } = await db.from('organization_members').update({ role }).eq('organization_id', organizationId).eq('user_id', userId);
   if (error) throw error;
+  if (role === 'staff') {
+    const { data: sections, error: sectionsError } = await db.from('sections').select('id').eq('organization_id', organizationId);
+    if (sectionsError) throw sectionsError;
+    await addSectionStaff(db, organizationId, userId, sections.map((s) => s.id as string));
+  } else {
+    const { error: deleteError } = await db.from('section_staff').delete().eq('organization_id', organizationId).eq('user_id', userId);
+    if (deleteError) throw deleteError;
+  }
   return { status: 'ok' };
 }
 

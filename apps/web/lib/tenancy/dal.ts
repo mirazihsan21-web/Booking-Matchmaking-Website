@@ -2,7 +2,9 @@ import 'server-only';
 import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import { requireUser, type SessionUser } from '@/lib/auth/dal';
+import { createServiceClient } from '@/lib/service-client';
 import { createClient } from '@/lib/supabase/server';
+import { canManageSection } from './sections-access';
 import type { BusinessType } from '@/presets';
 
 export type OrgRole = 'owner' | 'staff';
@@ -52,5 +54,17 @@ export const requireOrgRole = cache(
         branding: (org.branding ?? {}) as ManagedOrganization['branding'],
       },
     };
+  },
+);
+
+/**
+ * requireOrgRole for staff work in one section (bookings, schedule, sessions): the owner, or staff
+ * given this section. Anyone else gets the same 404, so staff can't probe other sections.
+ */
+export const requireSectionStaff = cache(
+  async (slug: string, sectionId: string): Promise<{ user: SessionUser; org: ManagedOrganization; role: OrgRole }> => {
+    const context = await requireOrgRole(slug, 'staff');
+    if (!(await canManageSection(createServiceClient(), { organizationId: context.org.id, userId: context.user.id, sectionId }))) notFound();
+    return context;
   },
 );

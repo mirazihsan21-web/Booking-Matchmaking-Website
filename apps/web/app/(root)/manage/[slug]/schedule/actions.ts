@@ -5,10 +5,10 @@ import { z } from "zod";
 import type { FormState } from "@/components/forms/action-form";
 import { bdtToPoisha } from "@/lib/money";
 import { cancelOpenPlay, scheduleOpenPlay } from "@/lib/schedule/schedule";
-import { loadSection } from "@/lib/sections/sections";
+import { loadSection, sectionOfSession } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { createClient } from "@/lib/supabase/server";
-import { requireOrgRole } from "@/lib/tenancy/dal";
+import { requireOrgRole, requireSectionStaff } from "@/lib/tenancy/dal";
 import { m } from "@/messages";
 
 const schema = z.object({
@@ -22,7 +22,7 @@ const schema = z.object({
   seatPrice: z.string().refine((p) => bdtToPoisha(p) !== null, m.forms.price),
 });
 
-/** Staff can run the schedule. Writes go through the schedule RPC (service role) after the role check. */
+/** Staff run the schedule of their sections. Writes go through the schedule RPC (service role) after the section check. */
 export async function scheduleAction(slug: string, _state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrgRole(slug, "staff");
   const parsed = schema.safeParse({
@@ -43,6 +43,7 @@ export async function scheduleAction(slug: string, _state: FormState, form: Form
   const supabase = await createClient();
   const section = await loadSection(supabase, { organizationId: org.id, sectionId: v.sectionId });
   if (!section) return { ok: false, errors: { sectionId: m.forms.choose } };
+  await requireSectionStaff(slug, section.id);
 
   const result = await scheduleOpenPlay(createServiceClient(), {
     organizationId: org.id,
@@ -71,10 +72,11 @@ export async function scheduleAction(slug: string, _state: FormState, form: Form
 
 export async function cancelSessionAction(slug: string, sessionId: string, _state: FormState, _form: FormData): Promise<FormState> {
   const { org } = await requireOrgRole(slug, "staff");
-  const supabase = await createClient();
-  const { data: session } = await supabase.from("open_play_sessions").select("id").eq("id", sessionId).eq("organization_id", org.id).maybeSingle();
-  if (!session) return { ok: false, message: m.schedule.invalid };
-  const result = await cancelOpenPlay(createServiceClient(), session.id);
+  const db = createServiceClient();
+  const section = await sectionOfSession(db, sessionId);
+  if (!section || section.organizationId !== org.id) return { ok: false, message: m.schedule.invalid };
+  await requireSectionStaff(slug, section.id);
+  const result = await cancelOpenPlay(db, sessionId);
   refresh();
   return result === "cancelled" ? { ok: true, message: m.schedule.cancelled } : { ok: false, message: m.schedule.notOpen };
 }

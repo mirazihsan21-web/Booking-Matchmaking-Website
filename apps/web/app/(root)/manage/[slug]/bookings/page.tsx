@@ -10,6 +10,7 @@ import { loadSections } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrgRole } from "@/lib/tenancy/dal";
+import { allowedSectionIds } from "@/lib/tenancy/sections-access";
 import { cn } from "@/lib/utils";
 import { m } from "@/messages";
 import { setBookingStatusAction, staffCancelBookingAction, walkInAction } from "./actions";
@@ -111,10 +112,11 @@ function SpaceColumn({ day, slug, timeZone, now }: { day: SpaceDay; slug: string
 async function Bookings({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { slug } = await params;
   const query = await searchParams;
-  const { org } = await requireOrgRole(slug, "staff");
+  const { org, user } = await requireOrgRole(slug, "staff");
   const supabase = await createClient();
-  const sections = await loadSections(supabase, org.id);
-  if (sections.length === 0) notFound();
+  const [all, allowed] = await Promise.all([loadSections(supabase, org.id), allowedSectionIds(createServiceClient(), { organizationId: org.id, userId: user.id })]);
+  const sections = all.filter((s) => allowed.includes(s.id));
+  if (sections.length === 0) return <p className="text-foreground/70">{m.manage.noSections}</p>;
 
   const asked = one(query.section);
   const section = asked === undefined ? sections[0]! : sections.find((s) => s.id === asked);

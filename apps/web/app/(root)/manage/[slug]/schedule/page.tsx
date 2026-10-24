@@ -6,30 +6,36 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatNight } from "@/lib/format";
 import { formatBdt } from "@/lib/money";
 import { loadSections } from "@/lib/sections/sections";
+import { createServiceClient } from "@/lib/service-client";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrgRole } from "@/lib/tenancy/dal";
+import { allowedSectionIds } from "@/lib/tenancy/sections-access";
 import { m } from "@/messages";
 import { getPreset } from "@/presets";
 import { cancelSessionAction, scheduleAction } from "./actions";
 
 async function Schedule({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { org } = await requireOrgRole(slug, "staff");
+  const { org, user } = await requireOrgRole(slug, "staff");
   const preset = getPreset(org.businessType);
   const supabase = await createClient();
-  const [sections, { data: resources }, { data: activities }, { data: sessions }] = await Promise.all([
+  const allowed = await allowedSectionIds(createServiceClient(), { organizationId: org.id, userId: user.id });
+  if (allowed.length === 0) return <p className="text-foreground/70">{m.manage.noSections}</p>;
+  const [all, { data: resources }, { data: activities }, { data: sessions }] = await Promise.all([
     loadSections(supabase, org.id),
-    supabase.from("resources").select("id, name, section_id").eq("organization_id", org.id).eq("active", true).order("name"),
-    supabase.from("activities").select("id, name, duration_min, section_id").eq("organization_id", org.id).eq("active", true).order("name"),
+    supabase.from("resources").select("id, name, section_id").eq("organization_id", org.id).in("section_id", allowed).eq("active", true).order("name"),
+    supabase.from("activities").select("id, name, duration_min, section_id").eq("organization_id", org.id).in("section_id", allowed).eq("active", true).order("name"),
     supabase
       .from("open_play_sessions")
       .select("id, starts_at, seat_price_poisha, status, activities(name), open_play_session_resources(resources(name))")
       .eq("organization_id", org.id)
+      .in("section_id", allowed)
       .gte("starts_at", new Date().toISOString())
       .neq("status", "cancelled")
       .order("starts_at")
       .limit(50),
   ]);
+  const sections = all.filter((s) => allowed.includes(s.id));
   const sectionName = new Map(sections.map((s) => [s.id, s.name]));
 
   return (

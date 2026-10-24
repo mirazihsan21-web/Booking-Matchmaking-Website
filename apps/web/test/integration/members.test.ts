@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { changeRole, listMembers, removeMember } from '@/lib/orgs/members';
+import { allowedSectionIds, canManageSection } from '@/lib/tenancy/sections-access';
 import { createTestUser, deleteTestUser, serviceDb, type TestUser } from './helpers';
 
 const db = serviceDb();
 const users: TestUser[] = [];
 let orgId: string;
+let turf: string;
+let cafe: string;
 
 async function user(): Promise<TestUser> {
   const u = await createTestUser(db);
@@ -26,7 +29,12 @@ beforeAll(async () => {
     .single();
   if (error) throw error;
   orgId = data.id;
+  turf = (await db.rpc('add_section', { p_organization_id: orgId, p_kind: 'turf', p_name: 'Turf' })).data as string;
+  cafe = (await db.rpc('add_section', { p_organization_id: orgId, p_kind: 'boardgame_cafe', p_name: 'Café' })).data as string;
 });
+
+const sectionsOf = async (userId: string) =>
+  ((await db.from('section_staff').select('section_id').eq('user_id', userId)).data ?? []).map((r) => r.section_id).sort();
 
 afterAll(async () => {
   await db.from('organizations').delete().eq('id', orgId);
@@ -65,3 +73,39 @@ describe('organization members (Review Focus 5)', () => {
     expect(members[0]).toMatchObject({ role: 'owner', email: users[0]!.email.toLowerCase() });
   });
 });
+
+describe('staff per section', () => {
+  it('an owner made staff gets every section, and staff made owner lose their section rows', async () => {
+    const second = await user();
+    await addMember(second.id, 'owner');
+    expect(await changeRole(db, orgId, second.id, 'staff')).toEqual({ status: 'ok' });
+    expect(await sectionsOf(second.id)).toEqual([turf, cafe].sort());
+    expect(await changeRole(db, orgId, second.id, 'owner')).toEqual({ status: 'ok' });
+    expect(await sectionsOf(second.id)).toEqual([]);
+  });
+
+  it('staff manage only their sections; the owner manages all of them', async () => {
+    const staff = await user();
+    await addMember(staff.id, 'staff');
+    must(await db.from('section_staff').insert({ organization_id: orgId, section_id: turf, user_id: staff.id }));
+    const owner = users[0]!;
+    expect(await canManageSection(db, { organizationId: orgId, userId: staff.id, sectionId: turf })).toBe(true);
+    expect(await canManageSection(db, { organizationId: orgId, userId: staff.id, sectionId: cafe })).toBe(false);
+    expect(await canManageSection(db, { organizationId: orgId, userId: owner.id, sectionId: cafe })).toBe(true);
+    expect(await allowedSectionIds(db, { organizationId: orgId, userId: owner.id })).toEqual([turf, cafe]);
+    expect(await allowedSectionIds(db, { organizationId: orgId, userId: staff.id })).toEqual([turf]);
+  });
+
+  it("someone outside the team, or another venue's section, is never allowed", async () => {
+    const stranger = await user();
+    expect(await canManageSection(db, { organizationId: orgId, userId: stranger.id, sectionId: turf })).toBe(false);
+    expect(await allowedSectionIds(db, { organizationId: orgId, userId: stranger.id })).toEqual([]);
+    expect(await canManageSection(db, { organizationId: randomUUID(), userId: users[0]!.id, sectionId: turf })).toBe(false);
+    expect(await canManageSection(db, { organizationId: orgId, userId: users[0]!.id, sectionId: 'nope' })).toBe(false);
+  });
+});
+
+function must<T extends { error: unknown }>(result: T): T {
+  if (result.error) throw result.error;
+  return result;
+}
