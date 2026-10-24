@@ -20,9 +20,9 @@ from generate_series(1, 30) n;
 insert into public.organizations (id, slug, name, business_type, status) values
   ('00000000-0000-4000-8000-0000000012a0', 'op-org-p', 'Org P', 'turf', 'live'),
   ('00000000-0000-4000-8000-0000000012a9', 'op-org-x', 'Org X', 'turf', 'live');
-insert into public.branches (id, organization_id, name) values
-  ('00000000-0000-4000-8000-0000000012b0', '00000000-0000-4000-8000-0000000012a0', 'Main');
-insert into public.resources (id, organization_id, branch_id, name, kind, capacity) values
+insert into public.sections (id, organization_id, name, kind, slug) values
+  ('00000000-0000-4000-8000-0000000012b0', '00000000-0000-4000-8000-0000000012a0', 'Main', 'turf', 'main');
+insert into public.resources (id, organization_id, section_id, name, kind, capacity) values
   ('00000000-0000-4000-8000-0000000012c1', '00000000-0000-4000-8000-0000000012a0', '00000000-0000-4000-8000-0000000012b0', 'Pitch 1', 'pitch', 14),
   ('00000000-0000-4000-8000-0000000012c2', '00000000-0000-4000-8000-0000000012a0', '00000000-0000-4000-8000-0000000012b0', 'Pitch 2', 'pitch', 14),
   ('00000000-0000-4000-8000-0000000012c3', '00000000-0000-4000-8000-0000000012a0', '00000000-0000-4000-8000-0000000012b0', 'Table 1', 'table', 4);
@@ -39,7 +39,7 @@ values (pg_temp.p(30), '00000000-0000-4000-8000-0000000012a9', '00000000-0000-40
 insert into public.profile_activities (organization_id, profile_id, activity_id, rank)
 values ('00000000-0000-4000-8000-0000000012a0', pg_temp.p(16), '00000000-0000-4000-8000-0000000012d3', 1);
 
-insert into public.open_play_sessions (id, organization_id, branch_id, activity_id, starts_at, ends_at, seat_price_poisha, status)
+insert into public.open_play_sessions (id, organization_id, section_id, activity_id, starts_at, ends_at, seat_price_poisha, status)
 select pg_temp.s(n), '00000000-0000-4000-8000-0000000012a0', '00000000-0000-4000-8000-0000000012b0', act,
        now() + starts, now() + starts + interval '1 hour', 30000, st::public.session_status
 from (values

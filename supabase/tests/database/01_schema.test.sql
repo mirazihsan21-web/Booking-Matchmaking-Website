@@ -1,12 +1,12 @@
 -- Stage A schema shape and the invariants that live in constraints.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(58);
+select plan(70);
 
 select has_table('public', t, format('table %s exists', t))
 from unnest(array[
   'organizations', 'organization_members', 'organization_invites', 'platform_admins',
-  'branches', 'resources', 'activities', 'open_play_sessions', 'open_play_session_resources',
+  'sections', 'resources', 'activities', 'open_play_sessions', 'open_play_session_resources',
   'resource_reservations', 'player_profiles', 'profile_activities', 'availability',
   'seat_requests', 'groups', 'bookings', 'waitlist_entries', 'seat_offers', 'notifications', 'events',
   'resource_bookings'
@@ -41,14 +41,14 @@ insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-000000000003', 'p2@test.local');
 insert into public.organizations (id, slug, name, business_type, created_by)
 values ('00000000-0000-4000-8000-0000000000a1', 'pgtap-schema-turf', 'Dhanmondi Turf', 'turf', '00000000-0000-4000-8000-000000000001');
-insert into public.branches (id, organization_id, name)
-values ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000000a1', 'Main');
-insert into public.resources (id, organization_id, branch_id, name, kind, capacity) values
+insert into public.sections (id, organization_id, name, kind, slug)
+values ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000000a1', 'Main', 'turf', 'main');
+insert into public.resources (id, organization_id, section_id, name, kind, capacity) values
   ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Pitch 1', 'pitch', 14),
   ('00000000-0000-4000-8000-0000000000b2', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Pitch 2', 'pitch', 14);
 insert into public.activities (id, organization_id, name, min_players, max_players, duration_min, team_mode, team_size)
 values ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000a1', '5-a-side', 10, 10, 60, 'two_teams', 5);
-insert into public.open_play_sessions (id, organization_id, branch_id, activity_id, starts_at, ends_at, seat_price_poisha)
+insert into public.open_play_sessions (id, organization_id, section_id, activity_id, starts_at, ends_at, seat_price_poisha)
 values ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2',
         '00000000-0000-4000-8000-0000000000c1', now(), now() + interval '1 hour', 30000);
 insert into public.groups (id, organization_id, session_id, resource_id, activity_id, capacity)
@@ -102,12 +102,12 @@ select throws_ok(
   '23514', null, 'a punycode (xn--) slug is rejected'
 );
 select throws_ok(
-  $$ insert into public.organizations (slug, name, business_type, match_cutoff_minutes, cancel_cutoff_minutes)
-     values ('pgtap-cutoffs', 'Cutoffs', 'turf', 120, 120) $$,
+  $$ insert into public.sections (organization_id, name, kind, slug, match_cutoff_minutes, cancel_cutoff_minutes)
+     values ('00000000-0000-4000-8000-0000000000a1', 'Cutoffs', 'turf', 'cutoffs', 120, 120) $$,
   '23514', null, 'matching must come before the cancellation cut-off'
 );
 select throws_ok(
-  $$ insert into public.resources (organization_id, branch_id, name, kind, capacity, slot_minutes)
+  $$ insert into public.resources (organization_id, section_id, name, kind, capacity, slot_minutes)
      values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Odd', 'pitch', 14, 50) $$,
   '23514', null, 'slot length is a multiple of 15 minutes'
 );
@@ -173,6 +173,13 @@ select has_column('public', 'bookings', 'team', 'a seat records its team');
 select enum_has_labels('public', 'booking_source', array['matched', 'waitlist', 'direct'],
   'a late request that took a free seat is a direct booking');
 select col_not_null('public', 'seat_offers', 'token_hash', 'every offer has a token hash');
+select hasnt_table('public', 'branches', 'branches are now sections');
+select has_column('public', 'organizations', 'address', 'the brand has one address');
+select hasnt_column('public', 'organizations', 'max_upcoming_bookings', 'booking rules moved to sections');
+select hasnt_column('public', 'sections', 'address', 'sections share the brand address');
+select has_column('public', 'sections', c, format('a section has %s', c))
+from unnest(array['kind', 'slug', 'booking_horizon_days', 'cancel_cutoff_minutes', 'match_cutoff_minutes',
+                  'max_upcoming_bookings', 'accent', 'position']) as c;
 
 select * from finish();
 rollback;

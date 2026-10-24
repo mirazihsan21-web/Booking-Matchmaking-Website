@@ -8,10 +8,10 @@ select plan(17);
 insert into public.organizations (id, slug, name, business_type, status) values
   ('00000000-0000-4000-8000-0000000000aa', 'org-x', 'Org X', 'turf', 'live'),
   ('00000000-0000-4000-8000-0000000000bb', 'org-y', 'Org Y', 'turf', 'live');
-insert into public.branches (id, organization_id, name) values
-  ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000aa', 'X main'),
-  ('00000000-0000-4000-8000-0000000000e2', '00000000-0000-4000-8000-0000000000bb', 'Y main');
-insert into public.resources (id, organization_id, branch_id, name, kind, capacity, active) values
+insert into public.sections (id, organization_id, name, kind, slug) values
+  ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000aa', 'X main', 'turf', 'x-main'),
+  ('00000000-0000-4000-8000-0000000000e2', '00000000-0000-4000-8000-0000000000bb', 'Y main', 'turf', 'y-main');
+insert into public.resources (id, organization_id, section_id, name, kind, capacity, active) values
   ('00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-0000000000e1', 'Pitch 1', 'pitch', 14, true),
   ('00000000-0000-4000-8000-0000000000d2', '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-0000000000e1', 'Pitch 2', 'pitch', 14, true),
   ('00000000-0000-4000-8000-0000000000d3', '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-0000000000e1', 'Pitch 3', 'pitch', 14, false),
