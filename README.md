@@ -10,7 +10,14 @@ and teams at the venue's cut-off and offers cancelled seats to the waitlist. bKa
 "Booking & Matchmaking" is a working name (see `m.platform.name` in `apps/web/messages/en.ts`).
 
 > Platform spec: [`docs/superpowers/specs/2026-10-20-booking-platform-design.md`](docs/superpowers/specs/2026-10-20-booking-platform-design.md)
+> · One-brand redesign: [`docs/superpowers/specs/2026-10-25-one-brand-sections-design.md`](docs/superpowers/specs/2026-10-25-one-brand-sections-design.md)
 > · Project notes for maintainers: [`memory.md`](memory.md)
+
+**Now one brand.** The site is being reshaped for one client: one brand running a turf, a board-game café
+and a gaming lounge in one place. The brand is an organization row; its **sections** (turf, café, lounge)
+each have their own hours, booking rules, spaces, games, ratings and staff. R1 (the foundation) is done;
+the public site (R2) and the manage area (R3) are redesigned next, so some pages below still show the
+multi-venue platform.
 
 ## Repo layout
 
@@ -26,7 +33,7 @@ and teams at the venue's cut-off and offers cancelled seats to the waitlist. bKa
 | Host | Path | Who |
 |---|---|---|
 | `localhost:3000` | `/`, `/signin`, `/onboarding` | Landing page, sign-in, the venue sign-up wizard |
-| | `/manage/[slug]/…` | Owners and staff: branches, spaces, activities, schedule, staff, settings |
+| | `/manage/[slug]/…` | Owners and staff: sections, spaces, activities, schedule, staff, settings |
 | | `/admin` | Platform admins: every venue, suspend / restore |
 | `<slug>.localhost:3000` | `/`, `/signin`, `/me` | A venue's public page, sign-in, and the player's profile there |
 
@@ -45,8 +52,14 @@ and teams at the venue's cut-off and offers cancelled seats to the waitlist. bKa
 pnpm install
 pnpm db:start            # local Supabase: API :54321, DB :54322, Studio :54323, Mailpit :54324 (SMTP :54325)
 pnpm env:local           # writes apps/web/.env.local and points the database's job tick at this app
+pnpm brand:setup --name "Demo Arena" --demo   # the local demo brand (BRAND_SLUG=demo-brand), see below
 pnpm --filter web dev    # http://localhost:3000 (keep it on :3000: the job tick calls it)
 ```
+
+The demo brand is live at http://demo-brand.localhost:3000 with three sections, 12 rated demo players
+(`demo-demo-brand-<n>@example.test`) and one open game per section. To manage it, give it an owner:
+`pnpm brand:setup --owner you@example.com` (an existing account becomes the owner at once; a new address
+gets an owner invite, accepted at its first sign-in).
 
 Then:
 
@@ -82,6 +95,21 @@ pnpm env:local                                               # .env.local → ba
   SMTP provider (e.g. Resend) or Google sign-in. Staff invites also need `supabase/templates/invite.html`
   copied into the "Invite user" template.
 
+### The brand, its sections and staff
+
+- `BRAND_SLUG` in `apps/web/.env.local` names the brand the site runs (`pnpm env:local` → `demo-brand`,
+  `pnpm env:hosted` → `chattoturf`). `getBrand()` in `apps/web/lib/tenancy/brand.ts` loads it with its sections.
+- `pnpm brand:setup [--name "<name>"] [--owner <email>] [--demo]` creates the brand (live) or tops it up: any
+  missing section (turf, café, lounge, in that order) with its preset spaces and games, and the owner. It is
+  safe to repeat and never changes what exists. `--name` is needed the first time; `--demo` refuses anything
+  but the local stack.
+- Owners set each section's name, hours and booking rules (how far ahead, cancel and match cut-offs, the most
+  upcoming bookings per player) at `/manage/<slug>/sections`, and add a section there.
+- **Staff per section:** an invite names the sections a staff member runs (all ticked by default). Staff see
+  and run only those sections' bookings, schedule and sessions; the database enforces it too. Owners run all.
+- **Ratings per section:** players rate their level for each section on `/me`; a section they haven't rated
+  asks them to rate it before they can join its open play.
+
 ### Bookings, notifications and the job tick
 
 - Players book a space at `http://<slug>.localhost:3000/book` (after creating a profile at `/me`), see their
@@ -91,8 +119,8 @@ pnpm env:local                                               # .env.local → ba
   and the app sends pending notification emails. `pnpm env:local` stores the app URL
   (`http://host.docker.internal:3000`) and a fresh `JOB_SECRET` in Supabase Vault and `.env.local`, so
   **restart the dev server after running it**. Locally the emails go to Mailpit over SMTP port 54325.
-- Owners set the booking rules in **Settings → Bookings**: how far ahead players can book, the cancellation
-  and matching cut-offs, and how many upcoming bookings one player may hold. Each space has a slot length.
+- Booking rules are per section (**Sections**): how far ahead players can book, the cancellation and matching
+  cut-offs, and how many upcoming bookings one player may hold in that section. Each space has a slot length.
 
 ### Open play: requests, matching and seat offers
 
@@ -104,12 +132,27 @@ pnpm env:local                                               # .env.local → ba
   `/manage/<slug>/sessions/<id>`, where they see requests, teams with skill totals, the waitlist and live offers.
 - A cancelled seat goes to the waiting player who fits that table best. They get a bell notification and an
   email with a one-time **Take the seat** link (`/offers/<token>`, no sign-in; only a hash of the token is
-  stored). Unanswered offers expire after the branch's offer time and pass on; a free seat whose hand-off
+  stored). Unanswered offers expire after the section's offer time and pass on; a free seat whose hand-off
   failed is offered by the next tick; at the start the session closes and anyone still waiting hears there was
   no seat.
 
 Staff invites arrive in Mailpit too. Their template lives in `supabase/templates/invite.html`; copy it to the
 hosted project's "Invite user" email template when you deploy.
+
+### Rolling R1 out to the hosted project (after merge)
+
+The hosted database still has the multi-venue shape until these run, in order:
+
+```bash
+pnpm exec supabase db push                       # sections, ratings per section, staff per section
+pnpm env:hosted                                  # .env.local → hosted; BRAND_SLUG=chattoturf, Google flag from the project
+pnpm brand:setup --name "<brand name>" --owner <owner email>   # adds the café and lounge to Chattoturf (no --demo)
+pnpm env:local                                   # back to local when done
+```
+
+`db push` keeps Chattoturf's turf section (renamed from its branch, with the same hours and rules) and gives
+its staff and pending staff invites every section. `brand:setup` then adds the missing sections with their
+preset spaces and games; edit their hours and rules under Sections.
 
 ### Google sign-in (optional)
 
@@ -126,11 +169,12 @@ Email links work out of the box. For Google:
 pnpm typecheck           # every package (web runs `next typegen` first)
 pnpm test                # engine, sim and web unit/property tests
 pnpm test:integration    # web against the local Supabase (real auth users, RLS)
-pnpm db:test             # pgTAP: schema, RLS, grants, RPCs, cross-venue references, history, outbox, jobs, bookings, open play
+pnpm db:test             # pgTAP: schema, RLS, grants, RPCs, cross-venue references, history, outbox, jobs, bookings, open play, sections, ratings, section staff
 pnpm test:race           # two-connection races: accepting an offer, booking the same slot, beating the limit, accept vs cancel session
 pnpm db:lint             # Supabase security/performance advisors, fails on warnings
 pnpm db:reset            # re-apply all migrations to a clean local DB
 pnpm env:local           # regenerate apps/web/.env.local + the Vault job secrets (then restart the dev server)
+pnpm brand:setup         # create or top up the brand (BRAND_SLUG): --name, --owner <email>, --demo (local only)
 pnpm admin:grant <email> # make a user a platform admin
 pnpm db:stop
 ```
@@ -143,6 +187,6 @@ Hard numbers for the case study, re-measured as features land.
 |---|---|---|
 | Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
 | Engine tests (incl. property tests) | 51 | `pnpm --filter @bm/engine test` |
-| Web unit tests | 205 | `pnpm --filter web test` |
-| Web integration tests (real Supabase, Realtime, Mailpit) | 84 | `pnpm test:integration` |
-| Database assertions | 286 pgTAP checks + 4 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
+| Web unit tests | 210 | `pnpm --filter web test` |
+| Web integration tests (real Supabase, Realtime, Mailpit) | 106 | `pnpm test:integration` |
+| Database assertions | 350 pgTAP checks + 4 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
