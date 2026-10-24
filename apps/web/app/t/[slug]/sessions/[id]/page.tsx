@@ -37,6 +37,16 @@ function Actions({ view, slug, signedIn, hasProfile }: { view: PlayerSessionView
   }
   switch (me.state) {
     case "none":
+      if (me.needsRating) {
+        return (
+          <div className="flex flex-col items-start gap-3">
+            <p>{m.openPlay.outcome.needs_skill}</p>
+            <Link href="/me" className={button}>
+              {m.openPlay.rateLevel}
+            </Link>
+          </div>
+        );
+      }
       return (
         <ActionButton
           action={requestSeatAction.bind(null, slug, session.id)}
@@ -123,7 +133,7 @@ async function SessionDetail({ params }: { params: Promise<{ slug: string; id: s
         <CardHeader>
           <CardTitle className="text-2xl">{session.activityName ?? m.tenant.anyActivity}</CardTitle>
           <CardDescription>
-            {formatNight(session.startsAt, org.timezone)}–{formatShortTime(session.endsAt, org.timezone)} · {session.branchName}
+            {formatNight(session.startsAt, org.timezone)}–{formatShortTime(session.endsAt, org.timezone)} · {session.sectionName}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

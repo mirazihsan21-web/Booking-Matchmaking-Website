@@ -62,10 +62,17 @@ beforeAll(async () => {
   const rows = must(
     await db
       .from('player_profiles')
-      .insert(squad.map((u, i) => ({ organization_id: orgId, user_id: u.id, display_name: `T${i + 1 }`})))
+      .insert(squad.map((u, i) => ({ organization_id: orgId, user_id: u.id, display_name: `T${i + 1}` })))
       .select('id'),
   );
   squadProfiles.push(...rows.map((r) => r.id));
+  // Requests need a level for the section: the squad is rated 1–5, the lone player 3.
+  must(
+    await db.from('profile_section_skills').insert([
+      ...squadProfiles.map((id, i) => ({ organization_id: orgId, profile_id: id, section_id: sectionId, skill: 1 + (i % 5) })),
+      { organization_id: orgId, profile_id: profileId, section_id: sectionId, skill: 3 },
+    ]),
+  );
 });
 
 afterAll(async () => {

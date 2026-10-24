@@ -13,6 +13,9 @@ let liveOrg: string;
 let onboardingOrg: string;
 let suspendedOrg: string;
 let activities: string[];
+let lounge: string; // the live venue's own section, from onboarding
+let turf: string; // a second section there
+let foreignSection: string; // another venue's section
 
 async function venue(owner: TestUser, state: 'live' | 'onboarding' | 'suspended'): Promise<string> {
   const created = await createOrganization(db, { userId: owner.id, businessType: 'gaming_lounge', name: `Lounge ${state}`, slug: `p-${state}-${randomUUID().slice(0, 6)}` });
@@ -32,7 +35,7 @@ async function player(): Promise<{ user: TestUser; client: SupabaseClient }> {
 const input = (overrides: Partial<ProfileInput> = {}): ProfileInput => ({
   displayName: 'Rafi',
   phone: null,
-  skill: 3,
+  ratings: {},
   favourites: [],
   availability: [{ weekday: 5, start: '18:00', end: '23:00' }],
   emailOptIn: true,
@@ -47,7 +50,13 @@ beforeAll(async () => {
   suspendedOrg = await venue(owner, 'suspended');
   const { data } = await db.from('activities').select('id, name').eq('organization_id', liveOrg).order('name');
   activities = data!.map((a) => a.id);
+  lounge = (await db.from('sections').select('id').eq('organization_id', liveOrg).single()).data!.id;
+  turf = (await db.rpc('add_section', { p_organization_id: liveOrg, p_kind: 'turf', p_name: 'Turf' })).data as string;
+  foreignSection = (await db.from('sections').select('id').eq('organization_id', suspendedOrg).single()).data!.id;
 });
+
+const ratingsOf = async (client: SupabaseClient, profileId: string) =>
+  ((await client.from('profile_section_skills').select('section_id, skill').eq('profile_id', profileId)).data ?? []).sort((x, y) => x.skill - y.skill);
 
 afterAll(async () => {
   await db.from('organizations').delete().in('id', orgIds);
@@ -59,11 +68,12 @@ describe('saveProfile', () => {
     const { user, client } = await player();
     const first = await saveProfile(client, { userId: user.id, organizationId: liveOrg, input: input() });
     expect(first.status).toBe('saved');
-    const second = await saveProfile(client, { userId: user.id, organizationId: liveOrg, input: input({ displayName: 'Rafi H.'}) });
+    const second = await saveProfile(client, { userId: user.id, organizationId: liveOrg, input: input({ displayName: 'Rafi H.' }) });
     expect(second).toEqual(first);
 
-    const { data } = await client.from('player_profiles').select('display_name, skill').eq('organization_id', liveOrg).single();
-    expect(data).toEqual({ display_name: 'Rafi H.' });
+    const { data } = await client.from('player_profiles').select('*').eq('organization_id', liveOrg).single();
+    expect(data).toMatchObject({ display_name: 'Rafi H.' });
+    expect(data).not.toHaveProperty('skill'); // levels are per section now
     const { data: avail } = await client.from('availability').select('weekday, start_time, end_time');
     expect(avail).toEqual([{ weekday: 5, start_time: '18:00:00', end_time: '23:00:00' }]);
   });
@@ -84,7 +94,19 @@ describe('saveProfile', () => {
     await saveProfile(a.client, { userId: a.user.id, organizationId: liveOrg, input: input({ displayName: 'A' }) });
     await saveProfile(b.client, { userId: b.user.id, organizationId: liveOrg, input: input({ displayName: 'B' }) });
     const { data } = await b.client.from('player_profiles').select('display_name');
-    expect(data).toEqual([{ display_name: 'B'  }]);
+    expect(data).toEqual([{ display_name: 'B' }]);
+  });
+
+  it("keeps one rating per section, each save replacing the last, and ignores other venues' sections", async () => {
+    const { user, client } = await player();
+    const saved = await saveProfile(client, { userId: user.id, organizationId: liveOrg, input: input({ ratings: { [lounge]: 4, [turf]: 2 } }) });
+    if (saved.status !== 'saved') throw new Error(saved.status);
+    expect(await ratingsOf(client, saved.profileId)).toEqual([
+      { section_id: turf, skill: 2 },
+      { section_id: lounge, skill: 4 },
+    ]);
+    await saveProfile(client, { userId: user.id, organizationId: liveOrg, input: input({ ratings: { [turf]: 5, [foreignSection]: 3 } }) });
+    expect(await ratingsOf(client, saved.profileId)).toEqual([{ section_id: turf, skill: 5 }]);
   });
 
   it('stores favourites in rank order and ignores ids from other venues', async () => {

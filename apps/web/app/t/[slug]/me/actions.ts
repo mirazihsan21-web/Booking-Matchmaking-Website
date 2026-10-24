@@ -5,6 +5,7 @@ import type { FormState } from "@/components/forms/action-form";
 import { getUser } from "@/lib/auth/dal";
 import { parseProfileForm } from "@/lib/forms/profile";
 import { saveProfile } from "@/lib/profiles/save-profile";
+import { loadSections } from "@/lib/sections/sections";
 import { createClient } from "@/lib/supabase/server";
 import { getLiveOrganization } from "@/lib/tenancy/org";
 import { m } from "@/messages";
@@ -15,7 +16,8 @@ export async function saveProfileAction(slug: string, _state: FormState, form: F
   const org = await getLiveOrganization(slug);
   if (!user || !org) return { ok: false, message: m.profile.unavailable };
 
-  const parsed = parseProfileForm(form);
+  const sections = await loadSections(await createClient(), org.id);
+  const parsed = parseProfileForm(form, sections.map((s) => s.id));
   if (!parsed.ok) return { ok: false, errors: parsed.errors };
 
   const result = await saveProfile(await createClient(), { userId: user.id, organizationId: org.id, input: parsed.value });

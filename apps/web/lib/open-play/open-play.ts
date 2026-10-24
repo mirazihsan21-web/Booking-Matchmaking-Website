@@ -7,10 +7,11 @@ import { planMatch, type MatchActivity, type MatchRequest } from './match';
  * Open play for players (tenant site), staff (manage) and the job tick. Pass the service client:
  * callers have already checked who is asking. Seat, offer and session state changes live in the SQL
  * functions (spec §3); this module loads data, runs the engine (matching, who gets a freed seat),
- * applies the venue's clock rules (cancel cut-off) and mints offer tokens.
+ * applies the section's clock rules (cancel cut-off) and mints offer tokens. Levels, games and rules
+ * are the session's section's.
  */
 
-export type RequestOutcome = 'requested' | 'seated' | 'waitlisted' | 'already' | 'closed' | 'not_found';
+export type RequestOutcome = 'requested' | 'seated' | 'waitlisted' | 'already' | 'needs_skill' | 'closed' | 'not_found';
 export type WithdrawOutcome = 'withdrawn' | 'has_offer' | 'closed' | 'not_found';
 export type MatchOutcome = 'matched' | 'already_matched' | 'not_open' | 'no_groups' | 'not_found';
 export type OfferNextOutcome = 'offered' | 'no_candidate' | 'seat_not_free' | 'closed';
@@ -34,7 +35,7 @@ export interface SessionSummary {
   startsAt: string;
   endsAt: string;
   activityName: string | null;
-  branchName: string;
+  sectionName: string;
   pricePoisha: number;
 }
 
@@ -48,6 +49,8 @@ export interface PlayerSessionView {
     bookingId?: string;
     team?: 1 | 2 | null;
     cancellable?: boolean;
+    /** Not asked yet, and no level for this section: asking would answer needs_skill. */
+    needsRating?: boolean;
   } | null;
   /** The player's own group, only once they hold a seat: display names, never phones. */
   group: { resourceName: string; activityName: string; teams: Array<{ team: 1 | 2 | null; names: string[] }> } | null;
@@ -96,8 +99,9 @@ interface SessionRow {
   ends_at: string;
   seat_price_poisha: number;
   status: string;
+  section_id: string;
   activities: { name: string; min_players: number; max_players: number; team_mode: 'none' | 'two_teams'; team_size: number | null } | null;
-  branches: { name: string } | null;
+  sections: { name: string; cancel_cutoff_minutes: number; match_cutoff_minutes: number };
 }
 
 const isLive = (s: { status: string; starts_at: string }, now = new Date()) =>
@@ -110,7 +114,9 @@ async function loadSession(db: SupabaseClient, organizationId: string, sessionId
   if (!UUID.test(organizationId) || !UUID.test(sessionId)) return null;
   const { data, error } = await db
     .from('open_play_sessions')
-    .select('id, organization_id, activity_id, starts_at, ends_at, seat_price_poisha, status, activities(name, min_players, max_players, team_mode, team_size), branches(name)')
+    .select(
+      'id, organization_id, activity_id, starts_at, ends_at, seat_price_poisha, status, section_id, activities(name, min_players, max_players, team_mode, team_size), sections(name, cancel_cutoff_minutes, match_cutoff_minutes)',
+    )
     .eq('id', sessionId)
     .eq('organization_id', organizationId)
     .maybeSingle();
@@ -124,27 +130,43 @@ const summary = (s: SessionRow): SessionSummary => ({
   startsAt: s.starts_at,
   endsAt: s.ends_at,
   activityName: s.activities?.name ?? null,
-  branchName: s.branches?.name ?? '',
+  sectionName: s.sections.name,
   pricePoisha: s.seat_price_poisha,
 });
 
-/** Each profile's favourite activity ids, most preferred first. */
-async function favouritesOf(db: SupabaseClient, profileIds: string[]): Promise<Map<string, string[]>> {
+/**
+ * Each profile's favourite games in this section, most preferred first. Favourites elsewhere don't
+ * count: someone whose favourites are all turf games plays anything at the café (as private.wants_game).
+ */
+async function favouritesOf(db: SupabaseClient, sectionId: string, profileIds: string[]): Promise<Map<string, string[]>> {
   const favourites = new Map<string, string[]>();
   if (profileIds.length === 0) return favourites;
-  const { data, error } = await db.from('profile_activities').select('profile_id, activity_id').in('profile_id', profileIds).order('rank');
+  const { data, error } = await db
+    .from('profile_activities')
+    .select('profile_id, activity_id, activities!inner(section_id)')
+    .in('profile_id', profileIds)
+    .eq('activities.section_id', sectionId)
+    .order('rank');
   if (error) throw error;
-  for (const row of data as Array<{ profile_id: string; activity_id: string }>) {
+  for (const row of data as unknown as Array<{ profile_id: string; activity_id: string }>) {
     favourites.set(row.profile_id, [...(favourites.get(row.profile_id) ?? []), row.activity_id]);
   }
   return favourites;
 }
 
-async function cancelCutoffMinutes(db: SupabaseClient, organizationId: string): Promise<number> {
-  const { data, error } = await db.from('organizations').select('cancel_cutoff_minutes').eq('id', organizationId).single();
+/** Players without a rating count as 3: requests need one (request_seat), so only rows from before ratings lack it. */
+const UNRATED_SKILL = 3;
+
+/** Each profile's level in this section. */
+async function skillsOf(db: SupabaseClient, sectionId: string, profileIds: string[]): Promise<Map<string, number>> {
+  const skills = new Map<string, number>();
+  if (profileIds.length === 0) return skills;
+  const { data, error } = await db.from('profile_section_skills').select('profile_id, skill').eq('section_id', sectionId).in('profile_id', profileIds);
   if (error) throw error;
-  return data.cancel_cutoff_minutes as number;
+  for (const row of data as Array<{ profile_id: string; skill: number }>) skills.set(row.profile_id, row.skill);
+  return skills;
 }
+const skillIn = (skills: Map<string, number>, profileId: string) => skills.get(profileId) ?? UNRATED_SKILL;
 
 // ── Requests ────────────────────────────────────────────────────────────────
 
@@ -172,19 +194,23 @@ export async function matchSession(db: SupabaseClient, input: { organizationId: 
   if (session.status !== 'open' || !isLive(session)) return 'not_open';
 
   const [requestsResult, resourcesResult, activitiesResult] = await Promise.all([
-    db.from('seat_requests').select('profile_id, priority, created_at, player_profiles(skill)').eq('session_id', session.id),
+    db.from('seat_requests').select('profile_id, priority, created_at').eq('session_id', session.id),
     db.from('open_play_session_resources').select('resources(id, capacity)').eq('session_id', session.id),
     session.activity_id
       ? db.from('activities').select('id, min_players, max_players, team_mode, team_size').eq('id', session.activity_id)
-      : db.from('activities').select('id, min_players, max_players, team_mode, team_size').eq('organization_id', session.organization_id).eq('active', true),
+      : db.from('activities').select('id, min_players, max_players, team_mode, team_size').eq('section_id', session.section_id).eq('active', true),
   ]);
   for (const result of [requestsResult, resourcesResult, activitiesResult]) if (result.error) throw result.error;
 
-  const rows = requestsResult.data as unknown as Array<{ profile_id: string; priority: number; created_at: string; player_profiles: { skill: number } }>;
-  const favourites = session.activity_id ? new Map<string, string[]>() : await favouritesOf(db, rows.map((r) => r.profile_id));
+  const rows = requestsResult.data as Array<{ profile_id: string; priority: number; created_at: string }>;
+  const profileIds = rows.map((r) => r.profile_id);
+  const [favourites, skills] = await Promise.all([
+    session.activity_id ? new Map<string, string[]>() : favouritesOf(db, session.section_id, profileIds),
+    skillsOf(db, session.section_id, profileIds),
+  ]);
   const requests: MatchRequest[] = rows.map((r) => ({
     profileId: r.profile_id,
-    skill: r.player_profiles.skill,
+    skill: skillIn(skills, r.profile_id),
     favourites: favourites.get(r.profile_id) ?? [],
     priority: r.priority,
     requestedAt: Date.parse(r.created_at),
@@ -217,27 +243,31 @@ export async function matchSession(db: SupabaseClient, input: { organizationId: 
 export async function offerNext(db: SupabaseClient, input: { groupId: string; seatNo: number }): Promise<OfferNextOutcome> {
   const { data: group, error } = await db
     .from('groups')
-    .select('id, session_id, activity_id, open_play_sessions(activity_id, status, starts_at)')
+    .select('id, session_id, activity_id, open_play_sessions(activity_id, status, starts_at, section_id)')
     .eq('id', input.groupId)
     .maybeSingle();
   if (error) throw error;
-  const session = (group as { open_play_sessions: { activity_id: string | null; status: string; starts_at: string } } | null)?.open_play_sessions;
+  const session = (group as { open_play_sessions: { activity_id: string | null; status: string; starts_at: string; section_id: string } } | null)?.open_play_sessions;
   if (!group || !session || !isLive(session)) return 'closed';
 
   const [entriesResult, tableResult] = await Promise.all([
-    db.from('waitlist_entries').select('id, profile_id, priority, created_at, player_profiles(skill)').eq('session_id', group.session_id).eq('status', 'waiting'),
-    db.from('bookings').select('player_profiles(skill)').eq('group_id', group.id).neq('status', 'cancelled'),
+    db.from('waitlist_entries').select('id, profile_id, priority, created_at').eq('session_id', group.session_id).eq('status', 'waiting'),
+    db.from('bookings').select('profile_id').eq('group_id', group.id).neq('status', 'cancelled'),
   ]);
   for (const result of [entriesResult, tableResult]) if (result.error) throw result.error;
-  const waiting = entriesResult.data as unknown as Array<{ id: string; profile_id: string; priority: number; created_at: string; player_profiles: { skill: number } }>;
+  const waiting = entriesResult.data as Array<{ id: string; profile_id: string; priority: number; created_at: string }>;
   if (waiting.length === 0) return 'no_candidate';
+  const table = (tableResult.data as Array<{ profile_id: string }>).map((b) => b.profile_id);
 
-  const favourites = session.activity_id ? new Map<string, string[]>() : await favouritesOf(db, waiting.map((e) => e.profile_id));
+  const [favourites, skills] = await Promise.all([
+    session.activity_id ? new Map<string, string[]>() : favouritesOf(db, session.section_id, waiting.map((e) => e.profile_id)),
+    skillsOf(db, session.section_id, [...waiting.map((e) => e.profile_id), ...table]),
+  ]);
   const candidates: WaitlistCandidate[] = waiting.map((e) => {
     const picked = favourites.get(e.profile_id) ?? [];
     return {
       id: e.profile_id,
-      skill: e.player_profiles.skill,
+      skill: skillIn(skills, e.profile_id),
       // A fixed session's game is everyone's; someone with no favourites plays anything.
       favourites: session.activity_id ? [session.activity_id] : picked.length > 0 ? picked : [group.activity_id],
       priority: e.priority,
@@ -245,7 +275,7 @@ export async function offerNext(db: SupabaseClient, input: { groupId: string; se
       available: true,
     };
   });
-  const tableSkills = (tableResult.data as unknown as Array<{ player_profiles: { skill: number } }>).map((b) => b.player_profiles.skill);
+  const tableSkills = table.map((id) => skillIn(skills, id));
   const entryOf = new Map(waiting.map((e) => [e.profile_id, e.id]));
 
   for (const profileId of rankWaitlist({ gameId: group.activity_id, tableSkills }, candidates)) {
@@ -267,12 +297,18 @@ export async function cancelSeat(
   if (!UUID.test(input.bookingId) || !UUID.test(input.organizationId)) return 'not_found';
   const { data, error } = await db
     .from('bookings')
-    .select('id, profile_id, status, group_id, seat_no, open_play_sessions(status, starts_at)')
+    .select('id, profile_id, status, group_id, seat_no, open_play_sessions(status, starts_at, sections(cancel_cutoff_minutes))')
     .eq('id', input.bookingId)
     .eq('organization_id', input.organizationId)
     .maybeSingle();
   if (error) throw error;
-  const booking = data as { profile_id: string; status: string; group_id: string; seat_no: number; open_play_sessions: { status: string; starts_at: string } } | null;
+  const booking = data as {
+    profile_id: string;
+    status: string;
+    group_id: string;
+    seat_no: number;
+    open_play_sessions: { status: string; starts_at: string; sections: { cancel_cutoff_minutes: number } };
+  } | null;
   if (!booking || (input.actor.kind === 'player' && booking.profile_id !== input.actor.profileId)) return 'not_found';
   if (booking.status !== 'confirmed') return 'not_cancellable';
   const session = booking.open_play_sessions;
@@ -281,7 +317,7 @@ export async function cancelSeat(
   const now = input.now ?? new Date();
   const start = new Date(session.starts_at).getTime();
   if (now.getTime() >= start) return 'too_late';
-  if (input.actor.kind === 'player' && now.getTime() >= start - (await cancelCutoffMinutes(db, input.organizationId)) * 60_000) return 'too_late';
+  if (input.actor.kind === 'player' && now.getTime() >= start - session.sections.cancel_cutoff_minutes * 60_000) return 'too_late';
 
   const { data: freed, error: cancelError } = await db.rpc('cancel_booking', { p_booking_id: input.bookingId, p_by_venue: input.actor.kind === 'staff' });
   if (cancelError) throw cancelError;
@@ -437,10 +473,10 @@ interface GroupRow {
   capacity: number;
   resources: { name: string };
   activities: { name: string; team_mode: string; team_size: number | null };
-  bookings: Array<{ id: string; seat_no: number; status: string; player_profiles: { display_name: string; skill: number } }>;
+  bookings: Array<{ id: string; seat_no: number; status: string; profile_id: string; player_profiles: { display_name: string } }>;
 }
 
-const GROUP_COLUMNS = 'id, capacity, resources(name), activities(name, team_mode, team_size), bookings(id, seat_no, status, player_profiles(display_name, skill))';
+const GROUP_COLUMNS = 'id, capacity, resources(name), activities(name, team_mode, team_size), bookings(id, seat_no, status, profile_id, player_profiles(display_name))';
 
 /** A group's live seats split by team (one list for free-for-all games), in seat order. */
 function teamsOf(group: GroupRow) {
@@ -469,7 +505,7 @@ export async function playerSessionView(
   const entry = entryResult.data as { id: string; status: string; queue_position: number } | null;
 
   if (booking) {
-    const cutoff = await cancelCutoffMinutes(db, input.organizationId);
+    const cutoff = session.sections.cancel_cutoff_minutes;
     const now = (input.now ?? new Date()).getTime();
     view.me = {
       state: 'seated',
@@ -501,7 +537,13 @@ export async function playerSessionView(
   } else if (requestResult.data && session.status === 'open') {
     view.me = { state: 'requested' };
   } else {
-    view.me = { state: 'none' };
+    const { count, error } = await db
+      .from('profile_section_skills')
+      .select('profile_id', { count: 'exact', head: true })
+      .eq('profile_id', input.profileId)
+      .eq('section_id', session.section_id);
+    if (error) throw error;
+    view.me = { state: 'none', needsRating: (count ?? 0) === 0 };
   }
   return view;
 }
@@ -513,9 +555,8 @@ export async function staffSessionView(
   const session = await loadSession(db, input.organizationId, input.sessionId);
   if (!session) return null;
 
-  const [orgResult, requestsResult, groupsResult, entriesResult, offersResult, choicesResult] = await Promise.all([
-    db.from('organizations').select('match_cutoff_minutes').eq('id', input.organizationId).single(),
-    db.from('seat_requests').select('profile_id, created_at, player_profiles(display_name, skill)').eq('session_id', session.id).order('created_at'),
+  const [requestsResult, groupsResult, entriesResult, offersResult, choicesResult] = await Promise.all([
+    db.from('seat_requests').select('profile_id, created_at, player_profiles(display_name)').eq('session_id', session.id).order('created_at'),
     db.from('groups').select(GROUP_COLUMNS).eq('session_id', session.id).order('id'),
     db.from('waitlist_entries').select('queue_position, status, player_profiles(display_name)').eq('session_id', session.id).in('status', ['waiting', 'offered']).order('queue_position'),
     db
@@ -526,32 +567,32 @@ export async function staffSessionView(
       .order('expires_at'),
     session.activity_id
       ? Promise.resolve({ data: [], error: null })
-      : db.from('activities').select('min_players').eq('organization_id', input.organizationId).eq('active', true),
+      : db.from('activities').select('min_players').eq('section_id', session.section_id).eq('active', true),
   ]);
-  for (const r of [orgResult, requestsResult, groupsResult, entriesResult, offersResult, choicesResult]) if (r.error) throw r.error;
+  for (const r of [requestsResult, groupsResult, entriesResult, offersResult, choicesResult]) if (r.error) throw r.error;
+
+  const requests = requestsResult.data as unknown as Array<{ profile_id: string; player_profiles: { display_name: string } }>;
+  const groups = groupsResult.data as unknown as GroupRow[];
+  const skills = await skillsOf(db, session.section_id, [...requests.map((r) => r.profile_id), ...groups.flatMap((g) => g.bookings.map((b) => b.profile_id))]);
 
   const fixed = session.activities;
   const minima = (choicesResult.data as Array<{ min_players: number }>).map((a) => a.min_players);
   const needed = fixed ? (fixed.team_mode === 'two_teams' && fixed.team_size ? 2 * fixed.team_size : fixed.min_players) : minima.length ? Math.min(...minima) : null;
   const now = (input.now ?? new Date()).getTime();
-  const cutoff = new Date(session.starts_at).getTime() - (orgResult.data!.match_cutoff_minutes as number) * 60_000;
+  const cutoff = new Date(session.starts_at).getTime() - session.sections.match_cutoff_minutes * 60_000;
 
   return {
     session: summary(session),
-    requests: (requestsResult.data as unknown as Array<{ profile_id: string; player_profiles: { display_name: string; skill: number } }>).map((r) => ({
-      profileId: r.profile_id,
-      name: r.player_profiles.display_name,
-      skill: r.player_profiles.skill,
-    })),
-    groups: (groupsResult.data as unknown as GroupRow[]).map((g) => ({
+    requests: requests.map((r) => ({ profileId: r.profile_id, name: r.player_profiles.display_name, skill: skillIn(skills, r.profile_id) })),
+    groups: groups.map((g) => ({
       id: g.id,
       resourceName: g.resources.name,
       activityName: g.activities.name,
       capacity: g.capacity,
       teams: teamsOf(g).map(({ team, seats }) => ({
         team,
-        skillTotal: seats.reduce((sum, b) => sum + b.player_profiles.skill, 0),
-        players: seats.map((b) => ({ bookingId: b.id, name: b.player_profiles.display_name, skill: b.player_profiles.skill, seatNo: b.seat_no })),
+        skillTotal: seats.reduce((sum, b) => sum + skillIn(skills, b.profile_id), 0),
+        players: seats.map((b) => ({ bookingId: b.id, name: b.player_profiles.display_name, skill: skillIn(skills, b.profile_id), seatNo: b.seat_no })),
       })),
     })),
     waitlist: (entriesResult.data as unknown as Array<{ status: string; player_profiles: { display_name: string } }>).map((e, i) => ({
@@ -575,12 +616,11 @@ export async function listMySeats(
   if (!UUID.test(input.organizationId) || !UUID.test(input.profileId)) return { upcoming: [], past: [] };
   const { data, error } = await db
     .from('bookings')
-    .select('id, session_id, seat_no, team, price_poisha, status, groups(activities(name), resources(name)), open_play_sessions(starts_at, ends_at, status)')
+    .select('id, session_id, seat_no, team, price_poisha, status, groups(activities(name), resources(name)), open_play_sessions(starts_at, ends_at, status, sections(cancel_cutoff_minutes))')
     .eq('organization_id', input.organizationId)
     .eq('profile_id', input.profileId);
   if (error) throw error;
   const now = (input.now ?? new Date()).getTime();
-  const cutoff = await cancelCutoffMinutes(db, input.organizationId);
   const seats = (data as unknown as Array<{
     id: string;
     session_id: string;
@@ -588,9 +628,10 @@ export async function listMySeats(
     price_poisha: number;
     status: string;
     groups: { activities: { name: string }; resources: { name: string } };
-    open_play_sessions: { starts_at: string; ends_at: string; status: string };
+    open_play_sessions: { starts_at: string; ends_at: string; status: string; sections: { cancel_cutoff_minutes: number } };
   }>).map((b): MySeat => {
     const start = new Date(b.open_play_sessions.starts_at).getTime();
+    const cutoff = b.open_play_sessions.sections.cancel_cutoff_minutes;
     return {
       bookingId: b.id,
       sessionId: b.session_id,
