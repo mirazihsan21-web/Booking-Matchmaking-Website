@@ -39,9 +39,10 @@ beforeAll(async () => {
     ids.org,
     ids.branch,
   ]);
-  await run(`insert into public.activities (id, organization_id, name, min_players, max_players, duration_min) values ($1, $2, 'Azul', 2, 4, 40)`, [
+  await run(`insert into public.activities (id, organization_id, section_id, name, min_players, max_players, duration_min) values ($1, $2, $3, 'Azul', 2, 4, 40)`, [
     ids.activity,
     ids.org,
+    ids.branch,
   ]);
   await run(
     `insert into public.open_play_sessions (id, organization_id, section_id, starts_at, ends_at, seat_price_poisha, status)
@@ -55,7 +56,7 @@ beforeAll(async () => {
     ids.resource,
     ids.activity,
   ]);
-  await run(`insert into public.player_profiles (id, organization_id, user_id, display_name, skill) values ($1, $2, $3, 'Racer R.', 3)`, [
+  await run(`insert into public.player_profiles (id, organization_id, user_id, display_name) values ($1, $2, $3, 'Racer R.')`, [
     ids.profile,
     ids.org,
     ids.playerUser,

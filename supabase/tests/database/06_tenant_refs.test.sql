@@ -37,16 +37,16 @@ insert into public.resources (id, organization_id, section_id, name, kind, capac
   ('00000000-0000-4000-8000-00000000e002', '00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e001', 'P pitch', 'pitch', 14),
   ('00000000-0000-4000-8000-00000000e00c', '00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e00b', 'P annex pitch', 'pitch', 14),
   ('00000000-0000-4000-8000-00000000f002', '00000000-0000-4000-8000-00000000f000', '00000000-0000-4000-8000-00000000f001', 'Q pitch', 'pitch', 14);
-insert into public.activities (id, organization_id, name, min_players, max_players, duration_min, team_mode, team_size) values
-  ('00000000-0000-4000-8000-00000000e003', '00000000-0000-4000-8000-00000000e000', '5-a-side', 10, 10, 60, 'two_teams', 5),
-  ('00000000-0000-4000-8000-00000000f003', '00000000-0000-4000-8000-00000000f000', '5-a-side', 10, 10, 60, 'two_teams', 5);
+insert into public.activities (id, organization_id, section_id, name, min_players, max_players, duration_min, team_mode, team_size) values
+  ('00000000-0000-4000-8000-00000000e003', '00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e001', '5-a-side', 10, 10, 60, 'two_teams', 5),
+  ('00000000-0000-4000-8000-00000000f003', '00000000-0000-4000-8000-00000000f000', '00000000-0000-4000-8000-00000000f001', '5-a-side', 10, 10, 60, 'two_teams', 5);
 insert into public.open_play_sessions (id, organization_id, section_id, activity_id, starts_at, ends_at, seat_price_poisha) values
   ('00000000-0000-4000-8000-00000000e004', '00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e001',
    '00000000-0000-4000-8000-00000000e003', now() + interval '1 day', now() + interval '1 day 1 hour', 30000),
   ('00000000-0000-4000-8000-00000000f004', '00000000-0000-4000-8000-00000000f000', '00000000-0000-4000-8000-00000000f001',
    '00000000-0000-4000-8000-00000000f003', now() + interval '1 day', now() + interval '1 day 1 hour', 30000);
-insert into public.player_profiles (id, organization_id, user_id, display_name, skill)
-values ('00000000-0000-4000-8000-00000000e005', '00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e0a2', 'Rafi', 3);
+insert into public.player_profiles (id, organization_id, user_id, display_name)
+values ('00000000-0000-4000-8000-00000000e005', '00000000-0000-4000-8000-00000000e000', '00000000-0000-4000-8000-00000000e0a2', 'Rafi');
 
 -- The owner of P, through RLS (what a direct PostgREST call does)
 set local role authenticated;

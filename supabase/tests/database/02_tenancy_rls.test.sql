@@ -28,17 +28,17 @@ insert into public.resources (id, organization_id, section_id, name, kind, capac
   ('00000000-0000-4000-8000-000000000a02', '00000000-0000-4000-8000-000000000a00', '00000000-0000-4000-8000-000000000a01', 'Pitch 1', 'pitch', 14),
   ('00000000-0000-4000-8000-000000000b02', '00000000-0000-4000-8000-000000000b00', '00000000-0000-4000-8000-000000000b01', 'Table 1', 'table', 4),
   ('00000000-0000-4000-8000-000000000c02', '00000000-0000-4000-8000-000000000c00', '00000000-0000-4000-8000-000000000c01', 'PC Zone A', 'zone', 10);
-insert into public.activities (id, organization_id, name, min_players, max_players, duration_min, team_mode, team_size)
-values ('00000000-0000-4000-8000-000000000a03', '00000000-0000-4000-8000-000000000a00', '5-a-side', 10, 10, 60, 'two_teams', 5);
+insert into public.activities (id, organization_id, section_id, name, min_players, max_players, duration_min, team_mode, team_size)
+values ('00000000-0000-4000-8000-000000000a03', '00000000-0000-4000-8000-000000000a00', '00000000-0000-4000-8000-000000000a01', '5-a-side', 10, 10, 60, 'two_teams', 5);
 insert into public.open_play_sessions (id, organization_id, section_id, activity_id, starts_at, ends_at, seat_price_poisha)
 values ('00000000-0000-4000-8000-000000000a04', '00000000-0000-4000-8000-000000000a00', '00000000-0000-4000-8000-000000000a01',
         '00000000-0000-4000-8000-000000000a03', now() + interval '1 day', now() + interval '1 day 1 hour', 30000);
 insert into public.groups (id, organization_id, session_id, resource_id, activity_id, capacity)
 values ('00000000-0000-4000-8000-000000000a05', '00000000-0000-4000-8000-000000000a00', '00000000-0000-4000-8000-000000000a04',
         '00000000-0000-4000-8000-000000000a02', '00000000-0000-4000-8000-000000000a03', 10);
-insert into public.player_profiles (id, organization_id, user_id, display_name, skill) values
-  ('00000000-0000-4000-8000-000000000a06', '00000000-0000-4000-8000-000000000a00', '00000000-0000-4000-8000-00000000000c', 'Pavel', 3),
-  ('00000000-0000-4000-8000-000000000b06', '00000000-0000-4000-8000-000000000b00', '00000000-0000-4000-8000-00000000000b', 'Sara', 4);
+insert into public.player_profiles (id, organization_id, user_id, display_name) values
+  ('00000000-0000-4000-8000-000000000a06', '00000000-0000-4000-8000-000000000a00', '00000000-0000-4000-8000-00000000000c', 'Pavel'),
+  ('00000000-0000-4000-8000-000000000b06', '00000000-0000-4000-8000-000000000b00', '00000000-0000-4000-8000-00000000000b', 'Sara');
 insert into public.bookings (organization_id, session_id, group_id, profile_id, seat_no, price_poisha)
 values ('00000000-0000-4000-8000-000000000a00', '00000000-0000-4000-8000-000000000a04', '00000000-0000-4000-8000-000000000a05',
         '00000000-0000-4000-8000-000000000a06', 1, 30000);
@@ -106,18 +106,18 @@ select throws_ok(
 -- U: a newcomer (Review Focus 3)
 set local request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000000f","role":"authenticated"}';
 select lives_ok(
-  $$ insert into public.player_profiles (organization_id, user_id, display_name, skill)
-     values ('00000000-0000-4000-8000-000000000a00', '00000000-0000-4000-8000-00000000000f', 'Newcomer', 2) $$,
+  $$ insert into public.player_profiles (organization_id, user_id, display_name)
+     values ('00000000-0000-4000-8000-000000000a00', '00000000-0000-4000-8000-00000000000f', 'Newcomer') $$,
   'a newcomer can join a live venue'
 );
 select throws_ok(
-  $$ insert into public.player_profiles (organization_id, user_id, display_name, skill)
-     values ('00000000-0000-4000-8000-000000000c00', '00000000-0000-4000-8000-00000000000f', 'Too early', 2) $$,
+  $$ insert into public.player_profiles (organization_id, user_id, display_name)
+     values ('00000000-0000-4000-8000-000000000c00', '00000000-0000-4000-8000-00000000000f', 'Too early') $$,
   '42501', null, 'nobody can join a venue that is still onboarding'
 );
 select throws_ok(
-  $$ insert into public.player_profiles (organization_id, user_id, display_name, skill)
-     values ('00000000-0000-4000-8000-000000000b00', '00000000-0000-4000-8000-00000000000d', 'Impostor', 2) $$,
+  $$ insert into public.player_profiles (organization_id, user_id, display_name)
+     values ('00000000-0000-4000-8000-000000000b00', '00000000-0000-4000-8000-00000000000d', 'Impostor') $$,
   '42501', null, 'nobody can create a profile for someone else'
 );
 

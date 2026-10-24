@@ -7,8 +7,8 @@ select plan(10);
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000009b1', 'outbox-p@test.local');
 insert into public.organizations (id, slug, name, business_type, status)
 values ('00000000-0000-4000-8000-0000000009a0', 'outbox-org-e', 'Org E', 'turf', 'live');
-insert into public.player_profiles (id, organization_id, user_id, display_name, skill)
-values ('00000000-0000-4000-8000-0000000009c1', '00000000-0000-4000-8000-0000000009a0', '00000000-0000-4000-8000-0000000009b1', 'P', 3);
+insert into public.player_profiles (id, organization_id, user_id, display_name)
+values ('00000000-0000-4000-8000-0000000009c1', '00000000-0000-4000-8000-0000000009a0', '00000000-0000-4000-8000-0000000009b1', 'P');
 insert into public.notifications (id, organization_id, profile_id, kind, link) values
   ('00000000-0000-4000-8000-0000000009d1', '00000000-0000-4000-8000-0000000009a0', '00000000-0000-4000-8000-0000000009c1', 'booking_confirmed', '/me/bookings');
 

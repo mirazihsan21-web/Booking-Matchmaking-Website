@@ -1,7 +1,7 @@
 -- Stage A schema shape and the invariants that live in constraints.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(70);
+select plan(73);
 
 select has_table('public', t, format('table %s exists', t))
 from unnest(array[
@@ -46,43 +46,44 @@ values ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000
 insert into public.resources (id, organization_id, section_id, name, kind, capacity) values
   ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Pitch 1', 'pitch', 14),
   ('00000000-0000-4000-8000-0000000000b2', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Pitch 2', 'pitch', 14);
-insert into public.activities (id, organization_id, name, min_players, max_players, duration_min, team_mode, team_size)
-values ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000a1', '5-a-side', 10, 10, 60, 'two_teams', 5);
+insert into public.activities (id, organization_id, section_id, name, min_players, max_players, duration_min, team_mode, team_size)
+values ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', '5-a-side', 10, 10, 60, 'two_teams', 5);
 insert into public.open_play_sessions (id, organization_id, section_id, activity_id, starts_at, ends_at, seat_price_poisha)
 values ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2',
         '00000000-0000-4000-8000-0000000000c1', now(), now() + interval '1 hour', 30000);
 insert into public.groups (id, organization_id, session_id, resource_id, activity_id, capacity)
 values ('00000000-0000-4000-8000-0000000000f1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000e1',
         '00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000c1', 10);
-insert into public.player_profiles (id, organization_id, user_id, display_name, skill) values
-  ('00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-000000000002', 'Rafi', 3),
-  ('00000000-0000-4000-8000-0000000000d2', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-000000000003', 'Nila', 4);
+insert into public.player_profiles (id, organization_id, user_id, display_name) values
+  ('00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-000000000002', 'Rafi'),
+  ('00000000-0000-4000-8000-0000000000d2', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-000000000003', 'Nila');
 insert into public.waitlist_entries (id, organization_id, session_id, profile_id, queue_position)
 values ('00000000-0000-4000-8000-0000000001a1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000e1',
         '00000000-0000-4000-8000-0000000000d2', 1);
 
 -- CHECK constraints (Review Focus: bad data never lands)
 select throws_ok(
-  $$ update public.player_profiles set skill = 6 where id = '00000000-0000-4000-8000-0000000000d1' $$,
-  '23514', null, 'skill above 5 is rejected'
+  $$ insert into public.profile_section_skills (organization_id, profile_id, section_id, skill)
+     values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000a2', 6) $$,
+  '23514', null, 'a rating above 5 is rejected'
 );
 select throws_ok(
   $$ update public.player_profiles set phone = 'not-a-phone' where id = '00000000-0000-4000-8000-0000000000d1' $$,
   '23514', null, 'a malformed phone is rejected'
 );
 select throws_ok(
-  $$ insert into public.activities (organization_id, name, min_players, max_players, duration_min)
-     values ('00000000-0000-4000-8000-0000000000a1', 'Backwards', 5, 4, 30) $$,
+  $$ insert into public.activities (organization_id, section_id, name, min_players, max_players, duration_min)
+     values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Backwards', 5, 4, 30) $$,
   '23514', null, 'an activity with min_players > max_players is rejected'
 );
 select throws_ok(
-  $$ insert into public.activities (organization_id, name, min_players, max_players, duration_min, team_mode)
-     values ('00000000-0000-4000-8000-0000000000a1', 'No size', 10, 10, 60, 'two_teams') $$,
+  $$ insert into public.activities (organization_id, section_id, name, min_players, max_players, duration_min, team_mode)
+     values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'No size', 10, 10, 60, 'two_teams') $$,
   '23514', null, 'a two-team activity needs a team size'
 );
 select throws_ok(
-  $$ insert into public.activities (organization_id, name, min_players, max_players, duration_min, team_mode, team_size)
-     values ('00000000-0000-4000-8000-0000000000a1', 'Lopsided', 10, 8, 60, 'two_teams', 5) $$,
+  $$ insert into public.activities (organization_id, section_id, name, min_players, max_players, duration_min, team_mode, team_size)
+     values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Lopsided', 10, 8, 60, 'two_teams', 5) $$,
   '23514', null, 'a two-team activity must seat exactly 2 × team size'
 );
 select throws_ok(
@@ -174,6 +175,9 @@ select enum_has_labels('public', 'booking_source', array['matched', 'waitlist', 
   'a late request that took a free seat is a direct booking');
 select col_not_null('public', 'seat_offers', 'token_hash', 'every offer has a token hash');
 select hasnt_table('public', 'branches', 'branches are now sections');
+select has_table('public', 'profile_section_skills', 'players are rated per section');
+select has_column('public', 'activities', 'section_id', 'each game belongs to a section');
+select hasnt_column('public', 'player_profiles', 'skill', 'a profile no longer has one skill for everything');
 select has_column('public', 'organizations', 'address', 'the brand has one address');
 select hasnt_column('public', 'organizations', 'max_upcoming_bookings', 'booking rules moved to sections');
 select hasnt_column('public', 'sections', 'address', 'sections share the brand address');

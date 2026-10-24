@@ -16,9 +16,9 @@ insert into public.resources (id, organization_id, section_id, name, kind, capac
   ('00000000-0000-4000-8000-0000000000d2', '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-0000000000e1', 'Pitch 2', 'pitch', 14, true),
   ('00000000-0000-4000-8000-0000000000d3', '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-0000000000e1', 'Pitch 3', 'pitch', 14, false),
   ('00000000-0000-4000-8000-0000000000d4', '00000000-0000-4000-8000-0000000000bb', '00000000-0000-4000-8000-0000000000e2', 'Y Pitch', 'pitch', 14, true);
-insert into public.activities (id, organization_id, name, min_players, max_players, duration_min, team_mode, team_size) values
-  ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000aa', '5-a-side', 10, 10, 60, 'two_teams', 5),
-  ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000000bb', '5-a-side', 10, 10, 60, 'two_teams', 5);
+insert into public.activities (id, organization_id, section_id, name, min_players, max_players, duration_min, team_mode, team_size) values
+  ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-0000000000e1', '5-a-side', 10, 10, 60, 'two_teams', 5),
+  ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000000bb', '00000000-0000-4000-8000-0000000000e2', '5-a-side', 10, 10, 60, 'two_teams', 5);
 
 -- Three Fridays on two pitches
 select is(

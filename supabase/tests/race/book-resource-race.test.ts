@@ -57,7 +57,7 @@ beforeAll(async () => {
     [ids.pitch, ids.org, ids.branch],
   );
   await run(
-    `insert into public.player_profiles (id, organization_id, user_id, display_name, skill) values ($1, $2, $3, 'One', 3), ($4, $2, $5, 'Two', 3)`,
+    `insert into public.player_profiles (id, organization_id, user_id, display_name) values ($1, $2, $3, 'One'), ($4, $2, $5, 'Two')`,
     [ids.profile1, ids.org, ids.user1, ids.profile2, ids.user2],
   );
 });

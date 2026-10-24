@@ -15,17 +15,17 @@ insert into public.sections (id, organization_id, name, kind, slug, offer_ttl_se
 values ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000000a1', 'Main', 'turf', 'main', 900);
 insert into public.resources (id, organization_id, section_id, name, kind, capacity)
 values ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Table 1', 'table', 4);
-insert into public.activities (id, organization_id, name, min_players, max_players, duration_min)
-values ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000a1', 'Azul', 2, 4, 40);
+insert into public.activities (id, organization_id, section_id, name, min_players, max_players, duration_min)
+values ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', 'Azul', 2, 4, 40);
 insert into public.open_play_sessions (id, organization_id, section_id, starts_at, ends_at, seat_price_poisha)
 values ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2',
         now() + interval '1 day', now() + interval '1 day 4 hours', 80000);
 insert into public.groups (id, organization_id, session_id, resource_id, activity_id, capacity)
 values ('00000000-0000-4000-8000-0000000000f1', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000e1',
         '00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000c1', 4);
-insert into public.player_profiles (id, organization_id, user_id, display_name, skill)
+insert into public.player_profiles (id, organization_id, user_id, display_name)
 select ('00000000-0000-4000-8000-0000000001d' || n)::uuid, '00000000-0000-4000-8000-0000000000a1',
-       ('00000000-0000-4000-8000-0000000005d' || n)::uuid, 'Player ' || n, 3
+       ('00000000-0000-4000-8000-0000000005d' || n)::uuid, 'Player ' || n
 from unnest(array['1', '2', '3', '4', '5', '6', '7', '8', '9', 'a']) as n;
 insert into public.bookings (id, organization_id, session_id, group_id, profile_id, seat_no, price_poisha)
 select ('00000000-0000-4000-8000-0000000002b' || n)::uuid, '00000000-0000-4000-8000-0000000000a1',

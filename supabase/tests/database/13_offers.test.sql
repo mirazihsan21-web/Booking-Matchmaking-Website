@@ -33,11 +33,11 @@ insert into public.sections (id, organization_id, name, kind, slug, offer_ttl_se
 values ('00000000-0000-4000-8000-0000000013b0', '00000000-0000-4000-8000-0000000013a0', 'Main', 'turf', 'main', 900);
 insert into public.resources (id, organization_id, section_id, name, kind, capacity)
 values ('00000000-0000-4000-8000-0000000013c1', '00000000-0000-4000-8000-0000000013a0', '00000000-0000-4000-8000-0000000013b0', 'Pitch 1', 'pitch', 14);
-insert into public.activities (id, organization_id, name, min_players, max_players, duration_min, team_mode, team_size)
-values ('00000000-0000-4000-8000-0000000013d1', '00000000-0000-4000-8000-0000000013a0', '5-a-side', 10, 10, 60, 'two_teams', 5);
-insert into public.player_profiles (id, organization_id, user_id, display_name, skill)
+insert into public.activities (id, organization_id, section_id, name, min_players, max_players, duration_min, team_mode, team_size)
+values ('00000000-0000-4000-8000-0000000013d1', '00000000-0000-4000-8000-0000000013a0', '00000000-0000-4000-8000-0000000013b0', '5-a-side', 10, 10, 60, 'two_teams', 5);
+insert into public.player_profiles (id, organization_id, user_id, display_name)
 select pg_temp.p(n), '00000000-0000-4000-8000-0000000013a0',
-       ('00000000-0000-4000-8000-0000001300' || lpad(to_hex(n), 2, '0'))::uuid, 'P' || n, 3
+       ('00000000-0000-4000-8000-0000001300' || lpad(to_hex(n), 2, '0'))::uuid, 'P' || n
 from generate_series(1, 21) n;
 
 insert into public.open_play_sessions (id, organization_id, section_id, activity_id, starts_at, ends_at, seat_price_poisha, status)
