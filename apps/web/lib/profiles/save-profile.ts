@@ -3,7 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export interface ProfileInput {
   displayName: string;
   phone: string | null;
-  skill: number;
+  /** Section id → level 1–5. Sections left out are not rated (a player must rate one before asking to play there). */
+  ratings: Record<string, number>;
   /** Activity ids, favourite first (at most 3). */
   favourites: string[];
   availability: Array<{ weekday: number; start: string; end: string }>;
@@ -15,13 +16,14 @@ export type SaveProfileResult = { status: 'saved'; profileId: string } | { statu
 /**
  * Creates or updates the signed-in player's profile at one venue, through RLS as that player.
  * New profiles are only allowed at live venues (RLS) → 'unavailable'. Favourites are kept only if
- * they are this venue's active activities, ranked in the order given.
+ * they are this venue's active activities, ranked in the order given; ratings replace the old ones
+ * and are kept only for this venue's sections.
  */
 export async function saveProfile(
   db: SupabaseClient,
   { userId, organizationId, input }: { userId: string; organizationId: string; input: ProfileInput },
 ): Promise<SaveProfileResult> {
-  const fields = { display_name: input.displayName, phone: input.phone, skill: input.skill, email_opt_in: input.emailOptIn };
+  const fields = { display_name: input.displayName, phone: input.phone, email_opt_in: input.emailOptIn };
   const { data: existing } = await db
     .from('player_profiles')
     .select('id')
@@ -55,6 +57,20 @@ export async function saveProfile(
       await db
         .from('profile_activities')
         .insert(favourites.map((activityId, i) => ({ organization_id: organizationId, profile_id: profileId, activity_id: activityId, rank: i + 1 }))),
+    );
+  }
+  const ratedIds = Object.keys(input.ratings);
+  const { data: sections } = await db
+    .from('sections')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .in('id', ratedIds.length ? ratedIds : ['00000000-0000-0000-0000-000000000000']);
+  must(await db.from('profile_section_skills').delete().eq('profile_id', profileId));
+  if (sections?.length) {
+    must(
+      await db
+        .from('profile_section_skills')
+        .insert(sections.map((sec) => ({ organization_id: organizationId, profile_id: profileId, section_id: sec.id, skill: input.ratings[sec.id] }))),
     );
   }
   must(await db.from('availability').delete().eq('profile_id', profileId));

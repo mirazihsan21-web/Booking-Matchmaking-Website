@@ -4,6 +4,7 @@ import { AvailabilityEditor, type AvailabilityValue } from "@/components/profile
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { requireUser } from "@/lib/auth/dal";
+import { loadSections } from "@/lib/sections/sections";
 import { createClient } from "@/lib/supabase/server";
 import { getLiveOrganization } from "@/lib/tenancy/org";
 import { m } from "@/messages";
@@ -17,15 +18,20 @@ async function Profile({ params }: { params: Promise<{ slug: string }> }) {
   const org = await getLiveOrganization(slug);
   if (!org) return null;
   const supabase = await createClient();
-  const [{ data: profile }, { data: activities }] = await Promise.all([
+  const [{ data: profile }, { data: activities }, sections] = await Promise.all([
     supabase
       .from("player_profiles")
-      .select("id, display_name, phone, skill, email_opt_in, profile_activities(activity_id, rank), availability(weekday, start_time, end_time)")
+      .select(
+        "id, display_name, phone, email_opt_in, profile_activities(activity_id, rank), availability(weekday, start_time, end_time), profile_section_skills(section_id, skill)",
+      )
       .eq("organization_id", org.id)
       .eq("user_id", user.id)
       .maybeSingle(),
     supabase.from("activities").select("id, name").eq("organization_id", org.id).eq("active", true).order("name"),
+    loadSections(supabase, org.id),
   ]);
+  const ratings = new Map(((profile?.profile_section_skills as Array<{ section_id: string; skill: number }> | undefined) ?? []).map((r) => [r.section_id, r.skill]));
+  const levelOptions = [{ value: "", label: m.profile.notRated }, ...[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n} — ${m.profile.skillLevels[n]}` }))];
 
   const ranked = [...((profile?.profile_activities as Array<{ activity_id: string; rank: number }> | undefined) ?? [])].sort((a, b) => a.rank - b.rank);
   const availability: AvailabilityValue = Object.fromEntries(
@@ -46,12 +52,20 @@ async function Profile({ params }: { params: Promise<{ slug: string }> }) {
         <ActionForm action={saveProfileAction.bind(null, org.slug)} submitLabel={m.profile.save}>
           <Field name="displayName" label={m.profile.displayName} defaultValue={profile?.display_name ?? ""} required />
           <Field name="phone" label={m.profile.phone} type="tel" defaultValue={profile?.phone ?? ""} placeholder="01712345678" />
-          <SelectField
-            name="skill"
-            label={m.profile.skill}
-            defaultValue={String(profile?.skill ?? 3)}
-            options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n} — ${m.profile.skillLevels[n]}` }))}
-          />
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-foreground/70">{m.profile.skillHint}</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {sections.map((s) => (
+                <SelectField
+                  key={s.id}
+                  name={`rating.${s.id}`}
+                  label={m.profile.skill(s.name)}
+                  defaultValue={String(ratings.get(s.id) ?? "")}
+                  options={levelOptions}
+                />
+              ))}
+            </div>
+          </div>
           <div className="flex flex-col gap-1.5">
             <Label>{m.profile.favourites}</Label>
             <div className="grid gap-2 sm:grid-cols-3">

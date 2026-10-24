@@ -33,7 +33,7 @@ async function StaffSession({ params }: { params: Promise<{ slug: string; id: st
         <CardHeader>
           <CardTitle className="text-2xl">{session.activityName ?? m.schedule.playersChoose}</CardTitle>
           <CardDescription>
-            {formatNight(session.startsAt, tz)}–{formatShortTime(session.endsAt, tz)} · {session.branchName}
+            {formatNight(session.startsAt, tz)}–{formatShortTime(session.endsAt, tz)} · {session.sectionName}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-3">

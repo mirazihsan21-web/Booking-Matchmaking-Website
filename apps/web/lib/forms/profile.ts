@@ -18,21 +18,30 @@ export function normalizePhone(input: string): string | null {
 const schema = z.object({
   displayName: z.string().min(1, m.forms.required).max(60, m.forms.tooLong),
   phone: z.string().refine((p) => p === '' || normalizePhone(p) !== null, m.profile.phoneFormat),
-  skill: z.coerce.number().int().min(1, m.profile.pickSkill).max(5, m.profile.pickSkill),
   favourites: z
     .array(z.uuid())
     .max(3, m.profile.tooManyFavourites)
     .refine((ids) => new Set(ids).size === ids.length, m.profile.duplicateFavourite),
 });
 
-export function parseProfileForm(formData: FormData): FormResult<ProfileInput> {
+const RATING = /^[1-5]$/;
+
+/** `sectionIds` are the brand's sections; each may be rated 1–5 (`rating.<id>`) or left "Not rated" (''). */
+export function parseProfileForm(formData: FormData, sectionIds: string[]): FormResult<ProfileInput> {
   const parsed = schema.safeParse({
     displayName: text(formData, 'displayName'),
     phone: text(formData, 'phone'),
-    skill: text(formData, 'skill'),
     favourites: formData.getAll('favourites').map(String).filter(Boolean),
   });
   const errors: Record<string, string> = parsed.success ? {} : fieldErrors(parsed.error);
+
+  const ratings: ProfileInput['ratings'] = {};
+  for (const id of sectionIds) {
+    const value = text(formData, `rating.${id}`);
+    if (value === '') continue;
+    if (RATING.test(value)) ratings[id] = Number(value);
+    else errors[`rating.${id}`] = m.profile.pickSkill;
+  }
 
   const availability: ProfileInput['availability'] = [];
   for (const d of WEEKDAYS) {
@@ -44,9 +53,9 @@ export function parseProfileForm(formData: FormData): FormResult<ProfileInput> {
   }
 
   if (!parsed.success || Object.keys(errors).length) return { ok: false, errors };
-  const { displayName, phone, skill, favourites } = parsed.data;
+  const { displayName, phone, favourites } = parsed.data;
   return {
     ok: true,
-    value: { displayName, phone: phone === '' ? null : normalizePhone(phone), skill, favourites, availability, emailOptIn: formData.get('emailOptIn') === 'on' },
+    value: { displayName, phone: phone === '' ? null : normalizePhone(phone), ratings, favourites, availability, emailOptIn: formData.get('emailOptIn') === 'on' },
   };
 }
