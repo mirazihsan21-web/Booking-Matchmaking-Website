@@ -320,6 +320,7 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 
 ## 8. Change log
 
+- **2026-10-25: One-brand redesign spec written** (`docs/superpowers/specs/2026-10-25-one-brand-sections-design.md`, branch `one-brand-design`). The user's decisions: one client's business (not reused for others), all three sections in one place, approach A (branches become sections, the organization row is the brand), staff per section, skill per section, hours and rules per section, one brand look with section accents. Build stages: R1 foundation (data, access rules, migration, `pnpm brand:setup`), R2 public website, R3 manage area. Awaiting the user's review of the spec, then the R1 plan.
 - **2026-10-21: Gmail sending support kept on `main`.**
   - What it adds: `EMAIL_TRANSPORT=smtp` takes an optional `SMTP_USER` / `SMTP_PASS` (e.g. Gmail: `smtp.gmail.com`, port 465, an App Password; `EMAIL_FROM` must be the Gmail address). Port 465 uses TLS from the start; other ports upgrade with STARTTLS. `smtpOptions()` is in `lib/email/sender.ts`, and `pnpm env:hosted` keeps `SMTP_USER`, `SMTP_PASS` and `RESEND_API_KEY` when they're set.
   - Where it came from: another Claude session wrote it on a `gmail-smtp` branch in this same folder, then put the files back on disk uncommitted. At the user's choice I cherry-picked it onto `main` and deleted the branch.
