@@ -143,16 +143,24 @@ hosted project's "Invite user" email template when you deploy.
 
 The hosted database still has the multi-venue shape until these run, in order:
 
-```bash
-pnpm exec supabase db push                       # sections, ratings per section, staff per section
-pnpm env:hosted                                  # .env.local → hosted; BRAND_SLUG=chattoturf, Google flag from the project
-pnpm brand:setup --name "<brand name>" --owner <owner email>   # adds the café and lounge to Chattoturf (no --demo)
-pnpm env:local                                   # back to local when done
-```
+1. **Check first** (dashboard → SQL editor, read-only): `select organization_id from branches group by 1 having count(*) > 1;`
+   should return no rows. The migration puts every game in a venue's first section, so a venue with two
+   branches and games scheduled in the second would need its games sorted out by hand first.
+2. Then:
 
-`db push` keeps Chattoturf's turf section (renamed from its branch, with the same hours and rules) and gives
-its staff and pending staff invites every section. `brand:setup` then adds the missing sections with their
-preset spaces and games; edit their hours and rules under Sections.
+   ```bash
+   pnpm exec supabase db push        # sections, ratings per section, staff per section
+   pnpm env:hosted                   # .env.local → hosted; BRAND_SLUG=chattoturf, Google flag from the project
+   pnpm brand:setup --owner <owner email>   # adds the café and lounge to Chattoturf (no --name, no --demo)
+   pnpm env:local                    # back to local when done
+   ```
+
+`db push` turns Chattoturf's branch into its turf section (same hours and rules). Its staff and pending staff
+invites get every section that exists **at push time, so only the turf**. `brand:setup` then adds the café and
+lounge with their preset spaces and games; edit their hours and rules under Sections. To give an existing
+staff member the new sections before the manage redesign (R3) adds a screen for it, change their role to
+owner and back to staff on the Staff page (staff made from an owner get every section), or re-invite them.
+`--name` only names a brand that doesn't exist yet; it doesn't rename one.
 
 ### Google sign-in (optional)
 
@@ -188,5 +196,5 @@ Hard numbers for the case study, re-measured as features land.
 | Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
 | Engine tests (incl. property tests) | 51 | `pnpm --filter @bm/engine test` |
 | Web unit tests | 210 | `pnpm --filter web test` |
-| Web integration tests (real Supabase, Realtime, Mailpit) | 106 | `pnpm test:integration` |
-| Database assertions | 350 pgTAP checks + 4 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
+| Web integration tests (real Supabase, Realtime, Mailpit) | 108 | `pnpm test:integration` |
+| Database assertions | 351 pgTAP checks + 4 two-connection race tests | `pnpm db:test`, `pnpm test:race` |

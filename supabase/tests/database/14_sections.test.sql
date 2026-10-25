@@ -4,7 +4,7 @@
 -- player P (…14e1) books Pitch 1 (turf) and Table 1 (café).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(15);
+select plan(16);
 
 -- `days` from today in Dhaka at `hhmm`.
 create function pg_temp.at(days int, hhmm text) returns timestamptz language sql as $$
@@ -29,6 +29,17 @@ select results_eq(
   'add_section gives each section the next free slug, its kind''s accent and the next position'
 );
 select is((select kind::text from public.sections where id = pg_temp.section('cafe')), 'boardgame_cafe', 'and records its kind');
+
+-- ── names ───────────────────────────────────────────────────────────────────
+select is(
+  (select count(*) from (
+     select conname as name from pg_constraint c join pg_namespace n on n.oid = c.connamespace where n.nspname = 'public'
+     union all select indexname from pg_indexes where schemaname = 'public'
+     union all select policyname from pg_policies where schemaname = 'public'
+   ) x where name ~ 'branch|sectione'),
+  0::bigint,
+  'constraints, indexes and policies are named after sections (sections_pkey, not sectiones_pkey)'
+);
 
 -- ── checks ──────────────────────────────────────────────────────────────────
 select throws_ok(format($$ update public.sections set slug = 'manage' where id = %L $$, pg_temp.section('turf')),

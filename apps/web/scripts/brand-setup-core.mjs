@@ -42,7 +42,8 @@ async function usersByEmail(db) {
 }
 
 /**
- * Sets up the brand `slug`: creates it (live) if missing, adds any missing section (turf, café,
+ * Sets up the brand `slug`: creates it (live) if missing or makes a half-set-up one live (a suspended
+ * brand stays suspended), adds any missing section (turf, café,
  * lounge) with its preset spaces and games, makes `ownerEmail` its owner (or invites them), and with
  * `demo` adds 12 rated players and one open game per section.
  *
@@ -53,10 +54,11 @@ async function usersByEmail(db) {
 export async function setupBrand(db, { slug, name, presets, ownerEmail, demo = false }) {
   const presetOf = new Map(presets.map((p) => [p.businessType, p]));
 
-  // 1. The brand.
-  let org = must(await db.from('organizations').select('id').eq('slug', slug).maybeSingle());
+  // 1. The brand, live.
+  let org = must(await db.from('organizations').select('id, status').eq('slug', slug).maybeSingle());
   /** @type {'created' | 'existing'} */
   let brand = 'existing';
+  if (org?.status === 'onboarding') must(await db.from('organizations').update({ status: 'live' }).eq('id', org.id));
   if (!org) {
     if (!name?.trim()) throw new Error(`There is no brand "${slug}" yet: give it a name (--name "…").`);
     org = must(await db.from('organizations').insert({ slug, name: name.trim(), status: 'live' }).select('id').single());
