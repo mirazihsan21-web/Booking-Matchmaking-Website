@@ -94,6 +94,23 @@ describe('setupBrand', () => {
   });
 });
 
+describe('setupBrand on a brand that exists but is not live', () => {
+  it('makes an onboarding brand live, and leaves a suspended one suspended', async () => {
+    const rows = await db
+      .from('organizations')
+      .insert([
+        { slug: `${slug}-o`, name: 'Half set up', status: 'onboarding' },
+        { slug: `${slug}-s`, name: 'Stopped', status: 'suspended' },
+      ])
+      .select('id, slug');
+    for (const row of rows.data!) orgIds.push(row.id);
+    expect((await setupBrand(db, { slug: `${slug}-o`, presets })).brand).toBe('existing');
+    expect((await db.from('organizations').select('status').eq('slug', `${slug}-o`).single()).data?.status).toBe('live');
+    await setupBrand(db, { slug: `${slug}-s`, presets });
+    expect((await db.from('organizations').select('status').eq('slug', `${slug}-s`).single()).data?.status).toBe('suspended');
+  });
+});
+
 describe('loadBrand', () => {
   it('loads the live brand with its sections in order', async () => {
     const brand = await loadBrand(db, slug);

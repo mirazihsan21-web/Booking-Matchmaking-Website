@@ -22,13 +22,13 @@ begin
     from pg_constraint c join pg_namespace n on n.oid = c.connamespace
     where n.nspname = 'public' and c.conname ~ 'branch'
   loop
-    execute format('alter table %s rename constraint %I to %I', r.tbl, r.conname, replace(r.conname, 'branch', 'section'));
+    execute format('alter table %s rename constraint %I to %I', r.tbl, r.conname, replace(replace(r.conname, 'branches', 'sections'), 'branch', 'section'));
   end loop;
   for r in select indexname from pg_indexes where schemaname = 'public' and indexname ~ 'branch' loop
-    execute format('alter index public.%I rename to %I', r.indexname, replace(r.indexname, 'branch', 'section'));
+    execute format('alter index public.%I rename to %I', r.indexname, replace(replace(r.indexname, 'branches', 'sections'), 'branch', 'section'));
   end loop;
   for r in select policyname, tablename from pg_policies where schemaname = 'public' and policyname ~ 'branch' loop
-    execute format('alter policy %I on public.%I rename to %I', r.policyname, r.tablename, replace(r.policyname, 'branch', 'section'));
+    execute format('alter policy %I on public.%I rename to %I', r.policyname, r.tablename, replace(replace(r.policyname, 'branches', 'sections'), 'branch', 'section'));
   end loop;
 end $$;
 

@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { loadSection, loadSections, sectionOfResource, sectionOfSession } from '@/lib/sections/sections';
-import { serviceDb } from './helpers';
+import { loadSection, loadSections, sectionIdOfSeat, sectionIdOfSpaceBooking, sectionOfResource, sectionOfSession } from '@/lib/sections/sections';
+import { canManageSection } from '@/lib/tenancy/sections-access';
+import { createTestUser, deleteTestUser, serviceDb, type TestUser } from './helpers';
 
 // A brand with Turf and Café (made by add_section, so slugs, accents and positions are the real
 // defaults), and another brand with its own Turf.
@@ -13,6 +14,11 @@ let cafe: string;
 let otherTurf: string;
 let table: string;
 let session: string;
+let owner: TestUser;
+let turfStaff: TestUser;
+let spaceBooking: string; // a walk-in at the café table
+let walkInStatus: string;
+let seat: string; // a seat in the café game
 
 const must = <T>(r: { data: T; error: unknown }): NonNullable<T> => {
   if (r.error) throw r.error;
@@ -35,10 +41,30 @@ beforeAll(async () => {
       .select('id')
       .single(),
   ).id;
+
+  // An owner, turf-only staff, a café walk-in and a café seat: what the staff actions touch.
+  owner = await createTestUser(db);
+  turfStaff = await createTestUser(db);
+  must(await db.from('organization_members').insert([
+    { organization_id: orgId, user_id: owner.id, role: 'owner' },
+    { organization_id: orgId, user_id: turfStaff.id, role: 'staff' },
+  ]));
+  must(await db.from('section_staff').insert({ organization_id: orgId, section_id: turf, user_id: turfStaff.id }));
+  const walkIn = must(await db.rpc('book_resource', {
+    p_organization_id: orgId, p_resource_id: table, p_starts_at: at(2 * 86_400_000), p_slots: 1,
+    p_profile_id: null, p_guest_name: 'Karim', p_guest_phone: '+8801712345678', p_created_by: owner.id,
+  })) as Array<{ status: string; booking_id: string }>;
+  spaceBooking = walkIn[0]!.booking_id;
+  walkInStatus = walkIn[0]!.status;
+  const player = must(await db.from('player_profiles').insert({ organization_id: orgId, user_id: owner.id, display_name: 'Owner plays' }).select('id').single()).id;
+  const activity = must(await db.from('activities').insert({ organization_id: orgId, section_id: cafe, name: 'Catan', min_players: 2, max_players: 4, duration_min: 90 }).select('id').single()).id;
+  const group = must(await db.from('groups').insert({ organization_id: orgId, session_id: session, resource_id: table, activity_id: activity, capacity: 4 }).select('id').single()).id;
+  seat = must(await db.from('bookings').insert({ organization_id: orgId, session_id: session, group_id: group, profile_id: player, seat_no: 1, price_poisha: 20000 }).select('id').single()).id;
 });
 
 afterAll(async () => {
   await db.from('organizations').delete().in('id', [orgId, otherOrgId]);
+  for (const u of [owner, turfStaff]) if (u) await deleteTestUser(db, u.id);
 });
 
 describe('sections', () => {
@@ -64,6 +90,21 @@ describe('sections', () => {
     expect((await sectionOfSession(db, session))?.id).toBe(cafe);
     expect(await sectionOfResource(db, randomUUID())).toBeNull();
     expect(await sectionOfSession(db, 'nope')).toBeNull();
+  });
+
+  it('finds the section each staff write touches, so turf staff are refused café rows (Review: action barrier)', async () => {
+    expect(walkInStatus).toBe('booked');
+    expect(await sectionIdOfSpaceBooking(db, spaceBooking)).toBe(cafe);
+    expect(await sectionIdOfSeat(db, seat)).toBe(cafe);
+    for (const sectionId of [await sectionIdOfSpaceBooking(db, spaceBooking), await sectionIdOfSeat(db, seat), (await sectionOfResource(db, table))!.id, (await sectionOfSession(db, session))!.id]) {
+      expect(await canManageSection(db, { organizationId: orgId, userId: turfStaff.id, sectionId: sectionId! })).toBe(false);
+      expect(await canManageSection(db, { organizationId: orgId, userId: owner.id, sectionId: sectionId! })).toBe(true);
+    }
+    expect(await canManageSection(db, { organizationId: orgId, userId: turfStaff.id, sectionId: turf })).toBe(true);
+    for (const missing of [randomUUID(), 'nope']) {
+      expect(await sectionIdOfSpaceBooking(db, missing)).toBeNull();
+      expect(await sectionIdOfSeat(db, missing)).toBeNull();
+    }
   });
 
   it('keeps Turf first even when the café was renamed to sort earlier', async () => {
