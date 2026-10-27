@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { requireOrgRole } from "@/lib/tenancy/dal";
-import { tenantUrl } from "@/lib/tenancy/urls";
+import { rootUrl } from "@/lib/tenancy/urls";
 import { m } from "@/messages";
 import { getPreset } from "@/presets";
 
@@ -29,14 +29,10 @@ async function Nav({ params }: { params: Promise<{ slug: string }> }) {
   return (
     <header className="flex flex-col gap-3 border-b border-border pb-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Link href="/manage" className="text-sm text-foreground/60 hover:underline">
-          {m.manage.myVenues}
-        </Link>
-        <span className="text-foreground/40">/</span>
-        <h1 className="text-xl font-semibold">{org.name}</h1>
+        <h1 className="font-display text-2xl uppercase tracking-wide">{org.name}</h1>
         <Badge variant={org.status === "live" ? "default" : "secondary"}>{m.status[org.status]}</Badge>
         {org.status === "live" && (
-          <a href={tenantUrl(org.slug)} className="text-sm text-primary hover:underline">
+          <a href={rootUrl("/")} className="text-sm text-primary hover:underline">
             {m.manage.publicPage} ↗
           </a>
         )}

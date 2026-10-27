@@ -6,11 +6,6 @@ export function rootUrl(path = '/'): string {
   return `${protocol()}://${root()}${path}`;
 }
 
-/** Absolute URL on a venue's subdomain. */
-export function tenantUrl(slug: string, path = '/'): string {
-  return `${protocol()}://${slug}.${root()}${path === '/' ? '' : path}`;
-}
-
 /** Public URL of an uploaded logo (the org-assets bucket is public). */
 export function logoUrl(path: string | undefined): string | null {
   if (!path) return null;
