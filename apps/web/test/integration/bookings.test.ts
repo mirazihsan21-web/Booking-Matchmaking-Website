@@ -293,6 +293,8 @@ describe('my bookings', () => {
     const order = upcoming.map((x) => x.startsAt);
     expect([...order].sort()).toEqual(order);
     expect(upcoming.find((x) => x.resourceName === 'Zone L')?.sectionName).toBe('Late'); // two branches: each booking says where
+    const late = (await db.from('sections').select('id').eq('organization_id', orgId).eq('name', 'Late').single()).data!.id;
+    expect(upcoming.find((x) => x.resourceName === 'Zone L')?.sectionId).toBe(late); // …and which, for its colour on the site
   });
 });
 

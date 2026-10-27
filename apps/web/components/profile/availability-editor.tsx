@@ -19,9 +19,12 @@ export function AvailabilityEditor({ value }: { value: AvailabilityValue }) {
               <input type="checkbox" name={`avail.${d}.on`} defaultChecked={Boolean(day)} />
               {m.weekdays[Number(d)]}
             </label>
-            <input type="time" name={`avail.${d}.start`} defaultValue={day?.start ?? "18:00"} className="rounded-md border border-input px-2 py-1" />
-            <span>–</span>
-            <input type="time" name={`avail.${d}.end`} defaultValue={day?.end ?? "22:00"} className="rounded-md border border-input px-2 py-1" />
+            {/* The two times wrap together, so on a phone they sit as one line under the day. */}
+            <span className="flex items-center gap-2 pl-6 sm:pl-0">
+              <input type="time" name={`avail.${d}.start`} defaultValue={day?.start ?? "18:00"} className="rounded-md border border-input bg-raised px-2 py-1" />
+              <span>–</span>
+              <input type="time" name={`avail.${d}.end`} defaultValue={day?.end ?? "22:00"} className="rounded-md border border-input bg-raised px-2 py-1" />
+            </span>
             <FieldError name={`avail.${d}`} />
           </div>
         );

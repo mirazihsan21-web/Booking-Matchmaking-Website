@@ -235,7 +235,7 @@ describe('open play', () => {
     expect(booking?.team).toBe(leaver.team);
 
     const mine = await listMySeats(db, { organizationId: orgId, profileId: offered.profile_id });
-    expect(mine.upcoming.map((s) => [s.sessionId, s.team, s.cancellable])).toEqual([[sessionA, leaver.team, true]]);
+    expect(mine.upcoming.map((s) => [s.sessionId, s.team, s.cancellable, s.sectionId])).toEqual([[sessionA, leaver.team, true, turfId]]);
   });
 
   it('passes a declined seat to the next waiting player', async () => {
