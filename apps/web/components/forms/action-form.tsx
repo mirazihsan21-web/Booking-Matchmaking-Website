@@ -17,7 +17,8 @@ export const useFormState = () => useContext(FormStateContext);
  * A form wired to a server action with useActionState; fields read their errors from context.
  * Submits through onSubmit so React does NOT clear the inputs afterwards (its default for form
  * actions) — otherwise a validation error or schedule clash would wipe what the person typed.
- * `resetOnSuccess` clears the form after a successful save (for "add" forms).
+ * `resetOnSuccess` clears the form after a successful save (for "add" forms). `footer` adds content before
+ * the submit button and `footerClassName` styles that row (e.g. a sticky bar on the booking page).
  */
 export function ActionForm({
   action,
@@ -26,13 +27,17 @@ export function ActionForm({
   className,
   variant = "default",
   resetOnSuccess = false,
+  footer,
+  footerClassName,
 }: {
   action: FormAction;
   submitLabel: string;
   children?: ReactNode;
   className?: string;
-  variant?: "default" | "outline" | "destructive" | "ghost";
+  variant?: "default" | "outline" | "destructive" | "ghost" | "section";
   resetOnSuccess?: boolean;
+  footer?: ReactNode;
+  footerClassName?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -51,7 +56,8 @@ export function ActionForm({
     <FormStateContext value={state}>
       <form ref={formRef} action={formAction} onSubmit={submit} className={cn("flex flex-col gap-3", className)}>
         {children}
-        <div className="flex items-center gap-3">
+        <div className={cn("flex items-center gap-3", footerClassName)}>
+          {footer}
           <Button type="submit" variant={variant} disabled={pending}>
             {submitLabel}
           </Button>
@@ -67,7 +73,7 @@ export function ActionForm({
 }
 
 /** A one-button form (toggle, delete, publish) that still shows the action's message. */
-export function ActionButton({ action, label, variant = "outline" }: { action: FormAction; label: string; variant?: "default" | "outline" | "destructive" | "ghost" }) {
+export function ActionButton({ action, label, variant = "outline" }: { action: FormAction; label: string; variant?: "default" | "outline" | "destructive" | "ghost" | "section" }) {
   return <ActionForm action={action} submitLabel={label} variant={variant} className="inline-flex" />;
 }
 
