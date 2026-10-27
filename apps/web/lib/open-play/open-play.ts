@@ -419,13 +419,23 @@ export async function findOffer(
 
 // ── Views ───────────────────────────────────────────────────────────────────
 
-/**
- * Seats still to be had, per session (counts only). Before matching: what the session's spaces could
- * seat, minus requests. After: free seats in the formed groups. Never below 0; 0 once closed.
- */
+/** Seats still to be had per session (counts only); see seatCounts. */
 export async function seatsLeft(db: SupabaseClient, input: { organizationId: string; sessionIds: string[] }): Promise<Map<string, number>> {
+  const counts = await seatCounts(db, input);
+  return new Map([...counts].map(([id, c]) => [id, c.left]));
+}
+
+/**
+ * Seats per session (counts only). `total`: before matching, what the session's spaces could seat;
+ * after, the formed groups' capacity. `left`: total minus requests (before) or minus seats taken and
+ * on offer (after). Never below 0; 0 left once closed.
+ */
+export async function seatCounts(
+  db: SupabaseClient,
+  input: { organizationId: string; sessionIds: string[] },
+): Promise<Map<string, { left: number; total: number }>> {
   const ids = input.sessionIds.filter((id) => UUID.test(id));
-  const result = new Map<string, number>();
+  const result = new Map<string, { left: number; total: number }>();
   if (ids.length === 0 || !UUID.test(input.organizationId)) return result;
 
   const [sessionsResult, bookingsResult, offersResult] = await Promise.all([
@@ -452,18 +462,20 @@ export async function seatsLeft(db: SupabaseClient, input: { organizationId: str
     seat_requests: Array<{ count: number }>;
   }>) {
     let free = 0;
+    let total = 0;
     if (s.status === 'matched') {
-      free = s.groups.reduce((sum, g) => sum + g.capacity, 0) - (booked.get(s.id) ?? 0) - (offered.get(s.id) ?? 0);
+      total = s.groups.reduce((sum, g) => sum + g.capacity, 0);
+      free = total - (booked.get(s.id) ?? 0) - (offered.get(s.id) ?? 0);
     } else if (s.status === 'open') {
-      const seats = s.open_play_session_resources.reduce((sum, { resources: r }) => {
+      total = s.open_play_session_resources.reduce((sum, { resources: r }) => {
         const a = s.activities;
         if (!a) return sum + r.capacity;
         const size = a.team_mode === 'two_teams' && a.team_size ? 2 * a.team_size : Math.min(r.capacity, a.max_players);
         return sum + (r.capacity >= size && size >= a.min_players ? size : 0);
       }, 0);
-      free = seats - (s.seat_requests[0]?.count ?? 0);
+      free = total - (s.seat_requests[0]?.count ?? 0);
     }
-    result.set(s.id, Math.max(0, free));
+    result.set(s.id, { left: Math.max(0, free), total });
   }
   return result;
 }
