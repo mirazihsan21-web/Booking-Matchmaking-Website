@@ -105,7 +105,8 @@ describe('deliverPendingEmails', () => {
     const mine = sender.sent.filter((m) => m.to === keen.email);
     expect(mine).toHaveLength(1);
     expect(mine[0]!.subject).toBe('Deliver Turf: Booking confirmed');
-    expect(mine[0]!.html).toContain(`http://${slug}.localhost:3000/me/bookings`);
+    expect(mine[0]!.html).toContain('http://localhost:3000/me/bookings'); // the one site, not a venue subdomain
+    expect(mine[0]!.html).not.toContain(`${slug}.localhost`);
     expect(await emailState(id)).toEqual({ email_status: 'sent', email_attempts: 1 });
   });
 
@@ -142,7 +143,7 @@ describe('deliverPendingEmails', () => {
     const mine = sender.sent.filter((m) => m.to === keen.email);
     expect(mine).toHaveLength(1);
     expect(mine[0]!.subject).toBe('Deliver Turf: A seat is free — want it?');
-    const token = new RegExp(`http://${slug}\\.localhost:3000/offers/([A-Za-z0-9_-]{43})`).exec(mine[0]!.html)?.[1];
+    const token = /http:\/\/localhost:3000\/offers\/([A-Za-z0-9_-]{43})/.exec(mine[0]!.html)?.[1];
     expect(token).toBeDefined();
     expect(mine[0]!.html).not.toContain('/me/offers');
     const { data: offer } = await db.from('seat_offers').select('token_hash').eq('id', offerId).single();

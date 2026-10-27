@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { notificationEmail } from '@/lib/email/notification-email';
 import type { EmailSender } from '@/lib/email/sender';
 import { issueOfferToken } from '@/lib/open-play/open-play';
-import { tenantUrl } from '@/lib/tenancy/urls';
+import { rootUrl } from '@/lib/tenancy/urls';
 import { getPreset } from '@/presets';
 import type { NotificationKind } from './render';
 
@@ -60,7 +60,7 @@ export async function deliverPendingEmails(
         payload: row.payload ?? {},
         venueName: venue.name,
         primaryColour: venue.primary,
-        siteUrl: tenantUrl(venue.slug),
+        siteUrl: rootUrl(''), // the one site (links are /me/bookings, /offers/<token> …)
         link,
         timeZone: venue.timezone,
       });
