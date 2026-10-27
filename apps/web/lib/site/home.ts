@@ -61,3 +61,26 @@ export async function loadComingUp(
 export function findSection(sections: Section[], slug: string): Section | null {
   return sections.find((s) => s.slug === slug) ?? null;
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The section an old venue booking link (`/book?section=<id>&resource=<id>&date=…`) meant: its space's
+ * section, else its section, else null. Only this brand's rows count.
+ */
+export async function oldBookSection(db: SupabaseClient, organizationId: string, query: URLSearchParams): Promise<string | null> {
+  const resource = query.get('resource');
+  if (resource && UUID.test(resource)) {
+    const { data, error } = await db.from('resources').select('sections(slug)').eq('id', resource).eq('organization_id', organizationId).maybeSingle();
+    if (error) throw error;
+    const slug = (data?.sections as unknown as { slug: string } | null)?.slug;
+    if (slug) return slug;
+  }
+  const section = query.get('section');
+  if (section && UUID.test(section)) {
+    const { data, error } = await db.from('sections').select('slug').eq('id', section).eq('organization_id', organizationId).maybeSingle();
+    if (error) throw error;
+    if (data) return data.slug;
+  }
+  return null;
+}

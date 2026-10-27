@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { cancelOpenPlay } from '@/lib/schedule/schedule';
 import { loadSections } from '@/lib/sections/sections';
-import { findSection, loadComingUp } from '@/lib/site/home';
+import { findSection, loadComingUp, oldBookSection } from '@/lib/site/home';
 import { boardgame } from '@/presets/boardgame';
 import { lounge } from '@/presets/lounge';
 import { turf } from '@/presets/turf';
@@ -67,5 +67,22 @@ describe('findSection (Review Focus 4)', () => {
     expect(findSection(sections, 'turf-2')?.name).toBe('Second turf');
     expect(findSection(sections, 'me')).toBeNull();
     expect(findSection(sections, 'nope')).toBeNull();
+  });
+});
+
+describe('oldBookSection (Review Focus 1: old /book links)', () => {
+  it("finds an old booking link's section from its space or its section, only in this brand", async () => {
+    const sections = await loadSections(db, orgId);
+    const cafe = sections.find((x) => x.slug === 'cafe')!;
+    const lounge = sections.find((x) => x.slug === 'lounge')!;
+    const table = (await db.from('resources').select('id').eq('section_id', cafe.id).limit(1).single()).data!.id;
+    const q = (query: string) => new URLSearchParams(query);
+    expect(await oldBookSection(db, orgId, q(`resource=${table}&date=2026-10-30`))).toBe('cafe');
+    expect(await oldBookSection(db, orgId, q(`section=${lounge.id}`))).toBe('lounge');
+    expect(await oldBookSection(db, orgId, q(`section=${lounge.id}&resource=${table}`))).toBe('cafe'); // the space wins
+    expect(await oldBookSection(db, orgId, q('resource=not-a-uuid&section=nope'))).toBeNull();
+    expect(await oldBookSection(db, orgId, q(''))).toBeNull();
+    const elsewhere = (await db.from('resources').select('id').neq('organization_id', orgId).limit(1).single()).data!.id;
+    expect(await oldBookSection(db, orgId, q(`resource=${elsewhere}`))).toBeNull();
   });
 });
