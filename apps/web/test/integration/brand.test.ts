@@ -94,6 +94,29 @@ describe('setupBrand', () => {
   });
 });
 
+describe('setupBrand when something goes wrong part-way', () => {
+  it('takes back a section whose spaces could not be added, so the next run adds it whole', async () => {
+    const half = `${slug}-h`;
+    const broken = { ...lounge, resources: [{ ...lounge.resources[0]!, capacity: 0 }] }; // breaks the capacity check
+    await expect(setupBrand(db, { slug: half, name: 'Half', presets: [turf, boardgame, broken] })).rejects.toBeTruthy();
+    const { data: org } = await db.from('organizations').select('id').eq('slug', half).single();
+    orgIds.push(org!.id);
+    const kinds = async () => ((await db.from('sections').select('kind').eq('organization_id', org!.id).order('position')).data ?? []).map((x) => x.kind);
+    expect(await kinds()).toEqual(['turf', 'boardgame_cafe']);
+    expect((await setupBrand(db, { slug: half, presets })).sectionsAdded).toEqual(['lounge']);
+    expect(await kinds()).toEqual(['turf', 'boardgame_cafe', 'gaming_lounge']);
+  });
+
+  it('an owner invite replaces a pending staff invite for the same address', async () => {
+    const email = `was-staff-${randomUUID().slice(0, 8)}@example.test`;
+    const turfSection = (await db.from('sections').select('id').eq('organization_id', orgId).eq('kind', 'turf').single()).data!.id;
+    await db.from('organization_invites').insert({ organization_id: orgId, email, role: 'staff', section_ids: [turfSection] });
+    expect((await setupBrand(db, { slug, presets, ownerEmail: email })).owner).toBe('invited');
+    const { data } = await db.from('organization_invites').select('role').eq('organization_id', orgId).eq('email', email).is('accepted_at', null);
+    expect(data).toEqual([{ role: 'owner' }]);
+  });
+});
+
 describe('setupBrand on a brand that exists but is not live', () => {
   it('makes an onboarding brand live, and leaves a suspended one suspended', async () => {
     const rows = await db
