@@ -1,4 +1,4 @@
-/** Colours for the platform's own pages (marketing, sign-in, onboarding, owner admin). */
+/** Fallback colours (e.g. an email's accent when the brand has none) and branding → CSS variables. */
 export const PLATFORM_PALETTE = { primary: '#0F172A', accent: '#38BDF8' } as const;
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;

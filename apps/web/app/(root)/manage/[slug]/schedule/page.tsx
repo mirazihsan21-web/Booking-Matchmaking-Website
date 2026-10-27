@@ -74,7 +74,7 @@ async function Schedule({ params }: { params: Promise<{ slug: string }> }) {
               <SelectField name="sectionId" label={m.manage.section} options={sections.map((s) => ({ value: s.id, label: s.name }))} />
               <SelectField
                 name="activityId"
-                label={preset.labels.activity}
+                label={preset.labels.activity.charAt(0).toUpperCase() + preset.labels.activity.slice(1)}
                 options={[{ value: "", label: m.schedule.playersChoose }, ...(activities ?? []).map((a) => ({ value: a.id, label: `${a.name} (${sectionName.get(a.section_id)})` }))]}
               />
             </div>
