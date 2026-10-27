@@ -10,6 +10,7 @@
     "test": "vitest run",
     "typecheck": "next typegen && tsc --noEmit",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "playwright test",
     "env:local": "node scripts/write-env-local.mjs",
     "env:hosted": "node scripts/write-env-hosted.mjs",
     "brand:setup": "node scripts/brand-setup.mjs"
