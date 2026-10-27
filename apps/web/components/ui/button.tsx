@@ -8,6 +8,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        // The current section's colour (--section) with dark text; slightly brighter on hover, pressed in on click.
+        section:
+          "bg-section font-bold text-on-section hover:brightness-110 active:not-aria-[haspopup]:scale-[0.96] focus-visible:ring-section/50",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:

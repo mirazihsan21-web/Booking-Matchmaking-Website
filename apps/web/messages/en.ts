@@ -234,6 +234,8 @@ export const en = {
     seats: (taken: number, total: number) => `${taken} of ${total} in`,
     left: (n: number) => (n === 1 ? '1 seat left' : `${n} seats left`),
     full: 'Full · join the waitlist',
+    anyGame: 'Pick at the table',
+    perSeat: (price: string) => `${price} a seat`,
     comingUp: 'Coming up',
     nothingComingUp: 'Nothing on the board yet. Check back soon.',
     bookSpace: 'Book a space',
