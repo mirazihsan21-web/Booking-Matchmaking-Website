@@ -37,7 +37,7 @@ describe('createOrganization', () => {
 
     const { data: branches } = await db.from('sections').select('id, name, kind, slug, accent, position').eq('organization_id', organizationId);
     expect(branches).toHaveLength(1);
-    expect(branches![0]).toMatchObject({ name: 'Dhanmondi Turf', kind: 'turf', slug: 'turf', accent: '#15803D', position: 1 });
+    expect(branches![0]).toMatchObject({ name: 'Dhanmondi Turf', kind: 'turf', slug: 'turf', accent: '#43a66b', position: 1 });
 
     const { data: resources } = await db.from('resources').select('name, kind, capacity, price_per_hour_poisha, section_id').eq('organization_id', organizationId);
     expect(resources).toHaveLength(3);

@@ -71,8 +71,8 @@ describe('sections', () => {
   it('lists a brand’s sections in display order, each with its own rules', async () => {
     const sections = await loadSections(db, orgId);
     expect(sections.map((s) => [s.slug, s.name, s.kind, s.accent, s.position])).toEqual([
-      ['turf', 'Turf', 'turf', '#15803D', 1],
-      ['cafe', 'Board-game café', 'boardgame_cafe', '#0F766E', 2],
+      ['turf', 'Turf', 'turf', '#43a66b', 1],
+      ['cafe', 'Board-game café', 'boardgame_cafe', '#2e9e93', 2],
     ]);
     expect(sections[0]!.rules).toEqual({ bookingHorizonDays: 14, cancelCutoffMinutes: 120, matchCutoffMinutes: 360, maxUpcomingBookings: 3, offerTtlSeconds: 900 });
     expect(sections[1]!.rules).toEqual({ bookingHorizonDays: 3, cancelCutoffMinutes: 30, matchCutoffMinutes: 90, maxUpcomingBookings: 2, offerTtlSeconds: 600 });

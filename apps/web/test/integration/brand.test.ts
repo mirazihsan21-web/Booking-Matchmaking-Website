@@ -47,9 +47,9 @@ describe('setupBrand', () => {
     orgIds.push(orgId);
     const { data: sections } = await db.from('sections').select('slug, kind, accent, position').eq('organization_id', orgId).order('position');
     expect(sections).toEqual([
-      { slug: 'turf', kind: 'turf', accent: '#15803D', position: 1 },
-      { slug: 'cafe', kind: 'boardgame_cafe', accent: '#0F766E', position: 2 },
-      { slug: 'lounge', kind: 'gaming_lounge', accent: '#7C3AED', position: 3 },
+      { slug: 'turf', kind: 'turf', accent: '#43a66b', position: 1 },
+      { slug: 'cafe', kind: 'boardgame_cafe', accent: '#2e9e93', position: 2 },
+      { slug: 'lounge', kind: 'gaming_lounge', accent: '#8a78e6', position: 3 },
     ]);
     expect(await perSection('resources')).toEqual({ turf: 3, cafe: 7, lounge: 4 });
     expect(await perSection('activities')).toEqual({ turf: 3, cafe: 8, lounge: 4 });
