@@ -5,8 +5,8 @@ describe('requestOrigin (Next reports its own hostname in request.url, not the H
   const root = 'localhost:3000';
   const url = 'http://localhost:3000/auth/callback?code=x';
 
-  it('keeps a venue subdomain', () => {
-    expect(requestOrigin('dhanmondi-turf.localhost:3000', url, root)).toBe('http://dhanmondi-turf.localhost:3000');
+  it('no longer trusts a venue subdomain (one site): sign-ins land on the root', () => {
+    expect(requestOrigin('dhanmondi-turf.localhost:3000', url, root)).toBe('http://localhost:3000');
   });
 
   it('keeps the root host', () => {
@@ -17,7 +17,7 @@ describe('requestOrigin (Next reports its own hostname in request.url, not the H
     expect(requestOrigin('evil.example', url, root)).toBe('http://localhost:3000');
   });
 
-  it('ignores invalid venue hosts', () => {
+  it('ignores deeper subdomains and a missing host', () => {
     expect(requestOrigin('a.b.localhost:3000', url, root)).toBe('http://localhost:3000');
     expect(requestOrigin(null, url, root)).toBe('http://localhost:3000');
   });
