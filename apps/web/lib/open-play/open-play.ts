@@ -35,6 +35,7 @@ export interface SessionSummary {
   startsAt: string;
   endsAt: string;
   activityName: string | null;
+  sectionId: string;
   sectionName: string;
   pricePoisha: number;
 }
@@ -130,6 +131,7 @@ const summary = (s: SessionRow): SessionSummary => ({
   startsAt: s.starts_at,
   endsAt: s.ends_at,
   activityName: s.activities?.name ?? null,
+  sectionId: s.section_id,
   sectionName: s.sections.name,
   pricePoisha: s.seat_price_poisha,
 });

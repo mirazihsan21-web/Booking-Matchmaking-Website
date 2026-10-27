@@ -1,11 +1,15 @@
-import { ActionForm, FieldError, SelectField, type FormAction } from "@/components/forms/action-form";
+"use client";
+
+import { useState } from "react";
+import { ActionForm, FieldError, type FormAction } from "@/components/forms/action-form";
+import { SlotChip } from "@/components/site/slot-chip";
 import type { SlotState } from "@/lib/bookings/slots";
-import { cn } from "@/lib/utils";
 import { m } from "@/messages";
 
 /**
- * A day's slots as buttons: free ones can be picked as the start; taken, open-play and started ones
- * are shown but disabled. Submits `startsAt` (ISO) and `slots` (1–4) to the booking action.
+ * A day's slots as chips: free ones can be picked as the start; taken, open-play and started ones are
+ * shown but disabled. The picked slot, how long, the price and **Book** sit in a bar stuck to the bottom.
+ * Submits `startsAt` (ISO) and `slots` (1–4) to the booking action.
  */
 export function SlotPicker({
   action,
@@ -18,40 +22,42 @@ export function SlotPicker({
   slotMinutes: number;
   priceLabel: string;
 }) {
-  if (slots.length === 0) return <p className="text-foreground/60">{m.bookings.closed}</p>;
+  const [picked, setPicked] = useState<string | null>(null);
+  if (slots.length === 0) return <p className="text-muted-foreground">{m.bookings.closed}</p>;
+  // Only a slot that is still free stays picked: once it is booked (by you or anyone) the refresh shows it taken.
+  const pickedSlot = slots.find((s) => s.start === picked && s.state === "free");
+
   return (
-    <ActionForm action={action} submitLabel={m.bookings.book}>
-      <fieldset className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <ActionForm
+      action={action}
+      submitLabel={m.bookings.book}
+      variant="section"
+      footerClassName="sticky bottom-20 z-20 flex-wrap rounded-xl border border-border bg-raised/95 p-3 backdrop-blur md:bottom-4"
+      footer={
+        <div className="flex flex-1 flex-wrap items-center gap-3 text-sm">
+          <span className="font-semibold">{pickedSlot?.label ?? m.bookings.pickSlot}</span>
+          <label className="flex items-center gap-2 text-muted-foreground">
+            {m.bookings.howLong}
+            <select name="slots" defaultValue="1" className="h-8 rounded-lg border border-input bg-card px-2 text-foreground">
+              {[1, 2, 3, 4].map((n) => (
+                <option key={n} value={n}>
+                  {m.bookings.slots(n, slotMinutes)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span className="text-muted-foreground">{priceLabel}</span>
+        </div>
+      }
+    >
+      <input type="hidden" name="startsAt" value={pickedSlot?.start ?? ""} />
+      <fieldset className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
         <legend className="sr-only">{m.bookings.pickSlot}</legend>
-        {slots.map((slot) => {
-          const free = slot.state === "free";
-          return (
-            <label key={slot.start} className={cn("relative", !free && "cursor-not-allowed")}>
-              <input type="radio" name="startsAt" value={slot.start} disabled={!free} required className="peer sr-only" />
-              <span
-                className={cn(
-                  "flex flex-col rounded-lg border border-border px-3 py-2 text-sm",
-                  free ? "cursor-pointer hover:border-primary peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground" : "bg-foreground/5 text-foreground/40",
-                  "peer-focus-visible:ring-2 peer-focus-visible:ring-primary",
-                )}
-              >
-                <span className="font-medium">{slot.label}</span>
-                <span className="text-xs">{m.bookings.states[slot.state]}</span>
-              </span>
-            </label>
-          );
-        })}
+        {slots.map((slot) => (
+          <SlotChip key={slot.start} label={slot.label} state={slot.start === pickedSlot?.start ? "selected" : slot.state} onClick={() => setPicked(slot.start)} />
+        ))}
       </fieldset>
       <FieldError name="startsAt" />
-      <div className="flex flex-wrap items-end gap-4">
-        <SelectField
-          name="slots"
-          label={m.bookings.howLong}
-          options={[1, 2, 3, 4].map((n) => ({ value: String(n), label: m.bookings.slots(n, slotMinutes) }))}
-          defaultValue="1"
-        />
-        <p className="pb-2 text-sm text-foreground/70">{priceLabel}</p>
-      </div>
     </ActionForm>
   );
 }
