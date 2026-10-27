@@ -83,7 +83,7 @@ export const en = {
     saved: 'Saved.',
     deleted: 'Deleted.',
     lastSection: "You need at least one section, so this one can't be deleted.",
-    sectionInUse: "This section has spaces, games or sessions, so it can't be deleted. Deactivate its spaces instead.",
+    sectionInUse: "This section still has games, bookings or sessions, so it can't be deleted. Deactivate its spaces and games instead.",
     section: 'Section',
     kind: 'Kind',
     capacity: 'Capacity',

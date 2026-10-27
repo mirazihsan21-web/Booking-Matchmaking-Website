@@ -73,34 +73,40 @@ export async function setupBrand(db, { slug, name, presets, ownerEmail, demo = f
     const preset = presetOf.get(kind);
     if (!preset) throw new Error(`No preset for ${kind}`);
     const sectionId = must(await db.rpc('add_section', { p_organization_id: org.id, p_kind: kind, p_name: SECTION_NAMES[kind] }));
-    must(
-      await db.from('resources').insert(
-        preset.resources.map((r) => ({
-          organization_id: org.id,
-          section_id: sectionId,
-          name: r.name,
-          kind: r.kind,
-          capacity: r.capacity,
-          price_per_hour_poisha: r.pricePerHourPoisha,
-          slot_minutes: r.slotMinutes,
-        })),
-      ),
-    );
-    must(
-      await db.from('activities').insert(
-        preset.activities.map((a) => ({
-          organization_id: org.id,
-          section_id: sectionId,
-          name: a.name,
-          min_players: a.minPlayers,
-          max_players: a.maxPlayers,
-          duration_min: a.durationMin,
-          popularity: a.popularity,
-          team_mode: a.teamMode,
-          team_size: a.teamSize,
-        })),
-      ),
-    );
+    try {
+      must(
+        await db.from('resources').insert(
+          preset.resources.map((r) => ({
+            organization_id: org.id,
+            section_id: sectionId,
+            name: r.name,
+            kind: r.kind,
+            capacity: r.capacity,
+            price_per_hour_poisha: r.pricePerHourPoisha,
+            slot_minutes: r.slotMinutes,
+          })),
+        ),
+      );
+      must(
+        await db.from('activities').insert(
+          preset.activities.map((a) => ({
+            organization_id: org.id,
+            section_id: sectionId,
+            name: a.name,
+            min_players: a.minPlayers,
+            max_players: a.maxPlayers,
+            duration_min: a.durationMin,
+            popularity: a.popularity,
+            team_mode: a.teamMode,
+            team_size: a.teamSize,
+          })),
+        ),
+      );
+    } catch (err) {
+      // Take the section back (its spaces go with it) so the next run adds it whole, not empty.
+      await db.from('sections').delete().eq('id', sectionId);
+      throw err;
+    }
     sectionsAdded.push(must(await db.from('sections').select('slug').eq('id', sectionId).single()).slug);
   }
 
@@ -131,6 +137,8 @@ export async function setupBrand(db, { slug, name, presets, ownerEmail, demo = f
       );
       if (pending.length) owner = 'already';
       else {
+        // An owner invite replaces any other open invite for that address (as inviteMember does).
+        must(await db.from('organization_invites').delete().eq('organization_id', org.id).eq('email', email).is('accepted_at', null));
         must(await db.from('organization_invites').insert({ organization_id: org.id, email, role: 'owner', section_ids: [] }));
         owner = 'invited';
       }
