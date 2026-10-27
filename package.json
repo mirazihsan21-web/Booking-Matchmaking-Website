@@ -16,6 +16,8 @@
     "test:race": "vitest run supabase/tests/race",
     "db:lint": "supabase db advisors --local --type all --fail-on warn",
     "test:integration": "pnpm --filter web test:integration",
+    "test:e2e": "pnpm --filter web test:e2e",
+    "smoke": "node apps/web/scripts/smoke-site.mjs",
     "env:local": "pnpm --filter web env:local",
     "env:hosted": "pnpm --filter web env:hosted",
     "brand:setup": "pnpm --filter web brand:setup",
