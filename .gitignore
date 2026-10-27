@@ -19,3 +19,6 @@ Thumbs.db
 
 .superpowers/
 .playwright-mcp/
+
+# Personal Claude Code settings
+.claude/settings.local.json
