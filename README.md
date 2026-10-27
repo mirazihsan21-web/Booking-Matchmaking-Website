@@ -42,7 +42,9 @@ Everything is on one host (`localhost:3000` locally):
 | `/manage` → `/manage/<brand slug>/…` | Owners and staff: sections, spaces, games, schedule, bookings, staff, settings |
 
 `proxy.ts` refreshes the session. A link to an old venue subdomain (`<slug>.<root>/…`, from R1 emails)
-gets a 308 to the same page on the root host (through `/api/moved`); `/t/…` is not found.
+gets a 308 to the same page on the root host (through `/api/moved`); an old booking link
+(`/book?section=…&resource=…&date=…`) goes to its section's booking page with the same space and day, or home
+when its section is unknown. `/t/…` is not found.
 
 ## Prerequisites
 
@@ -112,7 +114,7 @@ pnpm env:local                                               # .env.local → ba
 ### The public site (R2)
 
 - **Look ("A1 · Matte"):** dark and flat, with each section in its own colour: turf `#43a66b`, café `#2e9e93`,
-  lounge `#8a78e6` (a new section gets its kind's colour; owners can change it under Sections). Tokens live
+  lounge `#8a78e6` (a new section gets its kind's colour; there is no control to change it yet). Tokens live
   in `apps/web/lib/site/tokens.ts` and `app/globals.css`; headings use Anton, text Inter. Every text/background
   pair is at least 4.5:1 (`test/site-tokens.test.ts`). Each section's words come from its kind: **Join match /
   Grab a seat / Squad up**, **Book pitch / Book table / Book a PC**.
@@ -120,7 +122,9 @@ pnpm env:local                                               # .env.local → ba
   250 KB; authors and links in `public/sections/CREDITS.md`. Swap in the brand's own photos by replacing the files.
 - **Live:** the home, section and game pages refresh every 30 s while visible. Motion (cards rising in, the open
   dot, seat bars filling) only runs when the system allows motion.
-- **One sign-in:** `/signin?next=…` for everyone (staff invite emails send `next=/manage`).
+- **One sign-in:** `/signin?next=…` for everyone (staff invite emails send `next=/manage`). It works even while
+  the brand isn't live, so staff can sign in to set it up and publish it; the other public pages then say
+  "Not open yet".
 
 ### Bookings, notifications and the job tick
 
@@ -219,7 +223,9 @@ pnpm db:stop
 `pnpm test:e2e` needs the local stack, `pnpm env:local` and the demo brand (`pnpm brand:setup --name "Demo Arena" --demo`).
 It reuses a dev server on :3000 or starts one. A fresh `e2e-<random>@example.test` signs in once by email link (read
 from Mailpit), rates each section, then in each section books tomorrow's first free slot and asks for a seat in the
-first game (or joins its waitlist). Each run leaves that player's bookings and requests in the local database.
+first game (or joins its waitlist). A second test sets the brand to `onboarding`, checks that `/` says "Not open yet"
+while `/signin` still works, and sets the status back. Each run leaves the journey player's bookings and requests in
+the local database.
 Results and the HTML report go to `<OS temp>/bookingandmatchmaking-e2e`, never into the repo (files written in the
 repo make `next dev` reload in a loop).
 
@@ -231,7 +237,7 @@ Hard numbers for the case study, re-measured as features land.
 |---|---|---|
 | Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
 | Engine tests (incl. property tests) | 51 | `pnpm --filter @bm/engine test` |
-| Web unit tests | 228 | `pnpm --filter web test` |
-| Web integration tests (real Supabase, Realtime, Mailpit) | 110 | `pnpm test:integration` |
+| Web unit tests | 230 | `pnpm --filter web test` |
+| Web integration tests (real Supabase, Realtime, Mailpit) | 111 | `pnpm test:integration` |
 | Database assertions | 365 pgTAP checks + 4 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
-| End-to-end journey (Playwright, Chromium) | 1 journey, 3 sections | `pnpm test:e2e` |
+| End-to-end tests (Playwright, Chromium) | 2 (the journey through 3 sections; sign-in while not live) | `pnpm test:e2e` |
