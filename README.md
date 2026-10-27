@@ -1,11 +1,10 @@
 # Booking & Matchmaking
 
-A multi-tenant booking and matchmaking platform for **board-game cafés, futsal/turf/court venues and
-gaming lounges in Bangladesh**, built by Console Log Studio. Venues sign themselves up, get their own
-subdomain in their own colours, set up branches, spaces, activities and an open-play schedule, and
-players create a profile per venue. A matching engine forms fair groups (or two balanced teams) and
-keeps a fair waitlist. Players book whole spaces or join open play, where the engine forms the groups
-and teams at the venue's cut-off and offers cancelled seats to the waitlist. bKash payments land in Stage C.
+Booking and matchmaking for **one brand in Bangladesh that runs a turf, a board-game café and a gaming
+lounge in one place**, built by Console Log Studio. One website, one sign-in: players book a pitch, a table
+or a PC, and join open games where a matching engine forms fair groups (or two balanced teams) at the
+section's cut-off and offers cancelled seats to a fair waitlist. Staff run their sections from `/manage`.
+bKash payments land in Stage C.
 
 "Booking & Matchmaking" is a working name (see `m.platform.name` in `apps/web/messages/en.ts`).
 
@@ -13,11 +12,10 @@ and teams at the venue's cut-off and offers cancelled seats to the waitlist. bKa
 > · One-brand redesign: [`docs/superpowers/specs/2026-10-25-one-brand-sections-design.md`](docs/superpowers/specs/2026-10-25-one-brand-sections-design.md)
 > · Project notes for maintainers: [`memory.md`](memory.md)
 
-**Now one brand.** The site is being reshaped for one client: one brand running a turf, a board-game café
-and a gaming lounge in one place. The brand is an organization row; its **sections** (turf, café, lounge)
-each have their own hours, booking rules, spaces, games, ratings and staff. R1 (the foundation) is done;
-the public site (R2) and the manage area (R3) are redesigned next, so some pages below still show the
-multi-venue platform.
+**One brand.** The brand is an organization row; its **sections** (turf, café, lounge) each have their own
+hours, booking rules, spaces, games, ratings and staff. R1 (the foundation) and R2 (the public site, spec
+[`2026-10-28-r2-public-site-design.md`](docs/superpowers/specs/2026-10-28-r2-public-site-design.md)) are
+built; the manage area's redesign (R3) is next.
 
 ## Repo layout
 
@@ -30,14 +28,21 @@ multi-venue platform.
 
 `apps/web` routes:
 
-| Host | Path | Who |
-|---|---|---|
-| `localhost:3000` | `/`, `/signin`, `/onboarding` | Landing page, sign-in, the venue sign-up wizard |
-| | `/manage/[slug]/…` | Owners and staff: sections, spaces, activities, schedule, staff, settings |
-| | `/admin` | Platform admins: every venue, suspend / restore |
-| `<slug>.localhost:3000` | `/`, `/signin`, `/me` | A venue's public page, sign-in, and the player's profile there |
+Everything is on one host (`localhost:3000` locally):
 
-`proxy.ts` refreshes the session and rewrites venue hosts to the internal `/t/[slug]` routes.
+| Path | What |
+|---|---|
+| `/` | The brand's home: open now / opens at, coming-up games, a card per section |
+| `/<section>` (`/turf`, `/cafe`, `/lounge`) | The section: its photo, open games, what you can play, the week's hours |
+| `/<section>/book` | Book a space: space tags, a 7-day strip, the slot grid and a sticky **Book** bar |
+| `/sessions/<id>` | A game: seats left, request a seat / join the waitlist, your team once matched |
+| `/offers/<token>`, `/me/offers/<id>` | A seat offer (from the email link, or the bell) |
+| `/signin` | One sign-in for players and staff (email link; Google when enabled) |
+| `/me`, `/me/bookings`, `/me/notifications` | Profile with a level per section, bookings and seats, notifications |
+| `/manage` → `/manage/<brand slug>/…` | Owners and staff: sections, spaces, games, schedule, bookings, staff, settings |
+
+`proxy.ts` refreshes the session. A link to an old venue subdomain (`<slug>.<root>/…`, from R1 emails)
+gets a 308 to the same page on the root host (through `/api/moved`); `/t/…` is not found.
 
 ## Prerequisites
 
@@ -56,21 +61,15 @@ pnpm brand:setup --name "Demo Arena" --demo   # the local demo brand (BRAND_SLUG
 pnpm --filter web dev    # http://localhost:3000 (keep it on :3000: the job tick calls it)
 ```
 
-The demo brand is live at http://demo-brand.localhost:3000 with three sections, 12 rated demo players
-(`demo-demo-brand-<n>@example.test`) and one open game per section. To manage it, give it an owner:
+The demo brand, **Demo Arena**, is live at http://localhost:3000 with three sections, 12 rated demo players
+(`demo-demo-brand-<n>@example.test`) and an open game per section (re-run `--demo` to add a game to any
+section whose games have passed). Its owner is `owner@demo-arena.test`; to manage it yourself:
 `pnpm brand:setup --owner you@example.com` (an existing account becomes the owner at once; a new address
 gets an owner invite, accepted at its first sign-in).
 
-Then:
-
-1. Open http://localhost:3000, choose **Create your venue** and sign in with any email address.
-   Sign-in links land in Mailpit at http://127.0.0.1:54324 (nothing leaves your machine).
-2. Finish the wizard and publish. The venue is live at `http://<slug>.localhost:3000`
-   (browsers resolve `*.localhost` to your machine, so no hosts-file edits are needed).
-3. Sign in on the venue's subdomain as a different email to create a player profile.
-4. To use `/admin`, make yourself a platform admin: `pnpm admin:grant you@example.com`
-   (the user must have signed in once). With `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SECRET_KEY`
-   set in the shell, the same command targets a hosted project instead.
+Sign in at http://localhost:3000/signin with any email address; the link lands in Mailpit at
+http://127.0.0.1:54324 (nothing leaves your machine). Set your level per section at `/me`, then book a space
+or ask for a seat in a game. Staff go to http://localhost:3000/manage.
 
 ### Using the hosted Supabase project
 
@@ -90,7 +89,7 @@ pnpm env:local                                               # .env.local → ba
   database; app emails still land in the local Mailpit. The hosted database's own job is idle until the app
   is deployed (it can't reach `localhost`).
 - In the dashboard (Authentication → URL Configuration) set the Site URL to `http://localhost:3000` and add
-  `http://localhost:3000/**` and `http://*.localhost:3000/**` to the redirect URLs. Keep "Confirm email" on.
+  `http://localhost:3000/**` to the redirect URLs. Keep "Confirm email" on.
 - Supabase's built-in email only reaches your project team's addresses, a few per hour. Players need a custom
   SMTP provider (e.g. Resend) or Google sign-in. Staff invites also need `supabase/templates/invite.html`
   copied into the "Invite user" template.
@@ -110,9 +109,22 @@ pnpm env:local                                               # .env.local → ba
 - **Ratings per section:** players rate their level for each section on `/me`; a section they haven't rated
   asks them to rate it before they can join its open play.
 
+### The public site (R2)
+
+- **Look ("A1 · Matte"):** dark and flat, with each section in its own colour: turf `#43a66b`, café `#2e9e93`,
+  lounge `#8a78e6` (a new section gets its kind's colour; owners can change it under Sections). Tokens live
+  in `apps/web/lib/site/tokens.ts` and `app/globals.css`; headings use Anton, text Inter. Every text/background
+  pair is at least 4.5:1 (`test/site-tokens.test.ts`). Each section's words come from its kind: **Join match /
+  Grab a seat / Squad up**, **Book pitch / Book table / Book a PC**.
+- **Photos:** `apps/web/public/sections/{turf,cafe,lounge}.jpg`, free-licence (Pexels / Unsplash), each under
+  250 KB; authors and links in `public/sections/CREDITS.md`. Swap in the brand's own photos by replacing the files.
+- **Live:** the home, section and game pages refresh every 30 s while visible. Motion (cards rising in, the open
+  dot, seat bars filling) only runs when the system allows motion.
+- **One sign-in:** `/signin?next=…` for everyone (staff invite emails send `next=/manage`).
+
 ### Bookings, notifications and the job tick
 
-- Players book a space at `http://<slug>.localhost:3000/book` (after creating a profile at `/me`), see their
+- Players book a space at `/<section>/book` (after creating a profile at `/me`), see their
   bookings at `/me/bookings`, and get a live bell plus an email for each booking change.
 - Staff see every booking, add walk-ins (name + phone) and mark attendance at `/manage/<slug>/bookings`.
 - Every 10 seconds the database (`pg_cron` → `pg_net`) calls `POST /api/jobs/tick` with a shared secret,
@@ -124,7 +136,8 @@ pnpm env:local                                               # .env.local → ba
 
 ### Open play: requests, matching and seat offers
 
-- Players open a session from the venue page (`/sessions/<id>`), press **Request a seat**, and later see
+- Players open a game from the home page or its section's page (`/sessions/<id>`), press **Request a seat**
+  (**Join the waitlist** when it is full), and later see
   their table or team with the other players' display names. Seats are cancelled there or at `/me/bookings`.
 - At the venue's match cut-off (default 6 hours before the start) the tick runs the engine over the requests:
   groups, and two balanced teams for team games. Everyone hears where they stand. With too few players the
@@ -162,6 +175,18 @@ staff member the new sections before the manage redesign (R3) adds a screen for 
 owner and back to staff on the Staff page (staff made from an owner get every section), or re-invite them.
 `--name` only names a brand that doesn't exist yet; it doesn't rename one.
 
+### Rolling R2 out to the hosted project (after merge)
+
+One migration changes the database: `20261028010000_matte_section_colours.sql` gives each kind its matte
+colour and repaints sections that still have their kind's old default colour (a colour an owner picked stays).
+
+```bash
+pnpm exec supabase db push        # the matte section colours
+```
+
+Nothing else changes on the hosted side. When the site is deployed, keep the old wildcard subdomain pointing at
+it for a while so links in R1 emails (`<slug>.<root>/…`) still redirect to the same page.
+
 ### Google sign-in (optional)
 
 Email links work out of the box. For Google:
@@ -177,15 +202,26 @@ Email links work out of the box. For Google:
 pnpm typecheck           # every package (web runs `next typegen` first)
 pnpm test                # engine, sim and web unit/property tests
 pnpm test:integration    # web against the local Supabase (real auth users, RLS)
+pnpm test:e2e            # Playwright: one player signs in, books and joins a game in each section (see below)
+pnpm smoke "/|Coming up" # quick page check on the running dev server: `path|text;text`, `--as <email>` signs in (local only)
 pnpm db:test             # pgTAP: schema, RLS, grants, RPCs, cross-venue references, history, outbox, jobs, bookings, open play, sections, ratings, section staff
 pnpm test:race           # two-connection races: accepting an offer, booking the same slot, beating the limit, accept vs cancel session
 pnpm db:lint             # Supabase security/performance advisors, fails on warnings
 pnpm db:reset            # re-apply all migrations to a clean local DB
 pnpm env:local           # regenerate apps/web/.env.local + the Vault job secrets (then restart the dev server)
 pnpm brand:setup         # create or top up the brand (BRAND_SLUG): --name, --owner <email>, --demo (local only)
-pnpm admin:grant <email> # make a user a platform admin
+pnpm admin:grant <email> # add a user to platform_admins (a database role; no page uses it since R2)
 pnpm db:stop
 ```
+
+### End-to-end journey
+
+`pnpm test:e2e` needs the local stack, `pnpm env:local` and the demo brand (`pnpm brand:setup --name "Demo Arena" --demo`).
+It reuses a dev server on :3000 or starts one. A fresh `e2e-<random>@example.test` signs in once by email link (read
+from Mailpit), rates each section, then in each section books tomorrow's first free slot and asks for a seat in the
+first game (or joins its waitlist). Each run leaves that player's bookings and requests in the local database.
+Results and the HTML report go to `<OS temp>/bookingandmatchmaking-e2e`, never into the repo (files written in the
+repo make `next dev` reload in a loop).
 
 ## Numbers
 
@@ -195,6 +231,7 @@ Hard numbers for the case study, re-measured as features land.
 |---|---|---|
 | Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
 | Engine tests (incl. property tests) | 51 | `pnpm --filter @bm/engine test` |
-| Web unit tests | 210 | `pnpm --filter web test` |
+| Web unit tests | 228 | `pnpm --filter web test` |
 | Web integration tests (real Supabase, Realtime, Mailpit) | 110 | `pnpm test:integration` |
-| Database assertions | 359 pgTAP checks + 4 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
+| Database assertions | 365 pgTAP checks + 4 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
+| End-to-end journey (Playwright, Chromium) | 1 journey, 3 sections | `pnpm test:e2e` |
