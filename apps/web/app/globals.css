@@ -106,3 +106,21 @@
     @apply font-sans;
   }
 }
+/* Motion ("live" feel): cards rise in one after another, live dots blink, seat bars fill, buttons press.
+   All of it is off for people who ask for reduced motion. */
+@keyframes site-rise {
+  from { opacity: 0; transform: translateY(12px); }
+}
+@keyframes site-blink {
+  50% { opacity: 0.3; }
+}
+@keyframes site-fill {
+  from { width: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rise { animation: site-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 60ms); }
+  .blink { animation: site-blink 2s ease-in-out infinite; }
+  .fill { animation: site-fill 1s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .press { transition: transform 80ms ease, filter 150ms ease; }
+  .press:active { transform: scale(0.96); }
+}
