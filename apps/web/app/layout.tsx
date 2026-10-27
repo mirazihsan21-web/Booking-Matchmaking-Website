@@ -1,17 +1,17 @@
-import type { CSSProperties } from "react";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { PLATFORM_PALETTE, brandingToCssVars } from "@/lib/theme";
+import { Anton, Inter } from "next/font/google";
 import { m } from "@/messages";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-sans",
+// Headlines: Anton (tall, uppercase). Everything else: Inter. Both are served with the site.
+const display = Anton({
+  weight: "400",
+  variable: "--font-display",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const sans = Inter({
+  variable: "--font-sans",
   subsets: ["latin"],
 });
 
@@ -22,11 +22,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-      style={brandingToCssVars({}, PLATFORM_PALETTE) as CSSProperties}
-    >
+    <html lang="en" className={`${display.variable} ${sans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">{children}</body>
     </html>
   );
