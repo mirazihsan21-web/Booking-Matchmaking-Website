@@ -116,7 +116,7 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 
 ## 5. Decisions & rulings log
 
-- **2026-10-28 · R2 public site build rulings** (spec `docs/superpowers/specs/2026-10-28-r2-public-site-design.md`, plan `docs/superpowers/plans/2026-10-28-r2-public-site.md`, 11 tasks; every ruling is in the plan's ledger):
+- **2026-10-28 · R2 public site build rulings** (spec `docs/superpowers/specs/2026-10-28-r2-public-site-design.md`, plan `docs/superpowers/plans/2026-10-28-r2-public-site.md`, 11 tasks; the build's full list of 48 rulings was reported to the user at the end; the ones that shape the code follow):
   - **The user's choices:** public site first; look **A1 · Matte** (dark, flat, no glow; "A. but the colours are too shiny. make it simple"); free-licence photos (Pexels / Unsplash, credited in `public/sections/CREDITS.md`) since the brand has none yet.
   - **One host.** Every page is on the root host; `app/t/[slug]`, onboarding, `/admin` and their code are gone. Old venue subdomain links get a 308 to the same path on the root host through `/api/moved` (Next turns a proxy redirect to another host into a relative one, so the proxy rewrites to a route handler that redirects). `requestOrigin` trusts only the root host or `www.<root>`.
   - **Section colours** come from the kind (`private.kind_accent`: turf `#43a66b`, café `#2e9e93`, lounge `#8a78e6`); the migration repaints only sections still on their kind's old default. A section's colour reaches components as `--section` (`sectionStyle`), with `bg-section`/`text-section`/`text-on-section`.
