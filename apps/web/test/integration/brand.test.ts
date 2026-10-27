@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { matchSession } from '@/lib/open-play/open-play';
+import { cancelOpenPlay } from '@/lib/schedule/schedule';
 import { loadBrand } from '@/lib/tenancy/brand';
 import { boardgame } from '@/presets/boardgame';
 import { lounge } from '@/presets/lounge';
@@ -91,6 +92,18 @@ describe('setupBrand', () => {
     expect(await matchSession(db, { organizationId: orgId, sessionId: bySection.turf!.id })).toBe('matched');
 
     expect((await setupBrand(db, { slug, presets, demo: true })).demo).toEqual({ players: 0, sessions: 0 });
+
+    // Once a section has no game coming up (here: the café's was cancelled), the next demo run gives it a
+    // new one; the others keep theirs.
+    expect(await cancelOpenPlay(db, bySection.cafe!.id)).toBe('cancelled');
+    expect((await setupBrand(db, { slug, presets, demo: true })).demo).toEqual({ players: 0, sessions: 1 });
+    const { count: upcoming } = await db
+      .from('open_play_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .in('status', ['open', 'matched'])
+      .gt('starts_at', new Date().toISOString());
+    expect(upcoming).toBe(3);
   });
 });
 

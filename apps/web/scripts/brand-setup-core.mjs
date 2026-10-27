@@ -148,7 +148,7 @@ export async function setupBrand(db, { slug, name, presets, ownerEmail, demo = f
   return { brand, sectionsAdded, owner, demo: demo ? await addDemo(db, org.id, slug, presetOf) : null };
 }
 
-/** 12 players rated in every section, and one open game in each section that has none yet. */
+/** 12 players rated in every section, and one open game in each section that has none coming up. */
 async function addDemo(db, organizationId, slug, presetOf) {
   const sections = must(await db.from('sections').select('id, kind').eq('organization_id', organizationId).order('position'));
   const users = await usersByEmail(db);
@@ -176,7 +176,13 @@ async function addDemo(db, organizationId, slug, presetOf) {
   let sessions = 0;
   for (const section of sections) {
     const plan = DEMO_GAMES[section.kind];
-    const { count, error } = await db.from('open_play_sessions').select('id', { count: 'exact', head: true }).eq('section_id', section.id);
+    // A section gets a demo game when it has none coming up (an old demo game that is over doesn't count).
+    const { count, error } = await db
+      .from('open_play_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('section_id', section.id)
+      .in('status', ['open', 'matched'])
+      .gt('starts_at', new Date().toISOString());
     if (error) throw error;
     if (!plan || count) continue;
     const resources = must(await db.from('resources').select('id').eq('section_id', section.id).in('name', plan.resources));
@@ -189,17 +195,17 @@ async function addDemo(db, organizationId, slug, presetOf) {
       activityId = activity.id;
       durationMin = activity.duration_min;
     }
-    const [sessionId] = must(
-      await db.rpc('schedule_open_play', {
-        p_organization_id: organizationId,
-        p_section_id: section.id,
-        p_activity_id: activityId,
-        p_resource_ids: resources.map((r) => r.id),
-        p_starts_at: [dhakaAt(plan.daysAhead, plan.time).toISOString()],
-        p_duration_min: durationMin,
-        p_seat_price_poisha: presetOf.get(section.kind)?.seatPricePoisha ?? 0,
-      }),
-    );
+    const scheduled = await db.rpc('schedule_open_play', {
+      p_organization_id: organizationId,
+      p_section_id: section.id,
+      p_activity_id: activityId,
+      p_resource_ids: resources.map((r) => r.id),
+      p_starts_at: [dhakaAt(plan.daysAhead, plan.time).toISOString()],
+      p_duration_min: durationMin,
+      p_seat_price_poisha: presetOf.get(section.kind)?.seatPricePoisha ?? 0,
+    });
+    if (scheduled.error?.code === '23P01') continue; // that time is already taken there (a real booking): no demo game
+    const [sessionId] = must(scheduled);
     for (const profileId of profileIds.slice(0, plan.requests)) {
       const outcome = must(await db.rpc('request_seat', { p_session_id: sessionId, p_profile_id: profileId }));
       if (outcome !== 'requested') throw new Error(`A demo request answered ${outcome}`);

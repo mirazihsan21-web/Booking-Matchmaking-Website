@@ -1,6 +1,16 @@
-import { Unavailable } from "@/components/unavailable";
+import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
+import { m } from "@/messages";
 
-// Also catches notFound() from the tenant layout (a layout's notFound goes to its parent boundary).
+/** Unknown addresses and unknown sections. */
 export default function NotFound() {
-  return <Unavailable />;
+  return (
+    <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-24 text-center">
+      <h1 className="font-display text-5xl uppercase tracking-wide">{m.site.notFound}</h1>
+      <p className="text-muted-foreground">{m.site.notFoundBody}</p>
+      <Link href="/" className={buttonVariants({ variant: "outline", size: "lg" })}>
+        {m.site.backHome}
+      </Link>
+    </main>
+  );
 }
