@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Anton, Inter } from "next/font/google";
+import { createServiceClient } from "@/lib/service-client";
+import { loadBrand } from "@/lib/tenancy/brand";
 import { m } from "@/messages";
 import "./globals.css";
 
@@ -15,10 +17,14 @@ const sans = Inter({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: m.platform.name,
-  description: m.platform.tagline,
-};
+/** The brand's name as the site title (cached: it's the brand's data, not the visitor's). */
+export async function generateMetadata(): Promise<Metadata> {
+  "use cache";
+  const brand = await loadBrand(createServiceClient(), process.env.BRAND_SLUG ?? "");
+  return brand
+    ? { title: brand.name, description: brand.sections.map((s) => s.name).join(" · ") }
+    : { title: m.platform.name, description: m.platform.tagline };
+}
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
