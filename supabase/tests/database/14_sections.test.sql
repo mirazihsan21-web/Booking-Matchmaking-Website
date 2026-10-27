@@ -25,7 +25,7 @@ insert into s values ('turf2', public.add_section('00000000-0000-4000-8000-00000
 -- ── add_section ─────────────────────────────────────────────────────────────
 select results_eq(
   $$ select slug, accent, position::int from public.sections where organization_id = '00000000-0000-4000-8000-0000000014a0' order by position $$,
-  $$ values ('turf'::text, '#15803D'::text, 1), ('cafe', '#0F766E', 2), ('turf-2', '#15803D', 3) $$,
+  $$ values ('turf'::text, '#43a66b'::text, 1), ('cafe', '#2e9e93', 2), ('turf-2', '#43a66b', 3) $$,
   'add_section gives each section the next free slug, its kind''s accent and the next position'
 );
 select is((select kind::text from public.sections where id = pg_temp.section('cafe')), 'boardgame_cafe', 'and records its kind');
