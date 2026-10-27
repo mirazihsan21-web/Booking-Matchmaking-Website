@@ -78,6 +78,7 @@ export interface StaffSessionView {
 export interface MySeat {
   bookingId: string;
   sessionId: string;
+  sectionId: string;
   activityName: string;
   resourceName: string;
   startsAt: string;
@@ -630,7 +631,7 @@ export async function listMySeats(
   if (!UUID.test(input.organizationId) || !UUID.test(input.profileId)) return { upcoming: [], past: [] };
   const { data, error } = await db
     .from('bookings')
-    .select('id, session_id, seat_no, team, price_poisha, status, groups(activities(name), resources(name)), open_play_sessions(starts_at, ends_at, status, sections(cancel_cutoff_minutes))')
+    .select('id, session_id, seat_no, team, price_poisha, status, groups(activities(name), resources(name)), open_play_sessions(starts_at, ends_at, status, section_id, sections(cancel_cutoff_minutes))')
     .eq('organization_id', input.organizationId)
     .eq('profile_id', input.profileId);
   if (error) throw error;
@@ -642,13 +643,14 @@ export async function listMySeats(
     price_poisha: number;
     status: string;
     groups: { activities: { name: string }; resources: { name: string } };
-    open_play_sessions: { starts_at: string; ends_at: string; status: string; sections: { cancel_cutoff_minutes: number } };
+    open_play_sessions: { starts_at: string; ends_at: string; status: string; section_id: string; sections: { cancel_cutoff_minutes: number } };
   }>).map((b): MySeat => {
     const start = new Date(b.open_play_sessions.starts_at).getTime();
     const cutoff = b.open_play_sessions.sections.cancel_cutoff_minutes;
     return {
       bookingId: b.id,
       sessionId: b.session_id,
+      sectionId: b.open_play_sessions.section_id,
       activityName: b.groups.activities.name,
       resourceName: b.groups.resources.name,
       startsAt: b.open_play_sessions.starts_at,

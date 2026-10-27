@@ -47,6 +47,7 @@ export interface SpaceDay {
 export interface MyBooking {
   id: string;
   resourceName: string;
+  sectionId: string;
   sectionName: string;
   startsAt: string;
   endsAt: string;
@@ -295,17 +296,18 @@ export async function listMyBookings(
   const now = input.now ?? new Date();
   const { data, error } = await db
     .from('resource_bookings')
-    .select('id, period, price_poisha, status, resources(name, sections(name, cancel_cutoff_minutes))')
+    .select('id, period, price_poisha, status, resources(name, section_id, sections(name, cancel_cutoff_minutes))')
     .eq('profile_id', input.profileId)
     .eq('organization_id', input.organizationId);
   if (error) throw error;
   const all = data.map((b) => {
     const { start, end } = parseTstzRange(b.period);
-    const resource = b.resources as unknown as { name: string; sections: { name: string; cancel_cutoff_minutes: number } | null } | null;
+    const resource = b.resources as unknown as { name: string; section_id: string; sections: { name: string; cancel_cutoff_minutes: number } | null } | null;
     const cutoff = (resource?.sections?.cancel_cutoff_minutes ?? 0) * 60_000;
     return {
       id: b.id,
       resourceName: resource?.name ?? '',
+      sectionId: resource?.section_id ?? '',
       sectionName: resource?.sections?.name ?? '',
       startsAt: start.toISOString(),
       endsAt: end.toISOString(),
