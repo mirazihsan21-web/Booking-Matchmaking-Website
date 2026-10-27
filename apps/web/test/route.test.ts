@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { movedTo, routeRequest } from '../lib/site/route';
+import { movedBookPath, movedTo, routeRequest } from '../lib/site/route';
 
 const root = 'localhost:3000';
 const at = (path: string) => new URL(`http://localhost:3000${path}`);
@@ -46,5 +46,19 @@ describe('movedTo (where /api/moved sends an old venue link)', () => {
     expect(movedTo('//evil.example', root)).toBe('http://localhost:3000/');
     expect(movedTo('https://evil.example', root)).toBe('http://localhost:3000/');
     expect(movedTo(null, root)).toBe('http://localhost:3000/');
+  });
+});
+
+describe('movedBookPath (an old venue booking link, Review Focus 1)', () => {
+  const S = '7b0f5d36-1111-4222-8333-944455556666';
+  const R = '0c1d2e3f-aaaa-4bbb-8ccc-ddddeeeeffff';
+
+  it("goes to its section's booking page, keeping the space and the day", () => {
+    expect(movedBookPath(`?section=${S}&resource=${R}&date=2026-10-30`, 'cafe')).toBe(`/cafe/book?resource=${R}&date=2026-10-30`);
+    expect(movedBookPath('', 'turf')).toBe('/turf/book');
+  });
+
+  it('goes home when the section is unknown', () => {
+    expect(movedBookPath('?date=2026-10-30', null)).toBe('/');
   });
 });

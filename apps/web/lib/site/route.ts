@@ -25,3 +25,19 @@ export function movedTo(path: string | null, rootDomain: string): string {
   const protocol = root.startsWith('localhost') ? 'http' : 'https';
   return `${protocol}://${root}${safeNext(path)}`;
 }
+
+/**
+ * Where an old venue booking link (`/book?section=…&resource=…&date=…`) goes on the site: its section's
+ * booking page with the same space and day, or home when the section is unknown (`/book` is no page now).
+ */
+export function movedBookPath(search: string, sectionSlug: string | null): string {
+  if (!sectionSlug) return '/';
+  const old = new URLSearchParams(search);
+  const kept = new URLSearchParams();
+  for (const key of ['resource', 'date']) {
+    const value = old.get(key);
+    if (value) kept.set(key, value);
+  }
+  const query = kept.toString();
+  return `/${sectionSlug}/book${query ? `?${query}` : ''}`;
+}
