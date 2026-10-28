@@ -62,6 +62,41 @@ export function findSection(sections: Section[], slug: string): Section | null {
   return sections.find((s) => s.slug === slug) ?? null;
 }
 
+/** What the landing page says about a section: its active spaces, its lowest hourly price (null = priced at the venue), its top games. */
+export interface SectionFacts {
+  spaces: number;
+  fromPoisha: number | null;
+  games: string[];
+}
+
+/** Facts for every section of a brand, by section id. Games are the four most popular active ones. */
+export async function loadSectionFacts(db: SupabaseClient, organizationId: string): Promise<Map<string, SectionFacts>> {
+  const [spaces, games] = await Promise.all([
+    db.from('resources').select('section_id, price_per_hour_poisha').eq('organization_id', organizationId).eq('active', true),
+    db
+      .from('activities')
+      .select('section_id, name')
+      .eq('organization_id', organizationId)
+      .eq('active', true)
+      .order('popularity', { ascending: false })
+      .order('name'),
+  ]);
+  if (spaces.error) throw spaces.error;
+  if (games.error) throw games.error;
+  const facts = new Map<string, SectionFacts>();
+  const of = (sectionId: string) => facts.get(sectionId) ?? facts.set(sectionId, { spaces: 0, fromPoisha: null, games: [] }).get(sectionId)!;
+  for (const r of spaces.data) {
+    const f = of(r.section_id);
+    f.spaces += 1;
+    if (r.price_per_hour_poisha !== null) f.fromPoisha = f.fromPoisha === null ? r.price_per_hour_poisha : Math.min(f.fromPoisha, r.price_per_hour_poisha);
+  }
+  for (const a of games.data) {
+    const f = of(a.section_id);
+    if (f.games.length < 4) f.games.push(a.name);
+  }
+  return facts;
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**

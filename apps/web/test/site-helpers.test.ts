@@ -3,7 +3,7 @@ import type { OpeningHours } from '../lib/opening-hours';
 import { dayWindow } from '../lib/site/days';
 import { clockLabel, statusNow } from '../lib/site/hours';
 import { kindWords, sectionPhoto } from '../lib/site/kinds';
-import { bookPath, sectionPath } from '../lib/site/paths';
+import { bookPath, mapsLink, sectionPath } from '../lib/site/paths';
 import { seatsLevel } from '../lib/site/seats';
 
 const tz = 'Asia/Dhaka'; // UTC+6, no daylight saving
@@ -97,5 +97,11 @@ describe('paths and kinds', () => {
     expect(sectionPhoto('boardgame_cafe')).toBe('/sections/cafe.jpg');
     expect(sectionPhoto('turf')).toBe('/sections/turf.jpg');
     expect(sectionPhoto('gaming_lounge')).toBe('/sections/lounge.jpg');
+  });
+});
+
+describe('mapsLink', () => {
+  it('searches Google Maps for the address', () => {
+    expect(mapsLink('House 12, Road 5, Dhanmondi, Dhaka')).toBe('https://www.google.com/maps/search/?api=1&query=House%2012%2C%20Road%205%2C%20Dhanmondi%2C%20Dhaka');
   });
 });
