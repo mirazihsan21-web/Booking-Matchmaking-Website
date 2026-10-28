@@ -66,6 +66,17 @@ export const en = {
       remove: 'Remove section',
     },
     offerMinutes: 'How long a seat offer waits (minutes)',
+    staffPage: {
+      title: 'Staff',
+      editSections: 'Edit sections',
+      sectionsSaved: 'Sections saved. They see the change on their next page.',
+      ownersRunAll: 'Owners run every section.',
+      makeOwner: 'Make owner',
+      makeStaff: 'Make staff',
+      removeQuestion: (email: string) => `Remove ${email} from the team?`,
+      keep: 'Keep them',
+      inviteTitle: 'Invite someone',
+    },
     website: {
       title: 'On the website',
       address: (path: string) => `Its address stays ${path}, so links keep working.`,

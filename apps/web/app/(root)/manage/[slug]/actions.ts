@@ -3,13 +3,10 @@
 import { refresh } from "next/cache";
 import { z } from "zod";
 import type { FormState } from "@/components/forms/action-form";
-import { cancelInvite, inviteMember } from "@/lib/orgs/invites";
-import { changeRole, removeMember } from "@/lib/orgs/members";
 import { publishOrganization } from "@/lib/orgs/publish";
 import { createServiceClient } from "@/lib/service-client";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrgRole } from "@/lib/tenancy/dal";
-import { rootUrl } from "@/lib/tenancy/urls";
 import { m } from "@/messages";
 
 const saved: FormState = { ok: true, message: m.manage.saved };
@@ -53,45 +50,3 @@ export async function saveSettingsAction(slug: string, _state: FormState, form: 
   return saved;
 }
 
-// ── Staff ────────────────────────────────────────────────────────────────────
-const inviteSchema = z.object({ email: z.email(m.forms.required), role: z.enum(["owner", "staff"]) });
-
-export async function inviteStaffAction(slug: string, _state: FormState, form: FormData): Promise<FormState> {
-  const { org, user } = await requireOrgRole(slug, "owner");
-  const parsed = inviteSchema.safeParse({ email: String(form.get("email") ?? "").trim(), role: form.get("role") });
-  if (!parsed.success) return { ok: false, errors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
-  const result = await inviteMember(createServiceClient(), {
-    organizationId: org.id,
-    email: parsed.data.email,
-    role: parsed.data.role,
-    sectionIds: form.getAll("sectionIds").map(String),
-    invitedBy: user.id,
-    redirectTo: rootUrl("/auth/callback?next=/manage"),
-  });
-  refresh();
-  if (result.status === "already_member") return { ok: false, message: m.manage.alreadyMember };
-  if (result.status === "no_sections") return { ok: false, errors: { sectionIds: m.manage.pickSections } };
-  return { ok: true, message: m.manage.invited(parsed.data.email.toLowerCase()) };
-}
-
-export async function cancelInviteAction(slug: string, inviteId: string, _state: FormState, _form: FormData): Promise<FormState> {
-  const { org } = await requireOrgRole(slug, "owner");
-  await cancelInvite(createServiceClient(), org.id, inviteId);
-  refresh();
-  return { ok: true, message: m.manage.inviteCancelled };
-}
-
-export async function changeRoleAction(slug: string, userId: string, _state: FormState, form: FormData): Promise<FormState> {
-  const { org } = await requireOrgRole(slug, "owner");
-  const role = form.get("role") === "owner" ? "owner" : "staff";
-  const result = await changeRole(createServiceClient(), org.id, userId, role);
-  refresh();
-  return result.status === "ok" ? saved : { ok: false, message: m.manage.lastOwner };
-}
-
-export async function removeMemberAction(slug: string, userId: string, _state: FormState, _form: FormData): Promise<FormState> {
-  const { org } = await requireOrgRole(slug, "owner");
-  const result = await removeMember(createServiceClient(), org.id, userId);
-  refresh();
-  return result.status === "ok" ? { ok: true, message: m.manage.deleted } : { ok: false, message: m.manage.lastOwner };
-}
