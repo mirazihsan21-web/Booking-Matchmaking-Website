@@ -1,13 +1,13 @@
--- The 10-second job tick: pg_cron → private.trigger_tick() → pg_net POST to the app, using the app URL
+-- The job tick (every minute since the Vercel launch): pg_cron → private.trigger_tick() → pg_net POST to the app, using the app URL
 -- and shared secret kept in Vault. Queued requests are rolled back with the test, so nothing is sent.
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(5);
 
-select is((select schedule from cron.job where jobname = 'tick'), '10 seconds', 'the tick is scheduled every 10 seconds');
+select is((select schedule from cron.job where jobname = 'tick'), '* * * * *', 'the tick runs every minute');
 select is((select command from cron.job where jobname = 'tick'), 'select private.trigger_tick()', 'and calls private.trigger_tick()');
 
--- While the local stack runs, the real 10-second tick can queue a request mid-test and break the count
+-- While the local stack runs, the real tick can queue a request mid-test and break the count
 -- below. Holding the queue's lock until this test rolls back makes the tick wait instead.
 lock table net.http_request_queue in exclusive mode;
 
