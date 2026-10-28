@@ -54,6 +54,22 @@ describe('freeGaps', () => {
       [at(13).toISOString(), at(14).toISOString()],
     ]);
   });
+
+  it('counts the hour already under way as free when nobody has it (the desk can still sell it)', () => {
+    const at = (h: number) => dhaka(`2026-10-28T${String(h).padStart(2, '0')}:00:00`);
+    const now = dhaka('2026-10-28T16:40:00');
+    const gaps = freeGaps(
+      [
+        { start: at(15), end: at(16), state: 'past' as const },
+        { start: at(16), end: at(17), state: 'past' as const },
+        { start: at(17), end: at(18), state: 'free' as const },
+      ],
+      now,
+    );
+    expect(gaps.map((g) => [g.start.toISOString(), g.end.toISOString()])).toEqual([[at(16).toISOString(), at(18).toISOString()]]);
+    const booked = freeGaps([{ start: at(16), end: at(17), state: 'past' as const, bookings: [{}] }], now);
+    expect(booked).toEqual([]);
+  });
 });
 
 describe('oldManagePath (spec edge 7)', () => {
