@@ -54,6 +54,17 @@ export const en = {
       seats: (filled: number, total: number) => `${filled}/${total}`,
       paid: 'Paid',
     },
+    takings: {
+      title: 'Takings',
+      section: 'Section',
+      bookings: 'Bookings',
+      seats: 'Game seats',
+      arrived: 'Arrived',
+      noShows: 'No-shows',
+      cash: 'Cash taken',
+      total: 'Total',
+      lastWeek: 'Last 7 days',
+    },
     book: {
       title: 'Book for a customer',
       space: 'Space',
