@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { cancelQuestion } from '../lib/manage/cancel';
 import { accentReadability } from '../lib/manage/colour';
 import { oldManagePath } from '../lib/manage/paths';
 import { brandBusinessDate, deskWindow, freeGaps, placeOnTimeline } from '../lib/manage/today';
@@ -102,5 +103,20 @@ describe('accentReadability (spec edge 5)', () => {
     const r = accentReadability('#2b313b');
     expect(r.ok).toBe(false);
     expect(r.onCard).toBeLessThan(4.5);
+  });
+});
+
+describe('cancelQuestion', () => {
+  it('asks plainly when no cash was taken', () => {
+    expect(cancelQuestion('booking', { count: 0, poisha: 0 })).toBe('Cancel this booking?');
+    expect(cancelQuestion('seat', { count: 0, poisha: 0 })).toBe('Cancel this seat?');
+    expect(cancelQuestion('game', { count: 0, poisha: 0 })).toBe('Cancel this game?');
+  });
+
+  it('asks the desk to give the cash back first when it was taken', () => {
+    expect(cancelQuestion('booking', { count: 1, poisha: 250000 })).toBe('Paid ৳2,500 in cash. Give it back before cancelling');
+    expect(cancelQuestion('seat', { count: 1, poisha: 30000 })).toBe('Paid ৳300 in cash. Give it back before cancelling');
+    expect(cancelQuestion('game', { count: 1, poisha: 30000 })).toBe('1 seat paid ৳300 in cash. Give it back before cancelling');
+    expect(cancelQuestion('game', { count: 2, poisha: 60000 })).toBe('2 seats paid ৳600 in cash. Give it back before cancelling');
   });
 });

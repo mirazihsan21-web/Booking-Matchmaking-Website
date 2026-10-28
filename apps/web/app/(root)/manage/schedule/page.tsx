@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { ActionButton, ActionForm, Field, FieldError, SelectField } from "@/components/forms/action-form";
+import { ActionForm, Field, FieldError, SelectField } from "@/components/forms/action-form";
+import { ConfirmAction } from "@/components/manage/confirm-action";
 import { sectionStyle } from "@/components/site/section-style";
 import { formatNight } from "@/lib/format";
+import { cancelQuestion } from "@/lib/manage/cancel";
 import { formatBdt } from "@/lib/money";
+import { livePayments } from "@/lib/payments/payments";
 import { loadSections } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { requireManager } from "@/lib/tenancy/manager";
@@ -32,6 +35,15 @@ async function Schedule() {
       .limit(50),
   ]);
   const sections = all.filter((s) => allowed.includes(s.id));
+  // The cash taken for each game's seats, so cancelling one can say what to give back.
+  const { data: seats } = (sessions ?? []).length
+    ? await db.from("bookings").select("id, session_id").in("session_id", (sessions ?? []).map((s) => s.id)).eq("status", "confirmed")
+    : { data: [] as Array<{ id: string; session_id: string }> };
+  const payments = await livePayments(db, { spaceBookingIds: [], seatBookingIds: (seats ?? []).map((b) => b.id) });
+  const paidFor = (sessionId: string) => {
+    const paid = (seats ?? []).filter((b) => b.session_id === sessionId).flatMap((b) => payments.get(b.id) ?? []);
+    return { count: paid.length, poisha: paid.reduce((sum, p) => sum + p.amountPoisha, 0) };
+  };
   const sectionName = new Map(sections.map((s) => [s.id, s.name]));
   const p = m.manage.schedulePage;
 
@@ -61,7 +73,13 @@ async function Schedule() {
                       <span className="rounded-full bg-raised px-2 py-0.5 text-xs">{formatBdt(s.seat_price_poisha)}</span>
                       {s.status !== "open" && <span className="rounded-full bg-section px-2 py-0.5 text-xs font-semibold text-on-section">{m.staffSession.status[s.status] ?? s.status}</span>}
                       <span className="ml-auto">
-                        <ActionButton action={cancelSessionAction.bind(null, s.id)} label={m.schedule.cancel} variant="ghost" />
+                        <ConfirmAction
+                          action={cancelSessionAction.bind(null, s.id)}
+                          label={m.schedule.cancel}
+                          question={cancelQuestion("game", paidFor(s.id))}
+                          confirmLabel={m.manage.panel.yesCancel}
+                          cancelLabel={m.manage.panel.keep}
+                        />
                       </span>
                     </li>
                   );
