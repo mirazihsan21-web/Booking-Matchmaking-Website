@@ -7,8 +7,7 @@ import { bdtToPoisha } from "@/lib/money";
 import { cancelOpenPlay, scheduleOpenPlay } from "@/lib/schedule/schedule";
 import { loadSection, sectionOfSession } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
-import { createClient } from "@/lib/supabase/server";
-import { requireOrgRole, requireSectionStaff } from "@/lib/tenancy/dal";
+import { requireManager } from "@/lib/tenancy/manager";
 import { m } from "@/messages";
 
 const schema = z.object({
@@ -23,8 +22,9 @@ const schema = z.object({
 });
 
 /** Staff run the schedule of their sections. Writes go through the schedule RPC (service role) after the section check. */
-export async function scheduleAction(slug: string, _state: FormState, form: FormData): Promise<FormState> {
-  const { org } = await requireOrgRole(slug, "staff");
+export async function scheduleAction(_state: FormState, form: FormData): Promise<FormState> {
+  const manager = await requireManager("staff");
+  const { org } = manager;
   const parsed = schema.safeParse({
     sectionId: form.get("sectionId"),
     activityId: form.get("activityId") ?? "",
@@ -40,10 +40,8 @@ export async function scheduleAction(slug: string, _state: FormState, form: Form
   }
   const v = parsed.data;
 
-  const supabase = await createClient();
-  const section = await loadSection(supabase, { organizationId: org.id, sectionId: v.sectionId });
-  if (!section) return { ok: false, errors: { sectionId: m.forms.choose } };
-  await requireSectionStaff(slug, section.id);
+  const section = await loadSection(createServiceClient(), { organizationId: org.id, sectionId: v.sectionId });
+  if (!section || !manager.sectionIds.includes(section.id)) return { ok: false, errors: { sectionId: m.forms.choose } };
 
   const result = await scheduleOpenPlay(createServiceClient(), {
     organizationId: org.id,
@@ -70,12 +68,12 @@ export async function scheduleAction(slug: string, _state: FormState, form: Form
   }
 }
 
-export async function cancelSessionAction(slug: string, sessionId: string, _state: FormState, _form: FormData): Promise<FormState> {
-  const { org } = await requireOrgRole(slug, "staff");
+/** Cancel a game in a section this person runs (its seats are released and players told). */
+export async function cancelSessionAction(sessionId: string, _state: FormState, _form: FormData): Promise<FormState> {
+  const manager = await requireManager("staff");
   const db = createServiceClient();
   const section = await sectionOfSession(db, sessionId);
-  if (!section || section.organizationId !== org.id) return { ok: false, message: m.schedule.invalid };
-  await requireSectionStaff(slug, section.id);
+  if (!section || section.organizationId !== manager.org.id || !manager.sectionIds.includes(section.id)) return { ok: false, message: m.schedule.invalid };
   const result = await cancelOpenPlay(db, sessionId);
   refresh();
   return result === "cancelled" ? { ok: true, message: m.schedule.cancelled } : { ok: false, message: m.schedule.notOpen };
