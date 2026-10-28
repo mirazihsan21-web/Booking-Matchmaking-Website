@@ -3,7 +3,7 @@
 -- Owner O (…19d1), turf-only staff T (…19d2), player P (…19d3).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(22);
+select plan(23);
 
 create function pg_temp.u(n int) returns uuid language sql as $$ select ('00000000-0000-4000-8000-0000000019d' || n)::uuid $$;
 create function pg_temp.act_as(n int) returns void language sql as $$
@@ -140,6 +140,24 @@ select is(
   (select count(*)::int from public.payments where voided_at is not null
      and (resource_booking_id = '00000000-0000-4000-8000-0000000019b4' or seat_booking_id = '00000000-0000-4000-8000-000000001981')),
   2, 'cancelling a paid booking or seat voids its payment'
+);
+
+-- Cancelling a whole game voids its seats' cash too (final review, Important 1).
+insert into public.open_play_sessions (id, organization_id, section_id, activity_id, starts_at, ends_at, seat_price_poisha, status) values
+  ('00000000-0000-4000-8000-0000000019f2', '00000000-0000-4000-8000-0000000019a0', (select id from s where label = 'turf'), '00000000-0000-4000-8000-0000000019f0',
+   now() + interval '5 days', now() + interval '121 hours', 30000, 'matched');
+insert into public.groups (id, organization_id, session_id, resource_id, activity_id, capacity) values
+  ('00000000-0000-4000-8000-000000001992', '00000000-0000-4000-8000-0000000019a0', '00000000-0000-4000-8000-0000000019f2', '00000000-0000-4000-8000-0000000019c1', '00000000-0000-4000-8000-0000000019f0', 10);
+insert into public.bookings (id, organization_id, session_id, group_id, profile_id, seat_no, price_poisha) values
+  ('00000000-0000-4000-8000-000000001982', '00000000-0000-4000-8000-0000000019a0', '00000000-0000-4000-8000-0000000019f2', '00000000-0000-4000-8000-000000001992', '00000000-0000-4000-8000-0000000019e3', 1, 30000);
+set local role authenticated;
+select pg_temp.act_as(1);
+insert into public.payments (seat_booking_id, amount_poisha) values ('00000000-0000-4000-8000-000000001982', 30000);
+reset role;
+select public.cancel_open_play_session('00000000-0000-4000-8000-0000000019f2');
+select is(
+  (select count(*)::int from public.payments where seat_booking_id = '00000000-0000-4000-8000-000000001982' and voided_at is null),
+  0, 'cancelling a whole game voids its seats'' cash'
 );
 
 -- Website fields and the photo limit.
