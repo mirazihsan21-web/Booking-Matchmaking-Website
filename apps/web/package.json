@@ -2,6 +2,9 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -13,6 +16,7 @@
     "test:e2e": "playwright test",
     "env:local": "node scripts/write-env-local.mjs",
     "env:hosted": "node scripts/write-env-hosted.mjs",
+    "env:vercel": "node scripts/write-env-vercel.mjs",
     "brand:setup": "node scripts/brand-setup.mjs"
   },
   "dependencies": {

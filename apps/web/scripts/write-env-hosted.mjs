@@ -3,37 +3,16 @@
 // Keys come from the Supabase CLI and are never printed. Run: pnpm env:hosted · back: pnpm env:local
 //
 // Tests keep using the local stack (they create and delete users and venues). JOB_SECRET and the email
-// settings are kept from the current .env.local: while the local stack runs, its 10-second cron keeps
+// settings are kept from the current .env.local: while the local stack runs, its every-minute cron keeps
 // calling this dev server's /api/jobs/tick, which then works on the hosted database, and app emails
-// keep landing in the local Mailpit. (The hosted database can't reach localhost, so its own tick is idle
-// until the app is deployed.)
-import { execSync } from 'node:child_process';
+// keep landing in the local Mailpit. (The hosted database's own tick calls the deployed site once
+// `pnpm env:vercel` has set its Vault.)
 import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { repoRoot } from './supabase-status.mjs';
+import { hostedProject } from './hosted-keys.mjs';
 
-const refFile = join(repoRoot, 'supabase', '.temp', 'project-ref');
-if (!existsSync(refFile)) {
-  throw new Error('No linked project. Run: pnpm exec supabase link --project-ref <your-project-ref>');
-}
-const ref = readFileSync(refFile, 'utf8').trim();
-// The ref goes into a shell command below (pnpm is a .cmd on Windows), so accept only a real ref.
-if (!/^[a-z]{20}$/.test(ref)) throw new Error(`Unexpected project ref in ${refFile}`);
-
-const out = execSync(`pnpm exec supabase projects api-keys --project-ref ${ref} --reveal -o json`, {
-  cwd: repoRoot,
-  encoding: 'utf8',
-  stdio: ['ignore', 'pipe', 'ignore'],
-});
-const keys = JSON.parse(out.slice(out.indexOf('[')));
-const key = (type) => keys.find((k) => k.type === type)?.api_key;
-const publishable = key('publishable');
-const secret = key('secret');
-if (!publishable || !secret?.startsWith('sb_secret_')) {
-  throw new Error('The project needs a publishable and a secret API key (Project Settings → API Keys).');
-}
+const { ref, publishable, secret } = hostedProject();
 
 const target = fileURLToPath(new URL('../.env.local', import.meta.url));
 const current = existsSync(target)

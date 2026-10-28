@@ -20,6 +20,7 @@
     "smoke": "node apps/web/scripts/smoke-site.mjs",
     "env:local": "pnpm --filter web env:local",
     "env:hosted": "pnpm --filter web env:hosted",
+    "env:vercel": "pnpm --filter web env:vercel",
     "brand:setup": "pnpm --filter web brand:setup",
     "admin:grant": "node apps/web/scripts/grant-platform-admin.mjs"
   },
