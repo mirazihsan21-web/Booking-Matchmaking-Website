@@ -2,10 +2,11 @@
 
 import { refresh } from "next/cache";
 import type { FormState } from "@/components/forms/action-form";
-import { setSpaceBookingStatus } from "@/lib/bookings/bookings";
+import { bookSpace, setSpaceBookingStatus } from "@/lib/bookings/bookings";
+import { parseWalkInForm } from "@/lib/forms/walk-in";
 import { setSeatStatus } from "@/lib/open-play/open-play";
 import type { PaymentKind } from "@/lib/payments/payments";
-import { sectionIdOfSeat, sectionIdOfSpaceBooking } from "@/lib/sections/sections";
+import { sectionIdOfSeat, sectionIdOfSpaceBooking, sectionOfResource } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { requireManager } from "@/lib/tenancy/manager";
 import { m } from "@/messages";
@@ -29,4 +30,33 @@ export async function setDeskStatusAction(
   if (result === "not_started") return { ok: false, message: m.manage.desk.tooEarly };
   if (result === "invalid") return { ok: false, message: m.manage.desk.cannotMark };
   return { ok: false, message: m.manage.desk.notFound };
+}
+
+/**
+ * Book for a customer at the desk: a space in a section this person runs, a free start, 1–4 slots, a name
+ * and a phone. The walk-in path (opening hours, slot grid and clashes checked; no booking window or limit).
+ */
+export async function deskBookAction(_state: FormState, form: FormData): Promise<FormState> {
+  const manager = await requireManager("staff");
+  const db = createServiceClient();
+  const resourceId = String(form.get("resourceId") ?? "");
+  const section = await sectionOfResource(db, resourceId);
+  if (!section || !manager.sectionIds.includes(section.id)) return { ok: false, message: m.bookings.invalid.not_bookable };
+  const startsAt = new Date(String(form.get("startsAt") ?? ""));
+  if (Number.isNaN(startsAt.getTime())) return { ok: false, errors: { startsAt: m.bookings.pickSlot } };
+  const parsed = parseWalkInForm(form);
+  if (!parsed.ok) return { ok: false, errors: parsed.errors };
+  const result = await bookSpace(db, {
+    organizationId: manager.org.id,
+    resourceId,
+    startsAt,
+    slots: parsed.value.slots,
+    who: { guestName: parsed.value.guestName, guestPhone: parsed.value.guestPhone },
+    createdBy: manager.user.id,
+    actor: "staff",
+  });
+  refresh();
+  if (result.status === "booked") return { ok: true, message: m.staffBookings.booked };
+  if (result.status === "invalid") return { ok: false, message: m.bookings.invalid[result.reason] };
+  return { ok: false, message: m.bookings.taken };
 }

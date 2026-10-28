@@ -33,15 +33,19 @@ export function placeOnTimeline(window: { start: Date; end: Date }, start: Date,
   return { leftPct: ((from - window.start.getTime()) / total) * 100, widthPct: ((to - from) / total) * 100 };
 }
 
-/**
- * Runs of neighbouring free slots, as one gap each. Given `now`, the slot already under way counts as
- * free when nobody has it: the desk can still sell the rest of that hour to a walk-in.
- */
-export function freeGaps(slots: Array<{ start: Date; end: Date; state: SlotState; bookings?: unknown[] }>, now?: Date): Array<{ start: Date; end: Date }> {
+type DeskSlot = { start: Date; end: Date; state: SlotState; bookings?: unknown[] };
+
+/** Whether the desk can sell a slot: free, or (given `now`) the one already under way when nobody has it. */
+export function isDeskFree(slot: DeskSlot, now?: Date): boolean {
+  if (slot.state === 'free') return true;
+  return now !== undefined && slot.state === 'past' && slot.start <= now && now < slot.end && !slot.bookings?.length;
+}
+
+/** Runs of neighbouring slots the desk can sell (see isDeskFree), as one gap each. */
+export function freeGaps(slots: DeskSlot[], now?: Date): Array<{ start: Date; end: Date }> {
   const gaps: Array<{ start: Date; end: Date }> = [];
   for (const slot of slots) {
-    const underWay = now !== undefined && slot.state === 'past' && slot.start <= now && now < slot.end && !slot.bookings?.length;
-    if (slot.state !== 'free' && !underWay) continue;
+    if (!isDeskFree(slot, now)) continue;
     const last = gaps.at(-1);
     if (last && last.end.getTime() === slot.start.getTime()) last.end = slot.end;
     else gaps.push({ start: slot.start, end: slot.end });
