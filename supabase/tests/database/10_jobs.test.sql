@@ -7,6 +7,10 @@ select plan(5);
 select is((select schedule from cron.job where jobname = 'tick'), '10 seconds', 'the tick is scheduled every 10 seconds');
 select is((select command from cron.job where jobname = 'tick'), 'select private.trigger_tick()', 'and calls private.trigger_tick()');
 
+-- While the local stack runs, the real 10-second tick can queue a request mid-test and break the count
+-- below. Holding the queue's lock until this test rolls back makes the tick wait instead.
+lock table net.http_request_queue in exclusive mode;
+
 -- Without configuration (CI, tests) the trigger does nothing.
 delete from vault.secrets where name in ('app_url', 'job_secret');
 create temp table queued_before as select count(*)::int as n from net.http_request_queue;
