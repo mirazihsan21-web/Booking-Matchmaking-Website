@@ -3,11 +3,14 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { cn } from "cn";
 import { ActionButton } from "@/components/forms/action-form";
+import { ConfirmAction } from "@/components/manage/confirm-action";
 import { sectionStyle } from "@/components/site/section-style";
 import { sectionDay, type SlotBooking } from "@/lib/bookings/bookings";
 import { addDays, parseDateParam } from "@/lib/bookings/slots";
 import { formatDay, formatShortTime } from "@/lib/format";
+import { cancelQuestion } from "@/lib/manage/cancel";
 import { brandBusinessDate } from "@/lib/manage/today";
+import { livePayments } from "@/lib/payments/payments";
 import { loadSections } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { requireManager } from "@/lib/tenancy/manager";
@@ -19,7 +22,7 @@ const one = (value: string | string[] | undefined) => (Array.isArray(value) ? va
 type Row = SlotBooking & { spaceName: string };
 
 /** One booking: time, space, who (a walk-in's phone to call), its state, and what the desk can do now. */
-function BookingRow({ row, timeZone }: { row: Row; timeZone: string }) {
+function BookingRow({ row, timeZone, paidPoisha }: { row: Row; timeZone: string; paidPoisha: number | null }) {
   const time = `${formatShortTime(row.start.toISOString(), timeZone)}–${formatShortTime(row.end.toISOString(), timeZone)}`;
   const desk = m.manage.desk;
   return (
@@ -41,7 +44,13 @@ function BookingRow({ row, timeZone }: { row: Row; timeZone: string }) {
           <>
             <ActionButton action={setDeskStatusAction.bind(null, "space", row.id, "attended")} label={desk.arrived} variant="section" />
             <ActionButton action={setDeskStatusAction.bind(null, "space", row.id, "no_show")} label={desk.noShow} />
-            <ActionButton action={cancelBookingAction.bind(null, row.id)} label={desk.cancel} variant="ghost" />
+            <ConfirmAction
+              action={cancelBookingAction.bind(null, row.id)}
+              label={desk.cancel}
+              question={cancelQuestion("booking", paidPoisha === null ? { count: 0, poisha: 0 } : { count: 1, poisha: paidPoisha })}
+              confirmLabel={m.manage.panel.yesCancel}
+              cancelLabel={m.manage.panel.keep}
+            />
           </>
         ) : row.status !== "cancelled" ? (
           <ActionButton action={setDeskStatusAction.bind(null, "space", row.id, "confirmed")} label={desk.undo} />
@@ -76,6 +85,7 @@ async function Bookings({ searchParams }: { searchParams: Promise<Record<string,
     return { section, rows: [...seen.values()].sort((a, b) => a.start.getTime() - b.start.getTime()) };
   });
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
+  const paid = await livePayments(db, { spaceBookingIds: groups.flatMap((g) => g.rows.map((r) => r.id)), seatBookingIds: [] });
   const href = (d: string) => `/manage/bookings?date=${d}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
 
   return (
@@ -111,7 +121,7 @@ async function Bookings({ searchParams }: { searchParams: Promise<Record<string,
             <h2 className="font-display text-2xl uppercase tracking-wide text-section">{section.name}</h2>
             <ul className="flex flex-col gap-2">
               {rows.map((row) => (
-                <BookingRow key={row.id} row={row} timeZone={tz} />
+                <BookingRow key={row.id} row={row} timeZone={tz} paidPoisha={paid.get(row.id)?.amountPoisha ?? null} />
               ))}
             </ul>
           </section>

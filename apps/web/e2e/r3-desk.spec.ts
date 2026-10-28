@@ -62,7 +62,17 @@ test('the owner books a walk-in, checks them in, takes cash and sees it in Takin
     await expect(panel.getByText(`Paid ৳${amount.toLocaleString('en-US')} in cash`)).toBeVisible();
     await expect.poll(() => cashOnToday(page)).toBe(cashBefore + amount);
 
-    // 3. Arrived — only possible from 30 minutes before the start (the rule itself is pinned by pgTAP 20_desk_status).
+    // 3. Cancelling it from Bookings first asks the desk to give the cash back (cancelling voids the payment); keep it.
+    await page.goto('/manage/bookings');
+    const row = page.locator('main li').filter({ hasText: guest });
+    await row.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(row.getByText(`Paid ৳${amount.toLocaleString('en-US')} in cash. Give it back before cancelling`)).toBeVisible();
+    await row.getByRole('button', { name: 'Keep it' }).click();
+    await expect(row.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+
+    // 4. Arrived — only possible from 30 minutes before the start (the rule itself is pinned by pgTAP 20_desk_status).
+    await page.goto('/manage');
+    await page.getByRole('button', { name: new RegExp(guest) }).first().click();
     if (startsAt.getTime() - Date.now() <= 30 * 60_000) {
       await panel.getByRole('button', { name: 'Arrived' }).click();
       await expect(panel.getByRole('button', { name: 'Undo', exact: true })).toBeVisible();
@@ -70,7 +80,7 @@ test('the owner books a walk-in, checks them in, takes cash and sees it in Takin
       test.info().annotations.push({ type: 'skipped-step', description: 'Arrived: booking starts later than 30 min' });
     }
 
-    // 4. Takings counts it.
+    // 5. Takings counts it.
     expect(await turfTakings(page)).toBe(takingsBefore + amount);
   } finally {
     await db.from('sections').update({ opening_hours: turf.openingHours }).eq('id', turf.sectionId);

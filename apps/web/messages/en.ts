@@ -66,6 +66,12 @@ export const en = {
       remove: 'Remove section',
     },
     offerMinutes: 'How long a seat offer waits (minutes)',
+    cancel: {
+      booking: 'Cancel this booking?',
+      seat: 'Cancel this seat?',
+      game: 'Cancel this game?',
+      paidSeats: (count: number, amount: string) => `${count === 1 ? '1 seat' : `${count} seats`} paid ${amount} in cash. Give it back before cancelling`,
+    },
     brandPage: {
       title: 'Brand',
       liveAt: 'Your site is live at',

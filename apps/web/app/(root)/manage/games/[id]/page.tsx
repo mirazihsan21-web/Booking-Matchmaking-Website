@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { cn } from "cn";
 import { ActionButton, ActionForm } from "@/components/forms/action-form";
+import { ConfirmAction } from "@/components/manage/confirm-action";
 import { sectionStyle } from "@/components/site/section-style";
 import { formatNight, formatShortTime } from "@/lib/format";
+import { cancelQuestion } from "@/lib/manage/cancel";
 import { amountInput, formatBdt } from "@/lib/money";
 import { staffSessionView } from "@/lib/open-play/open-play";
 import { livePayments } from "@/lib/payments/payments";
@@ -40,6 +42,7 @@ async function Game({ params }: { params: Promise<{ id: string }> }) {
     seatIds.length ? db.from("bookings").select("id, status, price_poisha").in("id", seatIds) : Promise.resolve({ data: [] as Array<{ id: string; status: string; price_poisha: number }> }),
     livePayments(db, { spaceBookingIds: [], seatBookingIds: seatIds }),
   ]);
+  const paidSeats = { count: payments.size, poisha: [...payments.values()].reduce((sum, p) => sum + p.amountPoisha, 0) };
   const seatOf = new Map((seats ?? []).map((s) => [s.id as string, { status: s.status as string, price: s.price_poisha as number }]));
 
   return (
@@ -55,7 +58,15 @@ async function Game({ params }: { params: Promise<{ id: string }> }) {
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <span className="rounded-full bg-raised px-2.5 py-0.5 text-xs font-semibold">{t.status[session.status] ?? session.status}</span>
-          {live && <ActionButton action={cancelSessionAction.bind(null, session.id)} label={t.cancelSession} variant="destructive" />}
+          {live && (
+            <ConfirmAction
+              action={cancelSessionAction.bind(null, session.id)}
+              label={t.cancelSession}
+              question={cancelQuestion("game", paidSeats)}
+              confirmLabel={m.manage.panel.yesCancel}
+              cancelLabel={m.manage.panel.keep}
+            />
+          )}
         </div>
       </section>
 
@@ -125,7 +136,15 @@ async function Game({ params }: { params: Promise<{ id: string }> }) {
                                     <input type="hidden" name="amount" value={amountInput(seat?.price ?? session.pricePoisha)} />
                                   </ActionForm>
                                 )}
-                                {live && <ActionButton action={staffCancelSeatAction.bind(null, p.bookingId)} label={t.cancelSeat} variant="ghost" />}
+                                {live && (
+                                  <ConfirmAction
+                                    action={staffCancelSeatAction.bind(null, p.bookingId)}
+                                    label={t.cancelSeat}
+                                    question={cancelQuestion("seat", paid ? { count: 1, poisha: paid.amountPoisha } : { count: 0, poisha: 0 })}
+                                    confirmLabel={m.manage.panel.yesCancel}
+                                    cancelLabel={m.manage.panel.keep}
+                                  />
+                                )}
                               </div>
                             )}
                           </li>
