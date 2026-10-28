@@ -1,7 +1,7 @@
 // Quick check that site pages render what they should, on the running dev server.
 //   node apps/web/scripts/smoke-site.mjs "/|Coming up;Join match" "/turf|Book a space"
 //   node apps/web/scripts/smoke-site.mjs --as player@example.test "/turf/book|Pitch 1"
-// Each argument is `path|text1;text2`: the page (redirects followed) must contain every text.
+// Each argument is `path|text1;text2`: the page (redirects followed) must contain every text; `!text` must be absent.
 // Signed out unless `--as <email>`: that local user is signed in through the admin API (a magic link
 // turned into a session cookie, keys from apps/web/.env.local); never point it at the hosted project.
 // Status codes are not checked: pages stream inside Suspense, so a not-found can arrive with 200.
@@ -42,9 +42,12 @@ for (const arg of args) {
   const [path, texts = ''] = arg.split('|');
   const res = await fetch(base + path, { redirect: 'follow', headers: cookie ? { cookie } : {} });
   const html = decode(await res.text());
-  const missing = texts.split(';').filter((t) => t && !html.includes(t));
-  if (missing.length) {
-    console.error(`FAIL ${path} (${res.status}): missing ${missing.map((t) => `"${t}"`).join(', ')}`);
+  const wanted = texts.split(';').filter(Boolean);
+  const missing = wanted.filter((t) => !t.startsWith('!') && !html.includes(t));
+  const unwanted = wanted.filter((t) => t.startsWith('!') && html.includes(t.slice(1))).map((t) => t.slice(1));
+  if (missing.length || unwanted.length) {
+    const parts = [missing.length && `missing ${missing.map((t) => `"${t}"`).join(', ')}`, unwanted.length && `unexpected ${unwanted.map((t) => `"${t}"`).join(', ')}`];
+    console.error(`FAIL ${path} (${res.status}): ${parts.filter(Boolean).join('; ')}`);
     process.exit(1);
   }
 }
