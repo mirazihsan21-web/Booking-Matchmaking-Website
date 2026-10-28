@@ -42,7 +42,7 @@ export function parseDateParam(value: string | undefined, today: string): string
 }
 
 /** Local minutes from the business day's midnight (may exceed 1440 overnight) → an instant. */
-function instantAt(date: string, minutes: number, timeZone: string): Date {
+export function instantAt(date: string, minutes: number, timeZone: string): Date {
   const day = addDays(date, Math.floor(minutes / 1440));
   const m = minutes % 1440;
   const hhmm = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
