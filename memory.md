@@ -244,6 +244,8 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 
 ## 6. Known issues / gotchas
 
+- **A browser tab left open across a dev-server restart replays old build errors** (e.g. "Module not found … (root)/onboarding/page.tsx" after that page was deleted). They show up once as `[browser]` lines right after "Ready"; fresh loads are clean. Hard-reload the tab (Ctrl+Shift+R) or open a new one.
+- **Browser extensions add attributes to `<html>`** (QuillBot: `data-qb-installed`), which React reported as a hydration mismatch. The root layout's `<html>` has `suppressHydrationWarning` (it covers that element only).
 - **Never write the dev server's log (or any file) inside the repo while `next dev` runs.** With the log at `.superpowers/…/dev.log`, every request wrote a line, Turbopack recompiled, the page reloaded and requested again: 50–80 reloads in 6 s, blank screenshots, odd "React Client Manifest" errors. Log to the OS temp folder; Playwright's results/report go there too (`playwright.config.ts`). Same family as the Playwright MCP loop below.
 - **The not-found page's text is in every page's HTML.** Next serialises `app/not-found.tsx` into each page's payload, so "Not on the board" matches real pages too. A real not-found render is the one with `<meta name="robots" content="noindex">`; check for that (or for the page's own content being absent).
 - **A `redirect()` inside Suspense is not an HTTP redirect.** Once streaming has started, Next sends it in the page (`<meta http-equiv="refresh" content="1;url=…">` plus `NEXT_REDIRECT` in the payload). A browser follows it; `fetch`/curl do not — assert on `url=/target` in a smoke check.
