@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { addSectionStaff, memberEmails } from './invites';
+import { addSectionStaff, memberEmails, ownSections } from './invites';
 
 export type Role = 'owner' | 'staff';
 
@@ -53,4 +53,31 @@ export async function removeMember(db: SupabaseClient, organizationId: string, u
   const { error } = await db.from('organization_members').delete().eq('organization_id', organizationId).eq('user_id', userId);
   if (error) throw error;
   return { status: 'ok' };
+}
+
+/**
+ * Sets exactly which sections a staff member runs (at least one, all this organization's). Owners run
+ * every section, so they have none to set. The new sections are added before the old ones go, so the
+ * person is never left with none.
+ */
+export async function setStaffSections(
+  db: SupabaseClient,
+  input: { organizationId: string; userId: string; sectionIds: string[] },
+): Promise<'saved' | 'none_selected' | 'not_staff' | 'invalid_section'> {
+  const wanted = [...new Set(input.sectionIds)];
+  if (wanted.length === 0) return 'none_selected';
+  const { data: member, error } = await db.from('organization_members').select('role').eq('organization_id', input.organizationId).eq('user_id', input.userId).maybeSingle();
+  if (error) throw error;
+  if (member?.role !== 'staff') return 'not_staff';
+  const sections = await ownSections(db, input.organizationId, wanted);
+  if (sections.length !== wanted.length) return 'invalid_section';
+  await addSectionStaff(db, input.organizationId, input.userId, sections);
+  const { error: deleteError } = await db
+    .from('section_staff')
+    .delete()
+    .eq('organization_id', input.organizationId)
+    .eq('user_id', input.userId)
+    .not('section_id', 'in', `(${sections.join(',')})`);
+  if (deleteError) throw deleteError;
+  return 'saved';
 }

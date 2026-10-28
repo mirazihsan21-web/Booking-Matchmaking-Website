@@ -5,7 +5,7 @@ type Role = 'owner' | 'staff';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The given ids that are sections of this organization, in display order. */
-async function ownSections(db: SupabaseClient, organizationId: string, sectionIds: string[]): Promise<string[]> {
+export async function ownSections(db: SupabaseClient, organizationId: string, sectionIds: string[]): Promise<string[]> {
   const ids = sectionIds.filter((id) => UUID.test(id));
   if (ids.length === 0) return [];
   const { data, error } = await db.from('sections').select('id').eq('organization_id', organizationId).in('id', ids).order('position').order('name');

@@ -1,14 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { changeRole, listMembers, removeMember } from '@/lib/orgs/members';
+import { changeRole, listMembers, removeMember, setStaffSections } from '@/lib/orgs/members';
+import { recordPayment } from '@/lib/payments/payments';
 import { allowedSectionIds, canManageSection } from '@/lib/tenancy/sections-access';
-import { createTestUser, deleteTestUser, serviceDb, type TestUser } from './helpers';
+import { createTestUser, deleteTestUser, serviceDb, signedInClient, type TestUser } from './helpers';
 
 const db = serviceDb();
 const users: TestUser[] = [];
 let orgId: string;
 let turf: string;
 let cafe: string;
+let otherOrgId: string | undefined;
 
 async function user(): Promise<TestUser> {
   const u = await createTestUser(db);
@@ -38,6 +40,7 @@ const sectionsOf = async (userId: string) =>
 
 afterAll(async () => {
   await db.from('organizations').delete().eq('id', orgId);
+  if (otherOrgId) await db.from('organizations').delete().eq('id', otherOrgId);
   for (const u of users) await deleteTestUser(db, u.id);
 });
 
@@ -102,6 +105,55 @@ describe('staff per section', () => {
     expect(await allowedSectionIds(db, { organizationId: orgId, userId: stranger.id })).toEqual([]);
     expect(await canManageSection(db, { organizationId: randomUUID(), userId: users[0]!.id, sectionId: turf })).toBe(false);
     expect(await canManageSection(db, { organizationId: orgId, userId: users[0]!.id, sectionId: 'nope' })).toBe(false);
+  });
+});
+
+describe('setStaffSections (Review Focus 4)', () => {
+  it('replaces the sections a staff member runs', async () => {
+    const staff = await user();
+    await addMember(staff.id, 'staff');
+    expect(await setStaffSections(db, { organizationId: orgId, userId: staff.id, sectionIds: [turf, cafe] })).toBe('saved');
+    expect(await sectionsOf(staff.id)).toEqual([turf, cafe].sort());
+    expect(await setStaffSections(db, { organizationId: orgId, userId: staff.id, sectionIds: [cafe] })).toBe('saved');
+    expect(await sectionsOf(staff.id)).toEqual([cafe]);
+  });
+
+  it('refuses no sections, another brand\'s section and an owner, changing nothing', async () => {
+    const staff = await user();
+    await addMember(staff.id, 'staff');
+    must(await db.from('section_staff').insert({ organization_id: orgId, section_id: turf, user_id: staff.id }));
+    const other = must(await db.from('organizations').insert({ slug: `members-x-${randomUUID().slice(0, 8)}`, name: 'Other', business_type: 'turf' }).select('id').single()).data!;
+    otherOrgId = other.id;
+    const otherSection = (await db.rpc('add_section', { p_organization_id: other.id, p_kind: 'turf', p_name: 'Turf' })).data as string;
+    expect(await setStaffSections(db, { organizationId: orgId, userId: staff.id, sectionIds: [] })).toBe('none_selected');
+    expect(await setStaffSections(db, { organizationId: orgId, userId: staff.id, sectionIds: [cafe, otherSection] })).toBe('invalid_section');
+    expect(await setStaffSections(db, { organizationId: orgId, userId: staff.id, sectionIds: ['nope'] })).toBe('invalid_section');
+    expect(await sectionsOf(staff.id)).toEqual([turf]);
+    const owner = (await listMembers(db, orgId)).find((m) => m.role === 'owner')!;
+    expect(await setStaffSections(db, { organizationId: orgId, userId: owner.userId, sectionIds: [turf] })).toBe('not_staff');
+    expect(await sectionsOf(owner.userId)).toEqual([]);
+  });
+
+  it('a signed-in staff member narrowed to Turf can no longer take cash for the café', async () => {
+    const staff = await user();
+    await addMember(staff.id, 'staff');
+    expect(await setStaffSections(db, { organizationId: orgId, userId: staff.id, sectionIds: [turf, cafe] })).toBe('saved');
+    const table = must(await db.from('resources').insert({ organization_id: orgId, section_id: cafe, name: 'Table 1', kind: 'table', capacity: 4 }).select('id').single()).data!.id;
+    const at = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+    const booking = async (fromH: number) =>
+      must(
+        await db
+          .from('resource_bookings')
+          .insert({ organization_id: orgId, resource_id: table, period: `[${at(fromH)},${at(fromH + 1)})`, price_poisha: 50000, guest_name: 'Walk-in', guest_phone: '01712345678' })
+          .select('id')
+          .single(),
+      ).data!.id;
+    const [first, second] = [await booking(24), await booking(26)];
+    const client = await signedInClient(staff.email, staff.password);
+    expect(await recordPayment(client, { kind: 'space', bookingId: first, amountPoisha: 50000 })).toBe('recorded');
+    expect(await setStaffSections(db, { organizationId: orgId, userId: staff.id, sectionIds: [turf] })).toBe('saved');
+    expect(await recordPayment(client, { kind: 'space', bookingId: second, amountPoisha: 50000 })).toBe('not_found');
+    expect((await db.from('payments').select('id').eq('resource_booking_id', second)).data).toEqual([]);
   });
 });
 
