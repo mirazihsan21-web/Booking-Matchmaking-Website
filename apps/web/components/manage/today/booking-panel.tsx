@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { ActionButton, type FormAction } from "@/components/forms/action-form";
+import { ActionButton, ActionForm, FieldError, type FormAction } from "@/components/forms/action-form";
 import { Button } from "@/components/ui/button";
-import { formatBdt } from "@/lib/money";
+import { Input } from "@/components/ui/input";
+import { amountInput, formatBdt } from "@/lib/money";
 import { formatShortTime } from "@/lib/format";
 import { m } from "@/messages";
 
@@ -17,6 +18,7 @@ export interface PanelBooking {
   pricePoisha: number;
   spaceName: string;
   paidPoisha: number | null;
+  paymentId: string | null;
 }
 
 /** The desk's actions on one booking, bound on the server (each checks the person may run its section). */
@@ -25,11 +27,14 @@ export interface PanelActions {
   noShow: FormAction;
   undo: FormAction;
   cancel: FormAction;
+  pay: FormAction;
+  voidPay: FormAction | null;
 }
 
 /**
- * A booking's panel: who, where, when, the price, and what the desk can do — Arrived / No-show (or Undo),
- * and Cancel behind a confirmation. `children` is the button that opens it (a timeline block or a card).
+ * A booking's panel: who, where, when, the price; Arrived / No-show (or Undo); Paid in cash (amount
+ * editable; Undo payment once paid); and Cancel behind a confirmation that warns when cash was taken.
+ * `children` is the button that opens it (a timeline block or a card's Details).
  */
 export function BookingPanel({ booking, actions, timeZone, className, children }: { booking: PanelBooking; actions: PanelActions; timeZone: string; className?: string; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -37,6 +42,7 @@ export function BookingPanel({ booking, actions, timeZone, className, children }
   const p = m.manage.panel;
   const desk = m.manage.desk;
   const time = `${formatShortTime(booking.start, timeZone)}–${formatShortTime(booking.end, timeZone)}`;
+  const live = booking.status !== "cancelled";
   return (
     <>
       <button type="button" className={className} onClick={() => dialog.current?.showModal()}>
@@ -75,12 +81,29 @@ export function BookingPanel({ booking, actions, timeZone, className, children }
               <ActionButton action={actions.arrived} label={desk.arrived} variant="section" />
               <ActionButton action={actions.noShow} label={desk.noShow} />
             </div>
-          ) : booking.status !== "cancelled" ? (
+          ) : live ? (
             <ActionButton action={actions.undo} label={desk.undo} />
           ) : null}
+          {live &&
+            (booking.paidPoisha !== null && actions.voidPay ? (
+              <div className="flex flex-col gap-2 rounded-lg bg-raised p-3">
+                <p className="text-sm font-semibold">{desk.paidAmount(formatBdt(booking.paidPoisha))}</p>
+                <ActionButton action={actions.voidPay} label={desk.undoPayment} />
+              </div>
+            ) : (
+              <ActionForm action={actions.pay} submitLabel={desk.markPaid} variant="section" className="rounded-lg bg-raised p-3">
+                {/* Its own id: every booking's panel is on the page at once. */}
+                <label htmlFor={`amount-${booking.id}`} className="text-sm font-medium">
+                  {desk.paidInCash} · {desk.amount}
+                </label>
+                <Input id={`amount-${booking.id}`} name="amount" inputMode="decimal" defaultValue={amountInput(booking.pricePoisha)} required />
+                <FieldError name="amount" />
+              </ActionForm>
+            ))}
           {booking.status === "confirmed" &&
             (confirming ? (
               <div className="flex flex-col gap-2 rounded-lg bg-raised p-3">
+                {booking.paidPoisha !== null && <p className="text-sm font-semibold text-warning">{desk.paidCancelWarning(formatBdt(booking.paidPoisha))}</p>}
                 <p className="text-sm font-semibold">{p.cancelConfirm}</p>
                 <div className="flex flex-wrap gap-2">
                   <ActionButton action={actions.cancel} label={p.yesCancel} variant="destructive" />

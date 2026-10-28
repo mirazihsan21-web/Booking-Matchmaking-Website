@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { cn } from "cn";
-import { ActionButton } from "@/components/forms/action-form";
+import { ActionButton, ActionForm } from "@/components/forms/action-form";
 import { sectionStyle } from "@/components/site/section-style";
 import { formatShortTime } from "@/lib/format";
+import { amountInput, formatBdt } from "@/lib/money";
 import type { DeskBooking, DeskGame, DeskSpace } from "@/lib/manage/desk-day";
 import type { Section } from "@/lib/sections/sections";
 import { m } from "@/messages";
@@ -85,6 +86,11 @@ export function NowNext({
             </>
           ) : (
             <ActionButton action={actions.undo} label={m.manage.desk.undo} />
+          )}
+          {!b.payment && b.pricePoisha > 0 && (
+            <ActionForm action={actions.pay} submitLabel={`${m.manage.desk.paid} ${formatBdt(b.pricePoisha)}`} className="flex-row">
+              <input type="hidden" name="amount" value={amountInput(b.pricePoisha)} />
+            </ActionForm>
           )}
           <BookingPanel booking={booking} actions={actions} timeZone={timeZone} className="h-8 rounded-lg px-2.5 text-sm text-muted-foreground hover:bg-raised">
             {m.manage.panel.details}

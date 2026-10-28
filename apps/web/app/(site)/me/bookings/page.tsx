@@ -38,9 +38,12 @@ function BookingRow({ booking, section, timeZone, upcoming }: { booking: MyBooki
       </span>
       <span className="text-muted-foreground">{booking.pricePoisha > 0 ? formatBdt(booking.pricePoisha) : m.bookings.priceAtVenue}</span>
       <span className="rounded-full bg-raised px-2.5 py-0.5 text-xs font-semibold">{m.bookings.status[booking.status]}</span>
+      {booking.paid && <span className="rounded-full bg-section px-2.5 py-0.5 text-xs font-semibold text-on-section">{m.bookings.paid}</span>}
       {upcoming && (
         <span className="ml-auto">
-          {booking.cancellable ? (
+          {booking.paid ? (
+            <span className="text-muted-foreground">{m.bookings.paidContact}</span>
+          ) : booking.cancellable ? (
             <ActionButton action={cancelMyBookingAction.bind(null, booking.id)} label={m.bookings.cancel} />
           ) : (
             <span className="text-muted-foreground">{m.bookings.contactVenue}</span>
@@ -65,8 +68,11 @@ function SeatRow({ seat, section, timeZone }: { seat: MySeat; section: Section |
         {seat.team !== null && ` · ${m.openPlay.team(seat.team)}`}
       </span>
       <span className="text-muted-foreground">{formatBdt(seat.pricePoisha)}</span>
+      {seat.paid && <span className="rounded-full bg-section px-2.5 py-0.5 text-xs font-semibold text-on-section">{m.bookings.paid}</span>}
       <span className="ml-auto">
-        {seat.cancellable ? (
+        {seat.paid ? (
+          <span className="text-muted-foreground">{m.bookings.paidContact}</span>
+        ) : seat.cancellable ? (
           <ActionButton action={cancelSeatAction.bind(null, seat.bookingId)} label={m.bookings.cancel} />
         ) : (
           <span className="text-muted-foreground">{m.bookings.contactVenue}</span>

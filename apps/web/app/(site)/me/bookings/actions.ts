@@ -21,6 +21,7 @@ export async function cancelMyBookingAction(bookingId: string, _state: FormState
   refresh();
   if (result === "cancelled") return { ok: true, message: m.bookings.cancelled };
   if (result === "too_late") return { ok: false, message: m.bookings.tooLate };
+  if (result === "paid") return { ok: false, message: m.bookings.paidContact };
   if (result === "not_cancellable") return { ok: false, message: m.bookings.alreadyCancelled };
   return { ok: false, message: m.bookings.unavailable };
 }
@@ -35,5 +36,6 @@ export async function cancelSeatAction(bookingId: string, _state: FormState, _fo
     actor: { kind: "player", profileId: player.profileId },
   });
   refresh();
+  if (result === "paid") return { ok: false, message: m.bookings.paidContact };
   return { ok: result === "cancelled", message: m.openPlay.outcome[result] ?? m.openPlay.closed };
 }

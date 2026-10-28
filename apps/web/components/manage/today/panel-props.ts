@@ -1,5 +1,5 @@
 import { cancelBookingAction } from "@/app/(root)/manage/bookings/actions";
-import { setDeskStatusAction } from "@/app/(root)/manage/desk-actions";
+import { recordPaymentAction, setDeskStatusAction, voidPaymentAction } from "@/app/(root)/manage/desk-actions";
 import type { DeskBooking } from "@/lib/manage/desk-day";
 import type { PanelActions, PanelBooking } from "./booking-panel";
 
@@ -16,12 +16,15 @@ export function panelFor(b: DeskBooking, spaceName: string): { booking: PanelBoo
       pricePoisha: b.pricePoisha,
       spaceName,
       paidPoisha: b.payment?.amountPoisha ?? null,
+      paymentId: b.payment?.id ?? null,
     },
     actions: {
       arrived: setDeskStatusAction.bind(null, "space", b.id, "attended"),
       noShow: setDeskStatusAction.bind(null, "space", b.id, "no_show"),
       undo: setDeskStatusAction.bind(null, "space", b.id, "confirmed"),
       cancel: cancelBookingAction.bind(null, b.id),
+      pay: recordPaymentAction.bind(null, "space", b.id),
+      voidPay: b.payment ? voidPaymentAction.bind(null, b.payment.id) : null,
     },
   };
 }
