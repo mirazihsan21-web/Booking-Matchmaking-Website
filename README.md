@@ -87,9 +87,9 @@ pnpm env:local                                               # .env.local → ba
 
 - **Tests always use the local stack** (`db:test`, `db:reset` and `db:lint` say `--local`): they create and
   delete users and venues. Keep `pnpm db:start` running.
-- While the local stack runs, its every-minute job keeps calling the dev server, which then works on the hosted
-  database; app emails still land in the local Mailpit. The hosted database's own job calls the deployed site
-  once `pnpm env:vercel` has set its Vault (see **Deploying (Vercel)**).
+- The deployed site runs the hosted database's job tick (see **Deploying (Vercel)**). `pnpm env:hosted` gives the
+  dev server a new `JOB_SECRET`, so the local stack's tick is turned away (401) and never works on the live
+  database — otherwise it would take real players' pending emails into Mailpit. `pnpm env:local` brings it back.
 - In the dashboard (Authentication → URL Configuration) set the Site URL to `http://localhost:3000` and add
   `http://localhost:3000/**` to the redirect URLs. Keep "Confirm email" on.
 - Supabase's built-in email only reaches your project team's addresses, a few per hour. Players need a custom
@@ -269,8 +269,11 @@ beside the hosted database: functions in Seoul (`icn1`), and only `main` deploys
 8. Push `main`; Vercel builds and deploys it.
 9. Checks: `SITE_URL=https://<address> node apps/web/scripts/smoke-site.mjs "/|Coming up" "/turf|Turf" "/signin|Email
    me a sign-in link"`; the tick answers every minute (`pnpm exec supabase db query --linked "select status_code,
-   count(*) from net._http_response where created > now() - interval '5 minutes' group by 1"`); on a phone, sign in
-   with Google and by email link (it must come back to `https://<address>`), and a booking's email arrives.
+   timed_out, error_msg, count(*) from net._http_response where created > now() - interval '5 minutes' group by 1, 2,
+   3"` shows only 200s, no timeouts or errors); on a phone, sign in with Google and by email link (it must come back
+   to `https://<address>`), and a booking's email arrives.
+10. After 3–7 days: Vercel → Usage. If Active CPU is heading past 4 hours for the month, act before Vercel pauses the
+   site (see the limits below).
 
 **Variables** (Production only, all set by `pnpm env:vercel`; * = sensitive): `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`*, `NEXT_PUBLIC_ROOT_DOMAIN`,
@@ -284,7 +287,10 @@ the site: `pnpm exec supabase db query --linked "delete from vault.secrets where
 env:vercel` starts it again.
 
 **Free-plan limits behind this:** Hobby includes 1,000,000 function calls and 4 CPU-hours a month and pauses the site
-for 30 days past them, so the tick runs every minute (about 43,000 calls). Gmail sends about 500 emails a day.
+for 30 days past them. The tick runs every minute (about 43,000 calls), but it isn't the only cost: every open home,
+section, game and Today page re-renders every 30 seconds while it's on screen — a desk tablet left on Today all day is
+roughly 57,000 renders a month on its own. Hence the usage check (step 10); if it runs hot, lengthen those refreshes or
+move to Pro. Gmail sends about 500 emails a day.
 
 ### Google sign-in (optional)
 

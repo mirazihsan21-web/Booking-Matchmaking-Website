@@ -61,7 +61,9 @@ the brand Gmail; the job timer runs every minute against the live site.
 - **One migration** reschedules the tick from every 10 seconds to **every minute** (`* * * * *`),
   everywhere, so local and hosted never drift. The pgTAP check that pins the schedule (`10_jobs`) changes
   with it. Matching at the cut-off, offer expiry, closing at the start and email delivery happen within a
-  minute. About 43,000 calls a month — far inside Hobby's 1,000,000 invocations and 4 CPU-hours.
+  minute. About 43,000 calls a month, well inside Hobby's 1,000,000 invocations. CPU is shared with page renders
+  (every open page refreshes every 30 s), so a usage check follows the launch (§6). The tick's request waits up to
+  30 s for the site (pg_net's default is a few seconds; a cold start plus email sending takes longer).
 - **The same migration quietly closes past games:** any open-play session whose start has passed but is still
   `open` or `matched` becomes `closed`, with no "no seat" notifications. On hosted this is expected to be a
   no-op (no sessions as of the R1 rollout); it guarantees the first live tick sends nothing weeks late.
@@ -86,7 +88,9 @@ the brand Gmail; the job timer runs every minute against the live site.
 ## 6. Checks
 
 - **Automated, read-only:** the smoke script signed out against the live address — home, each section, a
-  game page, `/signin` — and the hosted `net._http_response` rows show the tick answered 200 each minute.
+  game page, `/signin` — and the hosted `net._http_response` rows show the tick answered 200 each minute (no
+  timeouts or errors).
+- **After 3–7 days:** Vercel → Usage, against Hobby's 4 CPU-hours a month.
 - **By hand (the developer, on a phone):** sign in with Google; sign in by email link (the email arrives from
   the brand Gmail); the owner account opens `/manage`; a booking made by a test player sends its confirmation
   email. Nothing writes real data automatically; the e2e and integration tests stay on the local stack (they
