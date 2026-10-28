@@ -87,9 +87,9 @@ pnpm env:local                                               # .env.local → ba
 
 - **Tests always use the local stack** (`db:test`, `db:reset` and `db:lint` say `--local`): they create and
   delete users and venues. Keep `pnpm db:start` running.
-- While the local stack runs, its 10-second job keeps calling the dev server, which then works on the hosted
-  database; app emails still land in the local Mailpit. The hosted database's own job is idle until the app
-  is deployed (it can't reach `localhost`).
+- While the local stack runs, its every-minute job keeps calling the dev server, which then works on the hosted
+  database; app emails still land in the local Mailpit. The hosted database's own job calls the deployed site
+  once `pnpm env:vercel` has set its Vault (see **Deploying (Vercel)**).
 - In the dashboard (Authentication → URL Configuration) set the Site URL to `http://localhost:3000` and add
   `http://localhost:3000/**` to the redirect URLs. Keep "Confirm email" on.
 - Supabase's built-in email only reaches your project team's addresses, a few per hour. Players need a custom
@@ -165,8 +165,8 @@ address (`lib/manage/paths.ts`).
 
 - Players book a space at `/<section>/book` (after creating a profile at `/me`), see their
   bookings at `/me/bookings`, and get a live bell plus an email for each booking change.
-- Staff see every booking, add walk-ins (name + phone) and mark attendance at `/manage/<slug>/bookings`.
-- Every 10 seconds the database (`pg_cron` → `pg_net`) calls `POST /api/jobs/tick` with a shared secret,
+- Staff see every booking, add walk-ins (name + phone) and mark attendance on **Today** (`/manage`) and `/manage/bookings`.
+- Every minute the database (`pg_cron` → `pg_net`) calls `POST /api/jobs/tick` with a shared secret,
   and the app sends pending notification emails. `pnpm env:local` stores the app URL
   (`http://host.docker.internal:3000`) and a fresh `JOB_SECRET` in Supabase Vault and `.env.local`, so
   **restart the dev server after running it**. Locally the emails go to Mailpit over SMTP port 54325.
@@ -240,6 +240,52 @@ pnpm exec supabase db push        # R2's colours (if not pushed yet) and R3's de
 
 Nothing else changes on the hosted side. Bookmarks to the old `/manage/<brand>/…` pages redirect.
 
+### Deploying (Vercel)
+
+The site runs on Vercel's free (Hobby) plan at `https://chattoturf.vercel.app` (or the address Vercel assigned),
+beside the hosted database: functions in Seoul (`icn1`), and only `main` deploys (`apps/web/vercel.json`). Design:
+`docs/superpowers/specs/2026-10-29-vercel-launch-design.md`.
+
+**First launch, in order** (*you* = steps in your own accounts):
+
+1. *You:* a Gmail account for the brand, with 2-Step Verification and an **App Password**.
+2. *You:* `pnpm dlx vercel@65.4.0 login`; then `cd apps/web && pnpm dlx vercel@65.4.0 link` (project `chattoturf`,
+   root directory `apps/web`, connect the GitHub repo). Note the production address.
+3. The hosted outbox holds no old mail: `pnpm exec supabase db query --linked "select email_status, count(*) from
+   public.notifications group by 1"` shows no `pending` or `sending`.
+4. `pnpm env:vercel --host <address> --gmail <brand gmail>`. In a real terminal it asks for the App Password
+   without showing it; anywhere else, add `SMTP_PASS` in Vercel (Settings → Environment Variables, Production,
+   Sensitive). It also points the hosted job tick at the site (Vault `app_url`, `job_secret`).
+5. *You:* `pnpm exec supabase db push --yes`.
+6. *You:* in the Supabase dashboard —
+   - Authentication → URL Configuration: Site URL `https://<address>`; redirect URLs `https://<address>/**` and
+     `http://localhost:3000/**`.
+   - Authentication → SMTP Settings: host `smtp.gmail.com`, port `465`, username and sender email = the brand Gmail,
+     password = the App Password, sender name `Chattoturf`.
+   - Authentication → Email Templates → Invite user: subject "You've been invited to a venue's team", body from
+     `supabase/templates/invite.html`.
+   - Authentication → Rate Limits: emails sent per hour `100`.
+7. *You:* Google Cloud → Google Auth Platform → Audience → **Publish app** (basic scopes need no review).
+8. Push `main`; Vercel builds and deploys it.
+9. Checks: `SITE_URL=https://<address> node apps/web/scripts/smoke-site.mjs "/|Coming up" "/turf|Turf" "/signin|Email
+   me a sign-in link"`; the tick answers every minute (`pnpm exec supabase db query --linked "select status_code,
+   count(*) from net._http_response where created > now() - interval '5 minutes' group by 1"`); on a phone, sign in
+   with Google and by email link (it must come back to `https://<address>`), and a booking's email arrives.
+
+**Variables** (Production only, all set by `pnpm env:vercel`; * = sensitive): `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`*, `NEXT_PUBLIC_ROOT_DOMAIN`,
+`NEXT_PUBLIC_GOOGLE_AUTH_ENABLED`, `BRAND_SLUG`, `JOB_SECRET`*, `EMAIL_TRANSPORT`, `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USER`, `SMTP_PASS`*, `EMAIL_FROM`, `ENABLE_EXPERIMENTAL_COREPACK`. Re-running it replaces them all and makes a
+new job secret (in Vercel and the Vault together); redeploy afterwards so the site picks them up.
+
+**After launch:** push `main` to deploy; other branches never deploy (they would run against the live database).
+Roll back with Vercel → Deployments → an earlier one → **Promote to Production**. Stop the job tick without touching
+the site: `pnpm exec supabase db query --linked "delete from vault.secrets where name = 'app_url'"`; `pnpm
+env:vercel` starts it again.
+
+**Free-plan limits behind this:** Hobby includes 1,000,000 function calls and 4 CPU-hours a month and pauses the site
+for 30 days past them, so the tick runs every minute (about 43,000 calls). Gmail sends about 500 emails a day.
+
 ### Google sign-in (optional)
 
 Email links work out of the box. For Google:
@@ -262,6 +308,7 @@ pnpm test:race           # two-connection races: accepting an offer, booking the
 pnpm db:lint             # Supabase security/performance advisors, fails on warnings
 pnpm db:reset            # re-apply all migrations to a clean local DB
 pnpm env:local           # regenerate apps/web/.env.local + the Vault job secrets (then restart the dev server)
+pnpm env:vercel --host <h> --gmail <g>  # Vercel production variables + the hosted tick (see Deploying)
 pnpm brand:setup         # create or top up the brand (BRAND_SLUG): --name, --owner <email>, --demo (local only)
 pnpm admin:grant <email> # add a user to platform_admins (a database role; no page uses it since R2)
 pnpm db:stop
