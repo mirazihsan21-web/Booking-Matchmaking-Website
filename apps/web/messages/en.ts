@@ -54,6 +54,16 @@ export const en = {
       seats: (filled: number, total: number) => `${filled}/${total}`,
       paid: 'Paid',
     },
+    book: {
+      title: 'Book for a customer',
+      space: 'Space',
+      day: 'Day',
+      showTimes: 'Show times',
+      start: 'Start',
+      noTimes: 'No free start times this day. Try another day or space.',
+      book: 'Book',
+      close: 'Close',
+    },
     panel: {
       details: 'Details',
       phone: 'Phone',
