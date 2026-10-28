@@ -4,6 +4,10 @@ import { logoUrl } from "@/lib/tenancy/urls";
 import { getManager } from "@/lib/tenancy/manager";
 import { m } from "@/messages";
 
+// Manage pages render only for the brand's team (checked per request), so dev-time instant-navigation
+// validation can't see the page from outside; navigations within /manage are still checked.
+export const instant = false;
+
 async function Shell({ children }: { children: ReactNode }) {
   const manager = await getManager();
   if (!manager) {

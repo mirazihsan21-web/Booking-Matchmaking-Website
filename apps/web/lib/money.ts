@@ -17,3 +17,8 @@ export function formatBdt(poisha: number): string {
   const whole = taka.toLocaleString('en-US');
   return rest === 0 ? `৳${whole}` : `৳${whole}.${String(rest).padStart(2, '0')}`;
 }
+
+/** An amount field's starting value: `60000` → `'600'`; empty for 0 (a booking priced at the venue). */
+export function amountInput(poisha: number): string {
+  return poisha > 0 ? String(poisha / 100) : '';
+}

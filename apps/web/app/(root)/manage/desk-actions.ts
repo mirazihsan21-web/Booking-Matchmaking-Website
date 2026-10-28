@@ -4,10 +4,12 @@ import { refresh } from "next/cache";
 import type { FormState } from "@/components/forms/action-form";
 import { bookSpace, setSpaceBookingStatus } from "@/lib/bookings/bookings";
 import { parseWalkInForm } from "@/lib/forms/walk-in";
+import { bdtToPoisha } from "@/lib/money";
 import { setSeatStatus } from "@/lib/open-play/open-play";
-import type { PaymentKind } from "@/lib/payments/payments";
+import { recordPayment, voidPayment, type PaymentKind } from "@/lib/payments/payments";
 import { sectionIdOfSeat, sectionIdOfSpaceBooking, sectionOfResource } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
+import { createClient } from "@/lib/supabase/server";
 import { requireManager } from "@/lib/tenancy/manager";
 import { m } from "@/messages";
 
@@ -59,4 +61,28 @@ export async function deskBookAction(_state: FormState, form: FormData): Promise
   if (result.status === "booked") return { ok: true, message: m.staffBookings.booked };
   if (result.status === "invalid") return { ok: false, message: m.bookings.invalid[result.reason] };
   return { ok: false, message: m.bookings.taken };
+}
+
+/** Cash taken at the desk for a booking or seat. Uses the person's own client: the database decides who may. */
+export async function recordPaymentAction(kind: PaymentKind, bookingId: string, _state: FormState, form: FormData): Promise<FormState> {
+  await requireManager("staff");
+  const amountPoisha = bdtToPoisha(String(form.get("amount") ?? ""));
+  if (amountPoisha === null) return { ok: false, errors: { amount: m.manage.desk.invalidAmount } };
+  const result = await recordPayment(await createClient(), { kind, bookingId, amountPoisha });
+  refresh();
+  if (result === "recorded") return { ok: true, message: m.manage.desk.recorded };
+  if (result === "already_paid") return { ok: false, message: m.manage.desk.alreadyPaid };
+  if (result === "not_payable") return { ok: false, message: m.manage.desk.notPayable };
+  if (result === "invalid_amount") return { ok: false, errors: { amount: m.manage.desk.invalidAmount } };
+  return { ok: false, message: m.manage.desk.notFound };
+}
+
+/** Undo a payment (it is voided, not deleted). Uses the person's own client. */
+export async function voidPaymentAction(paymentId: string, _state: FormState, _form: FormData): Promise<FormState> {
+  await requireManager("staff");
+  const result = await voidPayment(await createClient(), { paymentId });
+  refresh();
+  if (result === "voided") return { ok: true, message: m.manage.desk.voided };
+  if (result === "already_voided") return { ok: false, message: m.manage.desk.alreadyVoided };
+  return { ok: false, message: m.manage.desk.notFound };
 }
