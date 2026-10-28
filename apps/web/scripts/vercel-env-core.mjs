@@ -32,6 +32,16 @@ export function vercelEnvironment(input) {
 }
 
 /**
+ * The Vercel CLI arguments that add one variable to Production with its type spelled out: without a flag, a
+ * value piped in is stored as a Secret, and a Secret can never be read again in the dashboard.
+ *
+ * @param {{ name: string, sensitive: boolean }} v
+ */
+export function vercelAddArgs(v) {
+  return ['env', 'add', v.name, 'production', v.sensitive ? '--sensitive' : '--no-sensitive'];
+}
+
+/**
  * What was set, by name only — the one thing the script prints.
  *
  * @param {Array<{ name: string, sensitive: boolean }>} vars

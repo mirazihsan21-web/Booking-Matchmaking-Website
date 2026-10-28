@@ -17,7 +17,7 @@ import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { hostedProject } from './hosted-keys.mjs';
 import { repoRoot } from './supabase-status.mjs';
-import { envSummary, vaultSql, vercelEnvironment } from './vercel-env-core.mjs';
+import { envSummary, vaultSql, vercelAddArgs, vercelEnvironment } from './vercel-env-core.mjs';
 
 const VERCEL = ['dlx', 'vercel@65.4.0'];
 const webDir = fileURLToPath(new URL('..', import.meta.url));
@@ -69,7 +69,7 @@ const vars = vercelEnvironment({
 
 for (const v of vars) {
   pnpm([...VERCEL, 'env', 'rm', v.name, 'production', '--yes'], { cwd: webDir, allowFailure: true });
-  pnpm([...VERCEL, 'env', 'add', v.name, 'production', ...(v.sensitive ? ['--sensitive'] : [])], { cwd: webDir, input: v.value });
+  pnpm([...VERCEL, ...vercelAddArgs(v)], { cwd: webDir, input: v.value });
 }
 console.log(`Vercel production variables set:\n${envSummary(vars)}`);
 if (!gmailAppPassword) console.log('SMTP_PASS not set (no terminal to ask in): add it in Vercel → Settings → Environment Variables, Production, Sensitive.');

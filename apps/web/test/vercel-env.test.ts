@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { envSummary, vaultSql, vercelEnvironment } from '../scripts/vercel-env-core.mjs';
+import { envSummary, vaultSql, vercelAddArgs, vercelEnvironment } from '../scripts/vercel-env-core.mjs';
 
 const secrets = {
   secretKey: 'sb_secret_TESTONLY0000',
@@ -53,6 +53,12 @@ describe('vercelEnvironment', () => {
 
   it('marks only the three secrets sensitive', () => {
     expect(vars.filter((v) => v.sensitive).map((v) => v.name)).toEqual(['SUPABASE_SECRET_KEY', 'JOB_SECRET', 'SMTP_PASS']);
+  });
+
+  it('tells the Vercel CLI the type of each variable, so plain ones stay readable (final review, Important 1)', () => {
+    expect(vercelAddArgs({ name: 'SMTP_USER', value: 'x', sensitive: false })).toEqual(['env', 'add', 'SMTP_USER', 'production', '--no-sensitive']);
+    expect(vercelAddArgs({ name: 'SMTP_PASS', value: 'x', sensitive: true })).toEqual(['env', 'add', 'SMTP_PASS', 'production', '--sensitive']);
+    for (const v of vars) expect(vercelAddArgs(v)).toContain(v.sensitive ? '--sensitive' : '--no-sensitive');
   });
 
   it('summarises by name, never by value (Review Focus 2)', () => {
