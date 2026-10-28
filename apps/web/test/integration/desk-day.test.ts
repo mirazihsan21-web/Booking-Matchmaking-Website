@@ -86,6 +86,10 @@ describe('loadDeskDay', () => {
     const old = turfSpaces.find((s) => s.id === ids.old)!;
     expect(old.active).toBe(false);
     expect(old.bookings.map((b) => b.id)).toEqual([ids.oldBooking]);
+    // Its people can be checked in, but it isn't offered for new bookings (a gap there would open Book for a
+    // customer on another space). Active spaces still show their gaps.
+    expect(old.gaps).toEqual([]);
+    expect(turfSpaces.some((s) => s.active && s.gaps.length > 0)).toBe(true);
     const cafeBookings = day.sections.find((s) => s.section.id === ids.cafe)!.spaces.flatMap((s) => s.bookings.map((b) => b.id));
     expect(cafeBookings).toContain(ids.cafeBooking);
   });
