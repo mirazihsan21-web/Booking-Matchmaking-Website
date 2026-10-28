@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { livePayments } from '@/lib/payments/payments';
 import type { OpeningHours } from '@/lib/opening-hours';
 import { businessDaySlots, businessDayWindow, checkBookingStart, slotStates, type Slot, type SlotState } from './slots';
 
@@ -54,6 +55,8 @@ export interface MyBooking {
   pricePoisha: number;
   status: string;
   cancellable: boolean;
+  /** Cash was taken at the desk (a live payment); the player can no longer cancel it themselves. */
+  paid: boolean;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -170,7 +173,7 @@ export async function bookSpace(db: SupabaseClient, input: BookSpaceInput): Prom
 export async function cancelSpaceBooking(
   db: SupabaseClient,
   input: { organizationId: string; bookingId: string; actor: { kind: 'player'; profileId: string } | { kind: 'staff' }; cancelledBy: string; now?: Date },
-): Promise<'cancelled' | 'too_late' | 'not_cancellable' | 'not_found'> {
+): Promise<'cancelled' | 'too_late' | 'not_cancellable' | 'not_found' | 'paid'> {
   if (!UUID.test(input.bookingId)) return 'not_found';
   const { data: booking } = await db
     .from('resource_bookings')
@@ -181,6 +184,8 @@ export async function cancelSpaceBooking(
   if (!booking) return 'not_found';
   if (input.actor.kind === 'player' && booking.profile_id !== input.actor.profileId) return 'not_found';
   if (booking.status !== 'confirmed') return 'not_cancellable';
+  // Paid at the desk: only the desk cancels it (and gives the cash back).
+  if (input.actor.kind === 'player' && (await livePayments(db, { spaceBookingIds: [input.bookingId], seatBookingIds: [] })).size > 0) return 'paid';
 
   const { start, end } = parseTstzRange(booking.period);
   const now = input.now ?? new Date();
@@ -198,7 +203,7 @@ export async function cancelSpaceBooking(
 
 export async function setSpaceBookingStatus(
   db: SupabaseClient,
-  input: { organizationId: string; bookingId: string; status: 'attended' | 'no_show' },
+  input: { organizationId: string; bookingId: string; status: 'attended' | 'no_show' | 'confirmed' },
 ): Promise<'updated' | 'not_started' | 'invalid' | 'not_found'> {
   if (!UUID.test(input.bookingId)) return 'not_found';
   const { data: booking } = await db.from('resource_bookings').select('id').eq('id', input.bookingId).eq('organization_id', input.organizationId).maybeSingle();
@@ -314,9 +319,12 @@ export async function listMyBookings(
       pricePoisha: b.price_poisha,
       status: b.status,
       cancellable: b.status === 'confirmed' && now.getTime() < start.getTime() - cutoff,
+      paid: false,
       ended: end <= now,
     };
   });
+  const live = await livePayments(db, { spaceBookingIds: all.map((b) => b.id), seatBookingIds: [] });
+  for (const b of all) b.paid = live.has(b.id);
   const strip = ({ ended: _ended, ...rest }: (typeof all)[number]): MyBooking => rest;
   const upcoming = all.filter((b) => b.status === 'confirmed' && !b.ended).sort((x, y) => x.startsAt.localeCompare(y.startsAt));
   const past = all.filter((b) => !(b.status === 'confirmed' && !b.ended)).sort((x, y) => y.startsAt.localeCompare(x.startsAt));
