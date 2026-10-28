@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { OpeningHours } from '../lib/opening-hours';
 import { dayWindow } from '../lib/site/days';
 import { clockLabel, statusNow } from '../lib/site/hours';
-import { kindWords, sectionPhoto } from '../lib/site/kinds';
+import { kindWords, sectionBlurb, sectionPhoto, sectionPhotoUrl } from '../lib/site/kinds';
 import { bookPath, mapsLink, sectionPath } from '../lib/site/paths';
 import { seatsLevel } from '../lib/site/seats';
+import { m } from '../messages';
 
 const tz = 'Asia/Dhaka'; // UTC+6, no daylight saving
 const every = (open: string, close: string): OpeningHours =>
@@ -97,6 +98,13 @@ describe('paths and kinds', () => {
     expect(sectionPhoto('boardgame_cafe')).toBe('/sections/cafe.jpg');
     expect(sectionPhoto('turf')).toBe('/sections/turf.jpg');
     expect(sectionPhoto('gaming_lounge')).toBe('/sections/lounge.jpg');
+  });
+
+  it("uses a section's own photo and description when it has them, else the kind's", () => {
+    expect(sectionPhotoUrl({ kind: 'turf', photoPath: null })).toBe('/sections/turf.jpg');
+    expect(sectionPhotoUrl({ kind: 'turf', photoPath: 'org/sections/sec/p.jpg' })).toBe(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/org-assets/org/sections/sec/p.jpg`);
+    expect(sectionBlurb({ kind: 'gaming_lounge', description: null })).toBe(m.site.landing.blurb.gaming_lounge);
+    expect(sectionBlurb({ kind: 'gaming_lounge', description: 'Forty PCs.' })).toBe('Forty PCs.');
   });
 });
 

@@ -26,12 +26,16 @@ export interface Section {
   position: number;
   openingHours: OpeningHours;
   rules: SectionRules;
+  /** The website's text for it; null shows the kind's general text. */
+  description: string | null;
+  /** Its uploaded photo in org-assets; null shows the stock photo. */
+  photoPath: string | null;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const SECTION_COLUMNS =
-  'id, organization_id, slug, name, kind, accent, position, opening_hours, booking_horizon_days, cancel_cutoff_minutes, match_cutoff_minutes, max_upcoming_bookings, offer_ttl_seconds';
+  'id, organization_id, slug, name, kind, accent, position, opening_hours, booking_horizon_days, cancel_cutoff_minutes, match_cutoff_minutes, max_upcoming_bookings, offer_ttl_seconds, description, photo_path';
 
 interface SectionRow {
   id: string;
@@ -47,6 +51,8 @@ interface SectionRow {
   match_cutoff_minutes: number;
   max_upcoming_bookings: number;
   offer_ttl_seconds: number;
+  description: string | null;
+  photo_path: string | null;
 }
 
 /** A sections row (selected with SECTION_COLUMNS) as a Section. */
@@ -67,6 +73,8 @@ export function toSection(row: SectionRow): Section {
       maxUpcomingBookings: row.max_upcoming_bookings,
       offerTtlSeconds: row.offer_ttl_seconds,
     },
+    description: row.description,
+    photoPath: row.photo_path,
   };
 }
 

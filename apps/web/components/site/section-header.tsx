@@ -2,7 +2,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import type { Section } from "@/lib/sections/sections";
 import type { OpenStatus } from "@/lib/site/hours";
-import { kindWords, sectionPhoto } from "@/lib/site/kinds";
+import { kindWords, sectionPhotoUrl } from "@/lib/site/kinds";
 import { sectionStyle } from "./section-style";
 import { StatusPill } from "./status-pill";
 
@@ -10,7 +10,7 @@ import { StatusPill } from "./status-pill";
 export function SectionHeader({ section, status, children }: { section: Section; status: OpenStatus; children?: ReactNode }) {
   return (
     <header style={sectionStyle(section.accent)} className="relative isolate overflow-hidden">
-      <Image src={sectionPhoto(section.kind)} alt="" fill preload sizes="100vw" className="-z-20 object-cover" />
+      <Image src={sectionPhotoUrl(section)} alt="" fill preload sizes="100vw" className="-z-20 object-cover" />
       <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-background via-background/75 to-background/25" />
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 pt-24 pb-6 sm:px-6 sm:pt-36">
         <StatusPill status={status} className="self-start" />
