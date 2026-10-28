@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    // With Turbopack's dev cache on, every dev-server restart left the browser in a reload loop (the server sent
+    // "restart" for the entry chunk list on each connect). A cold compile on restart is the smaller cost.
+    turbopackFileSystemCacheForDev: false,
+  },
   images: {
     remotePatterns: [new URL(`${supabase.origin}/storage/v1/object/public/org-assets/**`)],
     // The local Supabase runs on 127.0.0.1, which Next won't fetch images from unless told; the hosted one isn't local.
