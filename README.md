@@ -105,7 +105,8 @@ pnpm env:local                                               # .env.local → ba
   safe to repeat and never changes what exists. `--name` is needed the first time; `--demo` refuses anything
   but the local stack.
 - Owners set each section's name, hours and booking rules (how far ahead, cancel and match cut-offs, the most
-  upcoming bookings per player) at `/manage/<slug>/sections`, and add a section there.
+  upcoming bookings per player, how long a seat offer waits) at `/manage/sections/<section>`, and add a section at
+  `/manage/sections`.
 - **Staff per section:** an invite names the sections a staff member runs (all ticked by default). Staff see
   and run only those sections' bookings, schedule and sessions; the database enforces it too. Owners run all.
 - **Ratings per section:** players rate their level for each section on `/me`; a section they haven't rated
@@ -114,18 +115,49 @@ pnpm env:local                                               # .env.local → ba
 ### The public site (R2)
 
 - **Look ("A1 · Matte"):** dark and flat, with each section in its own colour: turf `#43a66b`, café `#2e9e93`,
-  lounge `#8a78e6` (a new section gets its kind's colour; there is no control to change it yet). Tokens live
+  lounge `#8a78e6` (a new section gets its kind's colour; owners can change it on the section's Website tab). Tokens live
   in `apps/web/lib/site/tokens.ts` and `app/globals.css`; headings use Anton, text Inter. Every text/background
   pair is at least 4.5:1 (`test/site-tokens.test.ts`). Each section's words come from its kind: **Join match /
   Grab a seat / Squad up**, **Book pitch / Book table / Book a PC**.
 - **Photos:** `apps/web/public/sections/{turf,cafe,lounge}.jpg`, free-licence (Pexels / Unsplash), each under
-  250 KB; authors and links in `public/sections/CREDITS.md`. Swap in the brand's own photos by replacing the files.
+  250 KB; authors and links in `public/sections/CREDITS.md`. Owners can upload their own photo per section (R3).
 - **Live:** the home, section and game pages refresh every 30 s while visible. Motion (cards rising in, the open
   dot, seat bars filling) only runs when the system allows motion.
 - **Footer** on every site page: the brand and its address, the sections, and sign-in or the player's own pages.
 - **One sign-in:** `/signin?next=…` for everyone (staff invite emails send `next=/manage`). It works even while
   the brand isn't live, so staff can sign in to set it up and publish it; the other public pages then say
   "Not open yet".
+
+### The manage area (R3)
+
+`/manage` is one place for the desk and the owner, in the site's matte look. Staff see only the sections they
+run (owner pages are a 404 for them); owners see everything. Old `/manage/<brand>/…` links get a 308 to the new
+address (`lib/manage/paths.ts`).
+
+| Address | Who | What |
+|---|---|---|
+| `/manage` | team | **Today:** the day's bookings and games per space (a timeline on laptops, a list on phones), what's on now and next, **Book for a customer**, Arrived / No-show / Undo, Paid in cash |
+| `/manage/bookings` | team | A day's bookings, search by name or phone, cancel |
+| `/manage/schedule` | team | Upcoming games by section; schedule more |
+| `/manage/games/<id>` | team | One game: requests and Match now, then the teams with Arrived / No-show / Paid per player, the waitlist and offers |
+| `/manage/takings` | owner | Cash and counts per section for a business day, and the last 7 days |
+| `/manage/sections` | owner | Sections with their spaces, games and today's hours; add or remove one |
+| `/manage/sections/<slug>` | owner | Tabs: Spaces · Games · Hours & rules (incl. how long a seat offer waits) · **Website** |
+| `/manage/staff` | owner | The team: each staff member's sections (edit them), roles, remove, invites |
+| `/manage/brand` | owner | Name, address, logo; **Publish** while the site isn't live |
+
+- **Cash** is recorded per booking or game seat in `payments` (`lib/payments/payments.ts`), through the person's
+  own client, so RLS decides who may. A payment is never deleted: Undo voids it, cancelling a booking voids its
+  payment, and a re-recorded payment counts once. A player can't cancel a paid booking themselves ("Paid. Contact
+  the venue to cancel"). **Takings** (`lib/payments/takings.ts`) counts live payments by the section's business
+  day (a 01:00 payment in a late-night section counts toward the night before).
+- **Arrived** can be marked from 30 minutes before the start; **No-show** from the start (`set_resource_booking_status`,
+  `set_seat_booking_status`).
+- **Website tab:** the name (the address stays), a description up to 300 characters (empty uses the kind's text),
+  a photo (JPG, PNG or WebP up to 5 MB, in `org-assets/<org>/sections/<section>/`; the one it replaces is removed;
+  "Use the default photo" goes back to the stock one) and a colour, saved only when it passes both 4.5:1 checks
+  (`lib/sections/website.ts`). The home page and the section page use them.
+- **Logo:** PNG, JPG or WebP up to 2 MB (no SVG), shown in the site header, the footer and the manage sidebar.
 
 ### Bookings, notifications and the job tick
 
@@ -192,6 +224,18 @@ pnpm exec supabase db push        # the matte section colours
 Nothing else changes on the hosted side. When the site is deployed, keep the old wildcard subdomain pointing at
 it for a while so links in R1 emails (`<slug>.<root>/…`) still redirect to the same page.
 
+### Rolling R3 out to the hosted project (after merge)
+
+One migration changes the database: `20261028020000_r3_desk_and_payments.sql` adds `payments` (with its RLS), the
+desk status rules (arrived from 30 minutes before, no-show from the start, undo), the void-on-cancel, the
+sections' `description` and `photo_path`, and raises the `org-assets` bucket limit to 5 MB.
+
+```bash
+pnpm exec supabase db push        # R2's colours (if not pushed yet) and R3's desk and payments
+```
+
+Nothing else changes on the hosted side. Bookmarks to the old `/manage/<brand>/…` pages redirect.
+
 ### Google sign-in (optional)
 
 Email links work out of the box. For Google:
@@ -207,9 +251,9 @@ Email links work out of the box. For Google:
 pnpm typecheck           # every package (web runs `next typegen` first)
 pnpm test                # engine, sim and web unit/property tests
 pnpm test:integration    # web against the local Supabase (real auth users, RLS)
-pnpm test:e2e            # Playwright: one player signs in, books and joins a game in each section (see below)
+pnpm test:e2e            # Playwright: the player journey, sign-in while not live, and the desk journeys (see below)
 pnpm smoke "/|Coming up" # quick page check on the running dev server: `path|text;text`, `--as <email>` signs in (local only)
-pnpm db:test             # pgTAP: schema, RLS, grants, RPCs, cross-venue references, history, outbox, jobs, bookings, open play, sections, ratings, section staff
+pnpm db:test             # pgTAP: schema, RLS, grants, RPCs, cross-venue references, history, outbox, jobs, bookings, open play, sections, ratings, section staff, payments, desk status
 pnpm test:race           # two-connection races: accepting an offer, booking the same slot, beating the limit, accept vs cancel session
 pnpm db:lint             # Supabase security/performance advisors, fails on warnings
 pnpm db:reset            # re-apply all migrations to a clean local DB
@@ -224,9 +268,11 @@ pnpm db:stop
 `pnpm test:e2e` needs the local stack, `pnpm env:local` and the demo brand (`pnpm brand:setup --name "Demo Arena" --demo`).
 It reuses a dev server on :3000 or starts one. A fresh `e2e-<random>@example.test` signs in once by email link (read
 from Mailpit), rates each section, then in each section books tomorrow's first free slot and asks for a seat in the
-first game (or joins its waitlist). A second test sets the brand to `onboarding`, checks that `/` says "Not open yet"
-while `/signin` still works, and sets the status back. Each run leaves the journey player's bookings and requests in
-the local database.
+first game (or joins its waitlist; where a section's demo games have passed, the test schedules one two days out).
+A second test sets the brand to `onboarding`, checks that `/` says "Not open yet" while `/signin` still works, and
+sets the status back. The R3 desk journeys: the owner books a walk-in on Today, takes cash and finds it in Takings
+(and marks them arrived when the start is within 30 minutes; Turf's hours are widened for the run so a start is
+always free today), and a turf-only staff member sees only turf. Every test removes what it made, so runs repeat.
 Results and the HTML report go to `<OS temp>/bookingandmatchmaking-e2e`, never into the repo (files written in the
 repo make `next dev` reload in a loop).
 
@@ -238,7 +284,7 @@ Hard numbers for the case study, re-measured as features land.
 |---|---|---|
 | Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
 | Engine tests (incl. property tests) | 51 | `pnpm --filter @bm/engine test` |
-| Web unit tests | 231 | `pnpm --filter web test` |
-| Web integration tests (real Supabase, Realtime, Mailpit) | 112 | `pnpm test:integration` |
-| Database assertions | 365 pgTAP checks + 4 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
-| End-to-end tests (Playwright, Chromium) | 2 (the journey through 3 sections; sign-in while not live) | `pnpm test:e2e` |
+| Web unit tests | 247 | `pnpm --filter web test` |
+| Web integration tests (real Supabase, Realtime, Mailpit) | 139 | `pnpm test:integration` |
+| Database assertions | 403 pgTAP checks + 4 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
+| End-to-end tests (Playwright, Chromium) | 4 (the journey through 3 sections; sign-in while not live; the desk walk-in with cash and takings; turf-only staff) | `pnpm test:e2e` |
