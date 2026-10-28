@@ -2,7 +2,7 @@
 -- with no "no seat" notifications (they would reach players weeks late). Org (…21a0), player P (…21d1).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(5);
+select plan(6);
 
 insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000021d1', 'launch21@test.local');
 insert into public.organizations (id, slug, name, status) values ('00000000-0000-4000-8000-0000000021a0', 'launch-org-21', 'Launch Org', 'live');
@@ -18,12 +18,20 @@ insert into public.seat_requests (organization_id, session_id, profile_id) value
 insert into public.waitlist_entries (id, organization_id, session_id, profile_id, queue_position) values
   ('00000000-0000-4000-8000-0000000021b1', '00000000-0000-4000-8000-0000000021a0', '00000000-0000-4000-8000-0000000021f1', '00000000-0000-4000-8000-0000000021e1', 1);
 
+-- Another brand's past open game, like the demo games on a developer's database: closed too, and the checks
+-- below must not depend on how many such games exist (final review, Important 4).
+insert into public.organizations (id, slug, name, status) values ('00000000-0000-4000-8000-0000000021a9', 'launch-org-21b', 'Other Org', 'live');
+create temp table s2 as select public.add_section('00000000-0000-4000-8000-0000000021a9', 'turf', 'Turf') as id;
+insert into public.open_play_sessions (id, organization_id, section_id, starts_at, ends_at, seat_price_poisha, status) values
+  ('00000000-0000-4000-8000-0000000021f9', '00000000-0000-4000-8000-0000000021a9', (select id from s2), now() - interval '2 days', now() - interval '47 hours', 30000, 'open');
+
 create temp table closed as select private.close_past_sessions_quietly() as n;
-select is((select n from closed), 1, 'one past game closed');
+select ok((select n from closed) >= 2, 'it reports the past games it closed (at least these two)');
 select is((select status::text from public.open_play_sessions where id = '00000000-0000-4000-8000-0000000021f1'), 'closed', 'the past game is closed');
+select is((select status::text from public.open_play_sessions where id = '00000000-0000-4000-8000-0000000021f9'), 'closed', 'so is another brand''s');
 select is((select status::text from public.open_play_sessions where id = '00000000-0000-4000-8000-0000000021f2'), 'open', 'a future game is untouched');
 select is((select status::text from public.waitlist_entries where id = '00000000-0000-4000-8000-0000000021b1'), 'expired', 'its waitlist place has expired');
-select is((select count(*) from public.notifications where organization_id = '00000000-0000-4000-8000-0000000021a0'), 0::bigint, 'and nobody is told');
+select is((select count(*) from public.notifications where organization_id in ('00000000-0000-4000-8000-0000000021a0', '00000000-0000-4000-8000-0000000021a9')), 0::bigint, 'and nobody is told');
 
 select * from finish();
 rollback;
