@@ -2,7 +2,7 @@
 -- and shared secret kept in Vault. Queued requests are rolled back with the test, so nothing is sent.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(5);
+select plan(6);
 
 select is((select schedule from cron.job where jobname = 'tick'), '* * * * *', 'the tick runs every minute');
 select is((select command from cron.job where jobname = 'tick'), 'select private.trigger_tick()', 'and calls private.trigger_tick()');
@@ -25,6 +25,11 @@ select is(
   (select url from net.http_request_queue where id = (select request_id from fired)),
   'http://pgtap.invalid:3000/api/jobs/tick',
   'with Vault secrets it queues a POST to <app_url>/api/jobs/tick'
+);
+select is(
+  (select timeout_milliseconds from net.http_request_queue where id = (select request_id from fired)),
+  30000,
+  'and waits up to 30 s for the site (a cold start plus email sending takes longer than pg_net''s default)'
 );
 
 select * from finish();
