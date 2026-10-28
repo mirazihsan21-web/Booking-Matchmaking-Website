@@ -36,9 +36,9 @@ describe('parseOpeningHours', () => {
 });
 
 describe('parseSectionForm', () => {
-  const rules = { horizonDays: '3', cancelCutoffHours: '1', matchCutoffHours: '4', maxUpcoming: '2' };
+  const rules = { horizonDays: '3', cancelCutoffHours: '1', matchCutoffHours: '4', maxUpcoming: '2', offerMinutes: '15' };
 
-  it('reads the name, hours and booking rules (cut-offs typed in hours, kept in minutes)', () => {
+  it('reads the name, hours and booking rules (cut-offs typed in hours, kept in minutes; offer time in minutes, kept in seconds)', () => {
     expect(parseSectionForm(form({ name: 'Board-game café', ...allDays('10:00', '23:00'), ...rules }))).toEqual({
       ok: true,
       value: {
@@ -48,8 +48,17 @@ describe('parseSectionForm', () => {
         cancelCutoffMinutes: 60,
         matchCutoffMinutes: 240,
         maxUpcomingBookings: 2,
+        offerTtlSeconds: 900,
       },
     });
+  });
+
+  it('keeps a seat offer between 1 and 120 minutes', () => {
+    for (const offerMinutes of ['0', '121', '']) {
+      const result = parseSectionForm(form({ name: 'Turf', ...allDays('10:00', '23:00'), ...rules, offerMinutes }));
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(Object.keys(result.errors)).toEqual(['offerMinutes']);
+    }
   });
 
   it('reports a missing name and bad rules together', () => {
