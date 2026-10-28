@@ -7,7 +7,7 @@ import { formatBdt } from "@/lib/money";
 import type { Section } from "@/lib/sections/sections";
 import type { SectionFacts } from "@/lib/site/home";
 import type { OpenStatus } from "@/lib/site/hours";
-import { kindWords, sectionPhoto } from "@/lib/site/kinds";
+import { kindWords, sectionBlurb, sectionPhotoUrl } from "@/lib/site/kinds";
 import { bookPath, sectionPath } from "@/lib/site/paths";
 import { m } from "@/messages";
 import { sectionStyle } from "../section-style";
@@ -23,11 +23,11 @@ export function ServiceRow({ section, facts, status, hasGames, flip }: { section
   return (
     <article style={sectionStyle(section.accent)} className="grid items-center gap-6 md:grid-cols-2 md:gap-12">
       <div className={cn("relative aspect-[16/10] overflow-hidden rounded-xl border-b-[3px] border-section", flip && "md:order-2")}>
-        <Image src={sectionPhoto(section.kind)} alt="" fill sizes="(min-width: 768px) 50vw, 100vw" className="object-cover" />
+        <Image src={sectionPhotoUrl(section)} alt="" fill sizes="(min-width: 768px) 50vw, 100vw" className="object-cover" />
       </div>
       <div className="flex flex-col gap-4">
         <h3 className="font-display text-4xl uppercase leading-none tracking-wide text-section sm:text-5xl">{section.name}</h3>
-        <p className="max-w-prose text-foreground/85">{m.site.landing.blurb[section.kind]}</p>
+        <p className="max-w-prose text-foreground/85">{sectionBlurb(section)}</p>
         <ul className="flex flex-col gap-2 text-sm">
           <li className="flex items-center gap-2">
             <Banknote aria-hidden className="size-4 text-section" />

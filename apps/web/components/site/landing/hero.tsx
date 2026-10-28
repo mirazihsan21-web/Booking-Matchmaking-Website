@@ -4,7 +4,7 @@ import { cn } from "cn";
 import { buttonVariants } from "@/components/ui/button";
 import type { Section } from "@/lib/sections/sections";
 import type { OpenStatus } from "@/lib/site/hours";
-import { sectionPhoto } from "@/lib/site/kinds";
+import { sectionPhotoUrl } from "@/lib/site/kinds";
 import { sectionPath } from "@/lib/site/paths";
 import { m } from "@/messages";
 import { sectionStyle } from "../section-style";
@@ -25,7 +25,7 @@ export function Hero({ brandName, sections, status }: { brandName: string; secti
             style={sectionStyle(s.accent)}
             className="group relative flex flex-col justify-end overflow-hidden border-l border-background outline-none first:border-l-0 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-section"
           >
-            <Image src={sectionPhoto(s.kind)} alt="" fill preload sizes="34vw" className="object-cover" />
+            <Image src={sectionPhotoUrl(s)} alt="" fill preload sizes="34vw" className="object-cover" />
             <span aria-hidden className="absolute inset-0 bg-gradient-to-b from-background/85 via-background/70 to-background/95 transition-colors group-hover:via-background/55" />
             {/* A fixed-height block, so the colour bars line up even when a name wraps to two lines. */}
             <span className="relative flex h-24 flex-col px-3 sm:h-28 sm:px-6">

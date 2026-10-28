@@ -6,6 +6,7 @@ import type { FormState } from "@/components/forms/action-form";
 import { parseActivityForm } from "@/lib/forms/activity";
 import { parseResourceForm } from "@/lib/forms/resource";
 import { parseSectionForm } from "@/lib/forms/section";
+import { saveSectionWebsite } from "@/lib/sections/website";
 import { createServiceClient } from "@/lib/service-client";
 import { createClient } from "@/lib/supabase/server";
 import { requireManager } from "@/lib/tenancy/manager";
@@ -73,6 +74,35 @@ export async function deleteSectionAction(sectionId: string, _state: FormState, 
   if (error) return fail(error);
   refresh();
   return { ok: true, message: m.manage.deleted };
+}
+
+/** What the website shows for a section: name, description, photo and a colour that stays readable. */
+export async function saveWebsiteAction(sectionId: string, _state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireManager("owner");
+  const w = m.manage.website;
+  const photo = String(form.get("photo_path") ?? "");
+  // The owner's own client: RLS lets owners change their sections and remove files in their folder.
+  const result = await saveSectionWebsite(await createClient(), {
+    organizationId: org.id,
+    sectionId,
+    name: String(form.get("name") ?? ""),
+    description: String(form.get("description") ?? ""),
+    accent: String(form.get("accent") ?? ""),
+    photoPath: photo || null,
+  });
+  switch (result.status) {
+    case "saved":
+      refresh();
+      return saved;
+    case "unreadable":
+      return { ok: false, errors: { accent: w.unreadable(result.ratio) } };
+    case "invalid":
+      return { ok: false, errors: { [result.field]: { name: w.nameRule, description: w.tooLong, accent: w.badColour }[result.field] } };
+    case "invalid_photo":
+      return { ok: false, errors: { photo_path: w.photoAgain } };
+    case "not_found":
+      return { ok: false, message: w.notFound };
+  }
 }
 
 // ── Spaces ───────────────────────────────────────────────────────────────────
