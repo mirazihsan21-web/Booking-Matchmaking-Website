@@ -56,8 +56,8 @@ describe('vercelEnvironment', () => {
   });
 
   it('tells the Vercel CLI the type of each variable, so plain ones stay readable (final review, Important 1)', () => {
-    expect(vercelAddArgs({ name: 'SMTP_USER', value: 'x', sensitive: false })).toEqual(['env', 'add', 'SMTP_USER', 'production', '--no-sensitive']);
-    expect(vercelAddArgs({ name: 'SMTP_PASS', value: 'x', sensitive: true })).toEqual(['env', 'add', 'SMTP_PASS', 'production', '--sensitive']);
+    expect(vercelAddArgs({ name: 'SMTP_USER', sensitive: false })).toEqual(['env', 'add', 'SMTP_USER', 'production', '--no-sensitive']);
+    expect(vercelAddArgs({ name: 'SMTP_PASS', sensitive: true })).toEqual(['env', 'add', 'SMTP_PASS', 'production', '--sensitive']);
     for (const v of vars) expect(vercelAddArgs(v)).toContain(v.sensitive ? '--sensitive' : '--no-sensitive');
   });
 
