@@ -117,7 +117,7 @@ export function Timeline({
                         </span>
                       );
                     })}
-                  {nowAt && <span aria-label={m.manage.today.now} className="absolute top-0 bottom-0 w-0.5 bg-warning" style={{ left: `${nowAt.leftPct}%` }} />}
+                  {nowAt && <span aria-label={m.manage.today.now} className="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-warning" style={{ left: `${nowAt.leftPct}%` }} />}
                 </div>
               </div>
             ))}
