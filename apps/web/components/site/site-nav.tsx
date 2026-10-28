@@ -25,11 +25,13 @@ export interface NavSection {
  */
 export function SiteNav({
   brandName,
+  logoUrl,
   sections,
   signedIn,
   bell,
 }: {
   brandName: string;
+  logoUrl: string | null;
   sections: NavSection[];
   signedIn: boolean;
   bell: { profileId: string; organizationId: string; unread: number } | null;
@@ -42,7 +44,9 @@ export function SiteNav({
     <>
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-6 px-4 sm:px-6">
-          <Link href="/" className="font-display text-2xl uppercase tracking-wide">
+          <Link href="/" className="flex shrink-0 items-center gap-2 font-display text-2xl uppercase tracking-wide">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a small uploaded logo from public storage */}
+            {logoUrl && <img src={logoUrl} alt="" className="size-8 rounded object-contain" />}
             {brandName}
           </Link>
           <nav className="hidden items-center gap-5 text-sm font-semibold md:flex">

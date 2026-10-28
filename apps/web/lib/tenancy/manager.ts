@@ -5,8 +5,20 @@ import { requireUser, type SessionUser } from '@/lib/auth/dal';
 import { createServiceClient } from '@/lib/service-client';
 import { createClient } from '@/lib/supabase/server';
 import type { BusinessType } from '@/presets';
-import type { ManagedOrganization, OrgRole } from './dal';
 import { allowedSectionIds } from './sections-access';
+
+export type OrgRole = 'owner' | 'staff';
+
+/** The brand as the manage area sees it. */
+export interface ManagedOrganization {
+  id: string;
+  slug: string;
+  name: string;
+  status: 'onboarding' | 'live' | 'suspended';
+  businessType: BusinessType;
+  timezone: string;
+  branding: { logo_path?: string; primary?: string; accent?: string };
+}
 
 /** The signed-in member of the brand (BRAND_SLUG) on a manage page: who, their role, and the sections they run. */
 export interface Manager {

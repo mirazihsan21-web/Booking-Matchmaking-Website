@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { oldManagePath } from '@/lib/manage/paths';
 import { updateSession } from '@/lib/supabase/proxy';
 import { routeRequest } from '@/lib/site/route';
 
@@ -23,8 +24,9 @@ function carrySession(from: NextResponse, to: NextResponse): NextResponse {
 
 /**
  * 1. Old venue hosts (`<slug>.<root>`) are sent to the same page on the one site.
- * 2. Refreshes the Supabase session.
- * 3. The old internal venue routes (`/t/…`) are a 404.
+ * 2. The old manage pages (`/manage/<brand>/…`) are moved for good to their new addresses.
+ * 3. Refreshes the Supabase session.
+ * 4. The old internal venue routes (`/t/…`) are a 404.
  */
 export async function proxy(request: NextRequest) {
   // The job tick: called by the database (as host.docker.internal locally) and authorized by its own
@@ -39,6 +41,13 @@ export async function proxy(request: NextRequest) {
     const headers = new Headers(request.headers);
     headers.set('x-moved-to', request.nextUrl.pathname + request.nextUrl.search);
     return NextResponse.rewrite(url, { request: { headers } });
+  }
+
+  const moved = oldManagePath(request.nextUrl.pathname, process.env.BRAND_SLUG ?? '');
+  if (moved) {
+    const url = request.nextUrl.clone();
+    url.pathname = moved;
+    return NextResponse.redirect(url, 308);
   }
 
   const session = await updateSession(request);
