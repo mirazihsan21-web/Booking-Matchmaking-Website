@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { cancelOpenPlay } from '@/lib/schedule/schedule';
 import { loadSections } from '@/lib/sections/sections';
-import { findSection, loadComingUp, oldBookSection } from '@/lib/site/home';
+import { findSection, loadComingUp, loadSectionFacts, oldBookSection } from '@/lib/site/home';
 import { boardgame } from '@/presets/boardgame';
 import { lounge } from '@/presets/lounge';
 import { turf } from '@/presets/turf';
@@ -84,5 +84,23 @@ describe('oldBookSection (Review Focus 1: old /book links)', () => {
     expect(await oldBookSection(db, orgId, q(''))).toBeNull();
     const elsewhere = (await db.from('resources').select('id').neq('organization_id', orgId).limit(1).single()).data!.id;
     expect(await oldBookSection(db, orgId, q(`resource=${elsewhere}`))).toBeNull();
+  });
+});
+
+describe('loadSectionFacts (services on the landing page)', () => {
+  it("gives each section its active spaces, its lowest hourly price and its top games", async () => {
+    const sections = await loadSections(db, orgId);
+    const facts = await loadSectionFacts(db, orgId);
+    const of = (slug: string) => facts.get(sections.find((x) => x.slug === slug)!.id);
+    expect(of('turf')).toEqual({ spaces: 3, fromPoisha: 60000, games: ['5-a-side futsal', '7-a-side football', 'Badminton doubles'] });
+    expect(of('lounge')).toEqual({ spaces: 4, fromPoisha: 40000, games: ['Valorant 5v5', 'EA FC 1v1', 'CS2 5v5', 'PUBG squad'] });
+    expect(of('cafe')).toMatchObject({ spaces: 7, fromPoisha: null }); // tables are priced at the venue
+    expect(of('cafe')!.games.length).toBeLessThanOrEqual(4);
+
+    // An inactive space no longer counts, nor does its price.
+    const turf = sections.find((x) => x.slug === 'turf')!;
+    const court = (await db.from('resources').select('id').eq('section_id', turf.id).eq('name', 'Badminton Court 1').single()).data!.id;
+    await db.from('resources').update({ active: false }).eq('id', court);
+    expect((await loadSectionFacts(db, orgId)).get(turf.id)).toMatchObject({ spaces: 2, fromPoisha: 250000 });
   });
 });

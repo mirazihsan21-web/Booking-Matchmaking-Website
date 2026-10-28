@@ -11,3 +11,8 @@ export function bookPath(slug: string, q: { resource?: string; date?: string } =
   const query = params.toString();
   return `/${slug}/book${query ? `?${query}` : ''}`;
 }
+
+/** A Google Maps search for an address (opens the app on a phone). */
+export function mapsLink(address: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+}
