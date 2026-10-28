@@ -323,6 +323,22 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 
 ## 7. Upgrade ideas / future work
 
+- **R3 review minors (deferred, 2026-10-29)** — from the final fresh review of `r3-manage-area`; none blocks merge:
+  - Deleting an auth user who took or voided a payment fails (`taken_by`/`voided_by` ON DELETE SET NULL fires `payments_void_only`). Let the trigger accept a change that only nulls those, or make the FKs `no action` on purpose.
+  - Payments' FKs to bookings/sections are ON DELETE CASCADE; make them `no action` so a cash record can't vanish with a booking.
+  - `voided_at` comes from the caller; set `new.voided_at := now()` in `payments_void_only` (as `taken_at`).
+  - A staff seat cancel voids with `voided_by` null (cancel_booking runs as the service role); pass the canceller through.
+  - Each booking's panel renders twice on Today (timeline + phone list): `amount-<id>` repeats and the phone label points at the hidden copy. Render once or use `useId`.
+  - A slot under a running game counts as "Free now" (`isDeskFree`), so Book for a customer offers it and then says "taken".
+  - A seat priced ৳0 can't be paid on the game page (no typed amount; its error has no field).
+  - Signed-in non-members see "You don't run any venues yet." on deeper `/manage` paths, not "not found".
+  - The player's paid-booking refusal is app-side (check, then cancel); refuse in `cancel_resource_booking` when the canceller is the booking's player.
+  - "That booking no longer exists." is the message when a staff member no longer runs the section — reword.
+  - A `BRAND_SLUG` equal to a manage route name (bookings, schedule, staff, sections, takings, games, brand) would be caught by `oldManagePath`; reserve those slugs.
+  - Today runs ~4 queries per space + `takingsDay` every 30 s per device; Takings runs `takingsDay` 8 times. Batch when it matters.
+  - The cached site title isn't refreshed on a brand or section rename (`cacheTag` + `updateTag`).
+  - No pgTAP case for turf staff voiding a café payment at the database level.
+
 - **R2 review minors (deferred, 2026-10-28)** — from the final fresh review of `r2-public-site`; none blocks merge:
   - `app/layout.tsx` `generateMetadata` uses `'use cache'` + `loadBrand`, so `next build` prerenders the title from the database (the build needs DB access and `SUPABASE_SECRET_KEY`), and a rename or go-live shows only after the cache revalidates. Decide before Stage E: uncached metadata, or `revalidateTag` on brand changes.
   - Every page has the same `<title>` (the brand name). Add per-page titles (`title.template`) for tab and screen-reader users (WCAG 2.4.2).
@@ -391,6 +407,8 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 - The swap search already re-scores only the two groups a swap touches (delta scoring). For much bigger venues, the next win is replacing the linear `seatings.find(...)` scans in the greedy `seatPass` with per-game open-group queues.
 
 ## 8. Change log
+
+- **2026-10-29: R3 final review fixed** (fresh Opus review: 0 Critical, 3 Important, 14 Minor; one minor re-graded Important). Migration `20261028030000_r3_review_fixes.sql`: cancelling a whole game voids its seats' cash; recording cash and cancelling the same booking take the same transaction lock (race test `pay-vs-cancel`). Every cancel (Bookings, Cancel seat, a game on its page and on Schedule) asks first with the paid warning. No free gaps on switched-off spaces. Each fix RED→GREEN. Suite: unit 51/23/249, pgTAP 404, race 6, integration 139, e2e 4 (twice), build, schema diff empty. Minors in §7.
 
 - **2026-10-28: R3 (manage area) built on `r3-manage-area`** (15 tasks; not merged, hosted untouched). Migration `20261028020000_r3_desk_and_payments.sql` (payments, desk status, void on cancel, section description/photo, bucket 5 MB). New: Today desk with Book for a customer, Arrived / No-show, Paid in cash; Bookings; Schedule and the game page with per-seat desk actions; Takings; Sections with Spaces / Games / Hours & rules / Website tabs; Staff with sections; Brand with logo and Publish; old `/manage/<brand>/…` routes redirect. Fixes found on the way: the "now" line on Today took clicks (`pointer-events-none`); Turbopack's dev cache restart loop. Suite: typecheck, lint, build, unit 51/23/247, pgTAP 403, race 4, integration 139, e2e 4 (twice in a row), schema diff empty, contrast audit of all 13 manage pages clean.
 

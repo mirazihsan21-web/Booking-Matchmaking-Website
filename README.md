@@ -147,8 +147,10 @@ address (`lib/manage/paths.ts`).
 | `/manage/brand` | owner | Name, address, logo; **Publish** while the site isn't live |
 
 - **Cash** is recorded per booking or game seat in `payments` (`lib/payments/payments.ts`), through the person's
-  own client, so RLS decides who may. A payment is never deleted: Undo voids it, cancelling a booking voids its
-  payment, and a re-recorded payment counts once. A player can't cancel a paid booking themselves ("Paid. Contact
+  own client, so RLS decides who may. A payment is never deleted: Undo voids it, cancelling a booking, a seat or a
+  whole game voids its cash, and a re-recorded payment counts once. Recording cash and cancelling the same booking
+  take turns (a transaction lock), so a payment is never left live on a cancelled booking. Every cancel asks first,
+  and says "Paid ৳X in cash. Give it back before cancelling" when cash was taken. A player can't cancel a paid booking themselves ("Paid. Contact
   the venue to cancel"). **Takings** (`lib/payments/takings.ts`) counts live payments by the section's business
   day (a 01:00 payment in a late-night section counts toward the night before).
 - **Arrived** can be marked from 30 minutes before the start; **No-show** from the start (`set_resource_booking_status`,
@@ -226,9 +228,11 @@ it for a while so links in R1 emails (`<slug>.<root>/…`) still redirect to the
 
 ### Rolling R3 out to the hosted project (after merge)
 
-One migration changes the database: `20261028020000_r3_desk_and_payments.sql` adds `payments` (with its RLS), the
+Two migrations change the database: `20261028020000_r3_desk_and_payments.sql` adds `payments` (with its RLS), the
 desk status rules (arrived from 30 minutes before, no-show from the start, undo), the void-on-cancel, the
-sections' `description` and `photo_path`, and raises the `org-assets` bucket limit to 5 MB.
+sections' `description` and `photo_path`, and raises the `org-assets` bucket limit to 5 MB;
+`20261028030000_r3_review_fixes.sql` makes cancelling a game void its seats' cash and makes cash and cancels on the
+same booking take turns.
 
 ```bash
 pnpm exec supabase db push        # R2's colours (if not pushed yet) and R3's desk and payments
@@ -254,7 +258,7 @@ pnpm test:integration    # web against the local Supabase (real auth users, RLS)
 pnpm test:e2e            # Playwright: the player journey, sign-in while not live, and the desk journeys (see below)
 pnpm smoke "/|Coming up" # quick page check on the running dev server: `path|text;text`, `--as <email>` signs in (local only)
 pnpm db:test             # pgTAP: schema, RLS, grants, RPCs, cross-venue references, history, outbox, jobs, bookings, open play, sections, ratings, section staff, payments, desk status
-pnpm test:race           # two-connection races: accepting an offer, booking the same slot, beating the limit, accept vs cancel session
+pnpm test:race           # two-connection races: accepting an offer, booking the same slot, beating the limit, accept vs cancel session, cash vs cancel
 pnpm db:lint             # Supabase security/performance advisors, fails on warnings
 pnpm db:reset            # re-apply all migrations to a clean local DB
 pnpm env:local           # regenerate apps/web/.env.local + the Vault job secrets (then restart the dev server)
@@ -284,7 +288,7 @@ Hard numbers for the case study, re-measured as features land.
 |---|---|---|
 | Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
 | Engine tests (incl. property tests) | 51 | `pnpm --filter @bm/engine test` |
-| Web unit tests | 247 | `pnpm --filter web test` |
+| Web unit tests | 249 | `pnpm --filter web test` |
 | Web integration tests (real Supabase, Realtime, Mailpit) | 139 | `pnpm test:integration` |
-| Database assertions | 403 pgTAP checks + 4 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
+| Database assertions | 404 pgTAP checks + 6 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
 | End-to-end tests (Playwright, Chromium) | 4 (the journey through 3 sections; sign-in while not live; the desk walk-in with cash and takings; turf-only staff) | `pnpm test:e2e` |
