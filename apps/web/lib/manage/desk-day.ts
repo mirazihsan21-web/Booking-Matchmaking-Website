@@ -64,7 +64,7 @@ export async function loadDeskDay(
       for (const b of [...day.slots.flatMap((slot) => slot.bookings ?? []), ...(day.extra ?? [])]) {
         if (!seen.has(b.id)) seen.set(b.id, { kind: 'space', id: b.id, resourceId: day.resource.id, name: b.name, phone: b.phone, status: b.status, start: b.start, end: b.end });
       }
-      return { id: day.resource.id, name: day.resource.name, active: day.resource.active, bookings: [...seen.values()], gaps: freeGaps(day.slots, input.now) };
+      return { id: day.resource.id, name: day.resource.name, active: day.resource.active, bookings: [...seen.values()], gaps: day.resource.active ? freeGaps(day.slots, input.now) : [] };
     }),
   }));
   const bookingIds = raw.flatMap((s) => s.spaces.flatMap((sp) => sp.bookings.map((b) => b.id)));
