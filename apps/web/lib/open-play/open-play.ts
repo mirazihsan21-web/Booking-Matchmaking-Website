@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { rankWaitlist, type WaitlistCandidate } from '@bm/engine';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { livePayments } from '@/lib/payments/payments';
 import { planMatch, type MatchActivity, type MatchRequest } from './match';
 
 /**
@@ -15,7 +16,7 @@ export type RequestOutcome = 'requested' | 'seated' | 'waitlisted' | 'already' |
 export type WithdrawOutcome = 'withdrawn' | 'has_offer' | 'closed' | 'not_found';
 export type MatchOutcome = 'matched' | 'already_matched' | 'not_open' | 'no_groups' | 'not_found';
 export type OfferNextOutcome = 'offered' | 'no_candidate' | 'seat_not_free' | 'closed';
-export type CancelSeatOutcome = 'cancelled' | 'too_late' | 'closed' | 'not_found' | 'not_cancellable';
+export type CancelSeatOutcome = 'cancelled' | 'too_late' | 'closed' | 'not_found' | 'not_cancellable' | 'paid';
 export type AcceptOutcome = 'accepted' | 'already_accepted' | 'declined' | 'expired' | 'seat_taken' | 'already_booked' | 'closed' | 'not_found';
 export type RespondOutcome = AcceptOutcome | 'not_pending';
 
@@ -87,6 +88,8 @@ export interface MySeat {
   pricePoisha: number;
   status: string;
   cancellable: boolean;
+  /** Cash was taken at the desk (a live payment); the player can no longer cancel it themselves. */
+  paid: boolean;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -314,6 +317,8 @@ export async function cancelSeat(
   } | null;
   if (!booking || (input.actor.kind === 'player' && booking.profile_id !== input.actor.profileId)) return 'not_found';
   if (booking.status !== 'confirmed') return 'not_cancellable';
+  // Paid at the desk: only the desk cancels it (and gives the cash back).
+  if (input.actor.kind === 'player' && (await livePayments(db, { spaceBookingIds: [], seatBookingIds: [input.bookingId] })).size > 0) return 'paid';
   const session = booking.open_play_sessions;
   if (session.status !== 'open' && session.status !== 'matched') return 'closed';
 
@@ -327,6 +332,22 @@ export async function cancelSeat(
   if (!(freed as unknown[]).length) return 'closed';
   await handOn(db, booking.group_id, booking.seat_no);
   return 'cancelled';
+}
+
+/**
+ * Desk check-in for a seat: Arrived from 30 minutes before the game, No-show from its start, or back to
+ * booked. Callers check the person may run the seat's section first (the service client skips RLS).
+ */
+export async function setSeatStatus(
+  db: SupabaseClient,
+  input: { organizationId: string; bookingId: string; status: 'attended' | 'no_show' | 'confirmed' },
+): Promise<'updated' | 'not_started' | 'invalid' | 'not_found'> {
+  if (!UUID.test(input.bookingId) || !UUID.test(input.organizationId)) return 'not_found';
+  const { data: seat } = await db.from('bookings').select('id').eq('id', input.bookingId).eq('organization_id', input.organizationId).maybeSingle();
+  if (!seat) return 'not_found';
+  const { data, error } = await db.rpc('set_seat_booking_status', { p_booking_id: input.bookingId, p_status: input.status });
+  if (error) throw error;
+  return data as 'updated' | 'not_started' | 'invalid' | 'not_found';
 }
 
 /** Take the seat / No thanks. A declined seat (or one the player no longer needs) goes to the next player. */
@@ -659,8 +680,11 @@ export async function listMySeats(
       pricePoisha: b.price_poisha,
       status: b.status,
       cancellable: b.status === 'confirmed' && isLive(b.open_play_sessions, new Date(now)) && now < start - cutoff * 60_000,
+      paid: false,
     };
   });
+  const live = await livePayments(db, { spaceBookingIds: [], seatBookingIds: seats.map((s) => s.bookingId) });
+  for (const seat of seats) seat.paid = live.has(seat.bookingId);
   const upcoming = seats.filter((s) => s.status === 'confirmed' && Date.parse(s.startsAt) > now).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const past = seats
     .filter((s) => !upcoming.includes(s))
