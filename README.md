@@ -32,7 +32,7 @@ Everything is on one host (`localhost:3000` locally):
 
 | Path | What |
 |---|---|
-| `/` | The brand's home: open now / opens at, coming-up games, a card per section |
+| `/` | The landing page: a hero made of the three sections' photos, our services (price from, spaces, today's hours, games, book / join), how it works, games coming up, why play here, hours and location |
 | `/<section>` (`/turf`, `/cafe`, `/lounge`) | The section: its photo, open games, what you can play, the week's hours |
 | `/<section>/book` | Book a space: space tags, a 7-day strip, the slot grid and a sticky **Book** bar |
 | `/sessions/<id>` | A game: seats left, request a seat / join the waitlist, your team once matched |
@@ -122,6 +122,7 @@ pnpm env:local                                               # .env.local → ba
   250 KB; authors and links in `public/sections/CREDITS.md`. Swap in the brand's own photos by replacing the files.
 - **Live:** the home, section and game pages refresh every 30 s while visible. Motion (cards rising in, the open
   dot, seat bars filling) only runs when the system allows motion.
+- **Footer** on every site page: the brand and its address, the sections, and sign-in or the player's own pages.
 - **One sign-in:** `/signin?next=…` for everyone (staff invite emails send `next=/manage`). It works even while
   the brand isn't live, so staff can sign in to set it up and publish it; the other public pages then say
   "Not open yet".
@@ -237,7 +238,7 @@ Hard numbers for the case study, re-measured as features land.
 |---|---|---|
 | Match 500 players into tables (median of 5) | **2.0–2.4 ms** | `packages/engine/test/bench.test.ts` (10 games, 60 tables, 2000 swap iterations) |
 | Engine tests (incl. property tests) | 51 | `pnpm --filter @bm/engine test` |
-| Web unit tests | 230 | `pnpm --filter web test` |
-| Web integration tests (real Supabase, Realtime, Mailpit) | 111 | `pnpm test:integration` |
+| Web unit tests | 231 | `pnpm --filter web test` |
+| Web integration tests (real Supabase, Realtime, Mailpit) | 112 | `pnpm test:integration` |
 | Database assertions | 365 pgTAP checks + 4 two-connection race tests | `pnpm db:test`, `pnpm test:race` |
 | End-to-end tests (Playwright, Chromium) | 2 (the journey through 3 sections; sign-in while not live) | `pnpm test:e2e` |
