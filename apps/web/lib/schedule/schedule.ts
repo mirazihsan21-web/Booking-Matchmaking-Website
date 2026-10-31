@@ -61,8 +61,9 @@ export async function scheduleOpenPlay(db: SupabaseClient, input: ScheduleInput)
   return { status: 'clash', at: formatNight(starts[0]!.toISOString(), input.timeZone) };
 }
 
-export async function cancelOpenPlay(db: SupabaseClient, sessionId: string): Promise<'cancelled' | 'not_open' | 'not_found'> {
-  const { data, error } = await db.rpc('cancel_open_play_session', { p_session_id: sessionId });
+/** Cancels a game; `cancelledBy` (the staff member) is recorded as voiding any seat's cash. */
+export async function cancelOpenPlay(db: SupabaseClient, sessionId: string, cancelledBy?: string): Promise<'cancelled' | 'not_open' | 'not_found'> {
+  const { data, error } = await db.rpc('cancel_open_play_session', { p_session_id: sessionId, p_cancelled_by: cancelledBy ?? null });
   if (error) throw error;
   return data as 'cancelled' | 'not_open' | 'not_found';
 }

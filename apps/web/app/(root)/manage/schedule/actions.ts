@@ -74,7 +74,7 @@ export async function cancelSessionAction(sessionId: string, _state: FormState, 
   const db = createServiceClient();
   const section = await sectionOfSession(db, sessionId);
   if (!section || section.organizationId !== manager.org.id || !manager.sectionIds.includes(section.id)) return { ok: false, message: m.schedule.invalid };
-  const result = await cancelOpenPlay(db, sessionId);
+  const result = await cancelOpenPlay(db, sessionId, manager.user.id);
   refresh();
   return result === "cancelled" ? { ok: true, message: m.schedule.cancelled } : { ok: false, message: m.schedule.notOpen };
 }

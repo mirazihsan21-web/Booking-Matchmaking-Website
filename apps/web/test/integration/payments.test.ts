@@ -131,8 +131,11 @@ describe('paid bookings and seats', () => {
     expect(await recordPayment(owner, { kind: 'seat', bookingId: id.seat!, amountPoisha: 30000 })).toBe('recorded');
     expect((await listMySeats(db, { organizationId: orgId, profileId })).upcoming.find((s) => s.bookingId === id.seat)?.paid).toBe(true);
     expect(await cancelSeat(db, { organizationId: orgId, bookingId: id.seat!, actor: { kind: 'player', profileId } })).toBe('paid');
-    expect(await cancelSeat(db, { organizationId: orgId, bookingId: id.seat!, actor: { kind: 'staff' } })).toBe('cancelled');
+    expect(await cancelSeat(db, { organizationId: orgId, bookingId: id.seat!, actor: { kind: 'staff' }, cancelledBy: users[1]!.id })).toBe('cancelled');
     expect((await livePayments(db, { spaceBookingIds: [], seatBookingIds: [id.seat!] })).size).toBe(0);
+    // The app cancels with the service role; the staff member who pressed Cancel is recorded as voiding the cash.
+    const { data: voided } = await db.from('payments').select('voided_by').eq('seat_booking_id', id.seat!).single();
+    expect(voided!.voided_by).toBe(users[1]!.id);
   });
 });
 

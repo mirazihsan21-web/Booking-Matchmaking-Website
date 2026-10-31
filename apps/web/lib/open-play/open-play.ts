@@ -298,7 +298,7 @@ export async function offerNext(db: SupabaseClient, input: { groupId: string; se
 /** Cancels a seat (a player their own, before the cut-off; staff any, before the start) and offers it on. */
 export async function cancelSeat(
   db: SupabaseClient,
-  input: { organizationId: string; bookingId: string; actor: { kind: 'player'; profileId: string } | { kind: 'staff' }; now?: Date },
+  input: { organizationId: string; bookingId: string; actor: { kind: 'player'; profileId: string } | { kind: 'staff' }; cancelledBy?: string; now?: Date },
 ): Promise<CancelSeatOutcome> {
   if (!UUID.test(input.bookingId) || !UUID.test(input.organizationId)) return 'not_found';
   const { data, error } = await db
@@ -327,7 +327,7 @@ export async function cancelSeat(
   if (now.getTime() >= start) return 'too_late';
   if (input.actor.kind === 'player' && now.getTime() >= start - session.sections.cancel_cutoff_minutes * 60_000) return 'too_late';
 
-  const { data: freed, error: cancelError } = await db.rpc('cancel_booking', { p_booking_id: input.bookingId, p_by_venue: input.actor.kind === 'staff' });
+  const { data: freed, error: cancelError } = await db.rpc('cancel_booking', { p_booking_id: input.bookingId, p_by_venue: input.actor.kind === 'staff', p_cancelled_by: input.cancelledBy ?? null });
   if (cancelError) throw cancelError;
   if (!(freed as unknown[]).length) return 'closed';
   await handOn(db, booking.group_id, booking.seat_no);

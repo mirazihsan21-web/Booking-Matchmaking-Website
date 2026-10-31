@@ -25,7 +25,7 @@ export async function staffCancelSeatAction(bookingId: string, _state: FormState
   const db = createServiceClient();
   const sectionId = await sectionIdOfSeat(db, bookingId);
   if (!sectionId || !manager.sectionIds.includes(sectionId)) return { ok: false, message: m.staffSession.outcome.not_found };
-  const result = await cancelSeat(db, { organizationId: manager.org.id, bookingId, actor: { kind: "staff" } });
+  const result = await cancelSeat(db, { organizationId: manager.org.id, bookingId, actor: { kind: "staff" }, cancelledBy: manager.user.id });
   refresh();
   return { ok: result === "cancelled", message: m.staffSession.outcome[result] };
 }

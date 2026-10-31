@@ -152,7 +152,8 @@ select is((select status::text from public.seat_offers where group_id = pg_temp.
 -- ── grants ──────────────────────────────────────────────────────────────────
 select is_empty(
   $$ select f from unnest(array['public.issue_offer_token(uuid, text)', 'public.close_started_sessions()',
-                                'public.cancel_booking(uuid, boolean)', 'public.create_offer(uuid, smallint, uuid)',
+                                'public.cancel_booking(uuid, boolean, uuid)', 'public.create_offer(uuid, smallint, uuid)',
+                                'public.cancel_open_play_session(uuid, uuid)',
                                 'public.unoffered_free_seats(integer)', 'public.sessions_due_for_matching(integer)']) as f
      where has_function_privilege('authenticated', f, 'execute') or has_function_privilege('anon', f, 'execute')
         or not has_function_privilege('service_role', f, 'execute') $$,
