@@ -25,3 +25,11 @@ export function requestOrigin(host: string | null, requestUrl: string, rootDomai
   if (h !== root && h !== `www.${root}`) return fallback.origin;
   return `${fallback.protocol}//${h}`;
 }
+
+/**
+ * Where someone goes after signing in: the brand's owners and staff with no page in mind (`next` is the
+ * default "/") go to the manage area; everyone else, and anyone heading somewhere, keeps `next`.
+ */
+export function landingAfterSignIn(next: string, isTeam: boolean): string {
+  return next === '/' && isTeam ? '/manage' : next;
+}

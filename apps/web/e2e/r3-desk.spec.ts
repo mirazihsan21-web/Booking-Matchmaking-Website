@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { localAdmin, signIn } from './helpers';
+import { localAdmin, signIn, signInLink } from './helpers';
 
 const OWNER = 'owner@demo-arena.test';
 const taka = (text: string) => Number(text.replace(/[^\d.]/g, ''));
@@ -146,6 +146,21 @@ test('the desk takes cash for a seat in a game priced at the venue', async ({ pa
     await db.from('resource_reservations').delete().eq('source', 'session').eq('source_id', session);
     await db.from('open_play_sessions').delete().eq('id', session);
   }
+});
+
+test('the owner signs in from the site and lands in the manage area', async ({ page }) => {
+  // Signing in from the site's own Sign in (no page in mind): the team goes to Manage, not the player pages.
+  const since = new Date();
+  await page.goto('/signin');
+  await page.getByLabel('Email address').fill(OWNER);
+  await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
+  await expect(page.getByText('Check your email')).toBeVisible();
+  await page.goto(await signInLink(OWNER, since));
+  await expect(page).toHaveURL((url) => url.pathname === '/manage');
+  // And from anywhere on the site, the menu has a way back in.
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Manage', exact: true }).click();
+  await expect(page).toHaveURL((url) => url.pathname === '/manage');
 });
 
 test('a turf-only staff member sees only turf', async ({ page }) => {

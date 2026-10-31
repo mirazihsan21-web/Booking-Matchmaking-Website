@@ -25,6 +25,8 @@ test('a player signs in once, books a space and joins a game in each section', a
     await expect(page.getByText('Check your email')).toBeVisible();
     await page.goto(await signInLink(address));
     await expect(page).toHaveURL(/\/me$/);
+    // Players have no way into the manage area.
+    await expect(page.getByRole('link', { name: 'Manage', exact: true })).toHaveCount(0);
     const signedInAt = visited.length;
 
     // 2. A profile with level 3 in every section.

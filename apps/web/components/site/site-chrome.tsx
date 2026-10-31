@@ -21,6 +21,7 @@ export async function SiteChrome({ brand, children }: { brand: Brand; children: 
         logoUrl={logo}
         sections={sections}
         signedIn={Boolean(player)}
+        showManage={Boolean(player?.isTeam)}
         bell={player?.profileId ? { profileId: player.profileId, organizationId: brand.id, unread } : null}
       />
       {children}

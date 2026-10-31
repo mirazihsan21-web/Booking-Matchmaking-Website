@@ -374,7 +374,7 @@ export const en = {
     notFound: 'Not on the board',
     notFoundBody: "There's nothing at this address.",
     backHome: 'Back home',
-    nav: { home: 'Home', me: 'Me', myBookings: 'My bookings', profile: 'Profile', signIn: 'Sign in' },
+    nav: { home: 'Home', me: 'Me', myBookings: 'My bookings', profile: 'Profile', signIn: 'Sign in', manage: 'Manage' },
     landing: {
       tagline: 'Turf, board games and gaming under one roof. Book a space for your group, or join a game with players at your level.',
       bookSpace: 'Book a space',

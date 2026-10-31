@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { requestOrigin, safeNext } from '../lib/auth/redirect';
+import { requestOrigin, landingAfterSignIn, safeNext } from '../lib/auth/redirect';
 
 describe('requestOrigin (Next reports its own hostname in request.url, not the Host header)', () => {
   const root = 'localhost:3000';
@@ -47,5 +47,17 @@ describe('safeNext (no open redirects after sign-in)', () => {
       const next = safeNext(`/${ch}/evil.example`);
       expect(new URL(next, 'http://localhost:3000').origin).toBe('http://localhost:3000');
     }
+  });
+});
+
+describe('landingAfterSignIn', () => {
+  it('sends the brand’s owners and staff to the manage area when they had no page in mind', () => {
+    expect(landingAfterSignIn('/', true)).toBe('/manage');
+  });
+
+  it('keeps everyone else, and anyone heading somewhere, where they were going', () => {
+    expect(landingAfterSignIn('/', false)).toBe('/');
+    expect(landingAfterSignIn('/sessions/abc', true)).toBe('/sessions/abc');
+    expect(landingAfterSignIn('/me', false)).toBe('/me');
   });
 });

@@ -28,12 +28,15 @@ export function SiteNav({
   logoUrl,
   sections,
   signedIn,
+  showManage,
   bell,
 }: {
   brandName: string;
   logoUrl: string | null;
   sections: NavSection[];
   signedIn: boolean;
+  /** The brand's owners and staff get a way into the manage area. */
+  showManage: boolean;
   bell: { profileId: string; organizationId: string; unread: number } | null;
 }) {
   const path = usePathname();
@@ -62,6 +65,11 @@ export function SiteNav({
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2 text-sm">
+            {showManage && (
+              <Link href="/manage" className="rounded-lg px-3 py-1.5 font-semibold hover:bg-raised">
+                {m.site.nav.manage}
+              </Link>
+            )}
             {signedIn && (
               <Link href="/me/bookings" className="hidden rounded-lg px-3 py-1.5 hover:bg-raised md:inline-block">
                 {m.site.nav.myBookings}
