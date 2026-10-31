@@ -107,6 +107,14 @@ describe('slotStates', () => {
   it('marks a slot that has started as past', () => {
     expect(slotStates(slots, [], new Date('2026-10-23T04:00:00Z'))[0]!.state).toBe('past');
   });
+
+  it('notes when something holds a slot that has started (a game under way), so the desk does not sell it', () => {
+    const during = new Date('2026-10-23T13:20:00Z'); // 19:20, the 19:00 game is on
+    const states = slotStates(slots, [{ start: new Date('2026-10-23T13:00:00Z'), end: new Date('2026-10-23T14:00:00Z'), source: 'session' }], during);
+    const running = states.find((s) => iso(s.start) === '2026-10-23T13:00:00.000Z')!;
+    expect(running).toMatchObject({ state: 'past', held: true });
+    expect(states.find((s) => iso(s.start) === '2026-10-23T12:00:00.000Z')!.held).toBeUndefined(); // 18:00, empty
+  });
 });
 
 describe('businessDayWindow (every booking belongs to exactly one business day)', () => {

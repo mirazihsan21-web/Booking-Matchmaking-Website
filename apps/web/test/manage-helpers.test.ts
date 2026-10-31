@@ -71,6 +71,12 @@ describe('freeGaps', () => {
     const booked = freeGaps([{ start: at(16), end: at(17), state: 'past' as const, bookings: [{}] }], now);
     expect(booked).toEqual([]);
   });
+
+  it('never offers the hour under way when a game holds it', () => {
+    const at = (h: number) => dhaka(`2026-10-28T${String(h).padStart(2, '0')}:00:00`);
+    const now = dhaka('2026-10-28T16:40:00');
+    expect(freeGaps([{ start: at(16), end: at(17), state: 'past' as const, held: true }], now)).toEqual([]);
+  });
 });
 
 describe('oldManagePath (spec edge 7)', () => {

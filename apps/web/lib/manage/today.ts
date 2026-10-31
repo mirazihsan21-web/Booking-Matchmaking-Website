@@ -33,12 +33,12 @@ export function placeOnTimeline(window: { start: Date; end: Date }, start: Date,
   return { leftPct: ((from - window.start.getTime()) / total) * 100, widthPct: ((to - from) / total) * 100 };
 }
 
-type DeskSlot = { start: Date; end: Date; state: SlotState; bookings?: unknown[] };
+type DeskSlot = { start: Date; end: Date; state: SlotState; held?: boolean; bookings?: unknown[] };
 
-/** Whether the desk can sell a slot: free, or (given `now`) the one already under way when nobody has it. */
+/** Whether the desk can sell a slot: free, or (given `now`) the one already under way when no booking or game holds it. */
 export function isDeskFree(slot: DeskSlot, now?: Date): boolean {
   if (slot.state === 'free') return true;
-  return now !== undefined && slot.state === 'past' && slot.start <= now && now < slot.end && !slot.bookings?.length;
+  return now !== undefined && slot.state === 'past' && slot.start <= now && now < slot.end && !slot.held && !slot.bookings?.length;
 }
 
 /** Runs of neighbouring slots the desk can sell (see isDeskFree), as one gap each. */

@@ -88,10 +88,11 @@ export function slotStates(
   slots: Slot[],
   busy: Array<{ start: Date; end: Date; source: 'booking' | 'session' }>,
   now: Date,
-): Array<Slot & { state: SlotState }> {
+): Array<Slot & { state: SlotState; held?: true }> {
   return slots.map((slot) => {
-    if (slot.start <= now) return { ...slot, state: 'past' };
     const overlapping = busy.filter((b) => b.start < slot.end && b.end > slot.start);
+    // A slot that has started is past for players; `held` tells the desk a booking or game is in it now.
+    if (slot.start <= now) return overlapping.length > 0 ? { ...slot, state: 'past', held: true } : { ...slot, state: 'past' };
     if (overlapping.some((b) => b.source === 'session')) return { ...slot, state: 'open_play' };
     if (overlapping.length > 0) return { ...slot, state: 'taken' };
     return { ...slot, state: 'free' };

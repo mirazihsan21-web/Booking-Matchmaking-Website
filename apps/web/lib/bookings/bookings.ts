@@ -40,7 +40,7 @@ export interface SlotBooking {
 export interface SpaceDay {
   resource: { id: string; name: string; slotMinutes: number; pricePerHourPoisha: number | null; active: boolean };
   /** `bookings` (staff only) lists every booking overlapping the slot. */
-  slots: Array<Slot & { state: SlotState; bookings?: SlotBooking[] }>;
+  slots: Array<Slot & { state: SlotState; held?: true; bookings?: SlotBooking[] }>;
   /** Staff only: bookings on this business day that no current slot covers (hours changed, day closed). */
   extra?: SlotBooking[];
 }
