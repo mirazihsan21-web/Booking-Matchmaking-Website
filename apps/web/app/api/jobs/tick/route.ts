@@ -5,7 +5,7 @@ import { runTick } from "@/lib/jobs/tick";
 import { createServiceClient } from "@/lib/service-client";
 
 /**
- * Called every 10 seconds by pg_cron (via pg_net) with the shared job secret. The database calls in
+ * Called every minute by pg_cron (via pg_net) with the shared job secret. The database calls in
  * as host.docker.internal locally, so proxy.ts lets /api/jobs/* through for any host.
  */
 export async function POST(request: Request) {

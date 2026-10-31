@@ -72,7 +72,7 @@ The agency re-skins it per business type through presets.
   - **First `supabase start`** pulls about 13 images (several GB). One pull hit `tls: bad record MAC` and retried on its own.
 - **Local Supabase keys** are the standard public demo keys printed by `supabase start` (`pnpm exec supabase status`). They're safe to use locally and must never be used in production.
 - `supabase/seed.sql` doesn't exist yet, so `db reset` prints "no files matched pattern". That's harmless. Seeding a demo tenant from `@bm/sim` comes in Stage B or later.
-- **The 10-second job tick needs three things locally:** the dev server on :3000, `pnpm env:local` run since the last `db:reset` (it writes `JOB_SECRET` to `.env.local` and `app_url` + `job_secret` to Vault), and a dev-server restart after that. The database reaches the host as `http://host.docker.internal:3000`; that name exists on Docker Desktop (Windows/macOS). **On Linux add `extra_hosts: host.docker.internal:host-gateway`** or point `app_url` at the host's IP.
+- **The job tick (every minute) needs three things locally:** the dev server on :3000, `pnpm env:local` run since the last `db:reset` (it writes `JOB_SECRET` to `.env.local` and `app_url` + `job_secret` to Vault), and a dev-server restart after that. The database reaches the host as `http://host.docker.internal:3000`; that name exists on Docker Desktop (Windows/macOS). **On Linux add `extra_hosts: host.docker.internal:host-gateway`** or point `app_url` at the host's IP.
 - **Integration tests pause the tick** (`cron.alter_job(…, active := false)` in `test/integration/global-setup.ts`) and resume it in teardown, so the live tick doesn't deliver the tests' emails. If a run is killed mid-way the tick stays paused: `select cron.alter_job(jobid, active := true) from cron.job where jobname = 'tick';`
 - **Mailpit SMTP** is on 54325 (`[local_smtp] smtp_port` in `config.toml`). Changes to `config.toml` (SMTP port, email templates) only apply after `pnpm db:stop && pnpm db:start` — data survives that.
 - **New migrations are named by hand, after `20261020200500`.** `supabase migration new` stamps the machine clock (it ran ~14:54Z on 2026-10-20), which sorts *before* the hand-named Stage A fix-pass migrations (`…191000`, `…191100`); a migration that sorts earlier than ones it depends on runs in the wrong order. Check `ls supabase/migrations | tail` and rename if needed.
@@ -198,7 +198,7 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
   - **Matching** runs automatically at a cut-off, plus a "Match now" button. Too few players → the session stays open and matching retries every tick until start.
   - **Cancelling:** players cancel online until a venue cut-off; staff can always cancel.
   - **Defaults:** match cut-off 6h, cancel cut-off 2h (the DB requires match > cancel). With equal cut-offs nobody could cancel after matching, so the waitlist would never be used.
-  - **Timed work:** `pg_cron` → `pg_net` → `POST /api/jobs/tick` every 10s (secret in Vault). Notifications are an outbox written inside the same SQL function as the state change; the tick sends their emails (SMTP→Mailpit locally, Resend in Stage E).
+  - **Timed work:** `pg_cron` → `pg_net` → `POST /api/jobs/tick` every minute (every 10 s before the Vercel launch; secret in Vault). Notifications are an outbox written inside the same SQL function as the state change; the tick sends their emails (SMTP→Mailpit locally, Resend in Stage E).
   - **Offer emails** link to `/offers/<token>`. Only the token's hash is stored, and the seat is taken by a POST button, never by opening the link (email scanners open links).
   - **Build order:** **B1** (history protection, notifications/email/jobs, whole-space bookings + walk-ins), then **B2** (open play, matching, offers), each reviewed and merged separately.
 
@@ -366,8 +366,8 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 - A withdraw racing a match makes `apply_match` raise `invalid_match`: Match now shows an error page, and the tick's match loop stops for that tick (no per-session try).
 - Favourites naming deactivated activities still count in `request_seat`/`offerNext`/`wants_game` (`planMatch` ignores them), so such a player can't be seated late or offered a seat in a players-choose session.
 - The repeat-request priority rule differs from spec §3: post-match requesters never earn it; requesters of a never-matched session, and players who withdrew or declined, do.
-- `cancel_open_play_session` doesn't refuse a session that has started (a stale button within the 10 s before the tick closes it).
-- **Before the hosted deploy:** the first tick closes every past `open`/`matched` session in history and emails "no seat" to its players, possibly weeks late. Silently close old sessions in a migration first.
+- `cancel_open_play_session` doesn't refuse a session that has started (a stale button within the minute before the tick closes it).
+- ~~**Before the hosted deploy:**~~ *Done 2026-10-29: migration `20261029010000_launch_timer` closed them quietly.* the first tick closes every past `open`/`matched` session in history and emails "no seat" to its players, possibly weeks late. Silently close old sessions in a migration first.
 - The tick matches, closes and emails for suspended venues too (no venue-status filter).
 - "Seat cancelled. We offered it to the next player." shows even when nobody was waiting (`cancelSeat` ignores `offerNext`'s result).
 - My bookings shows upcoming seats only; `listMySeats` already returns past ones (spec §7 asks for both).
@@ -386,7 +386,7 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 - **Missing events.** `accept_offer` writes no event for `seat_taken` / `already_booked`. Every other state change has one.
 
 **Deferred minor findings from the Stage B1 final review** (fix before production / when touched):
-- `claim_pending_emails`' OR filter can't use the pending partial index → a seq scan every 10 s; add a partial index on `email_status in ('pending','sending')`.
+- `claim_pending_emails`' OR filter can't use the pending partial index → a seq scan every minute; add a partial index on `email_status in ('pending','sending')`.
 - `cron.job_run_details` grows ~8,640 rows/day; add a cleanup job or turn off `cron.log_run`.
 - Double submit at the booking limit answers "limit reached" instead of "already yours".
 - `book_resource` price math is int and overflows above ~৳22,000/h × 960 min; cast to numeric and bound the price input.
@@ -396,7 +396,7 @@ supabase/           migrations (M1 → stage_a_schema → stage_a_rls → schedu
 - Deleting an auth user with bookings fails (history is protected); account deletion will need anonymisation.
 
 **Deferred minor findings from the Stage A final review** (fix with a test when the area is next touched):
-- **Before Stage B/C writes real bookings:** `on delete cascade` from `player_profiles` and `activities` would erase booking history. Switch to `restrict`/`set null` plus soft deletes.
+- ~~**Before Stage B/C writes real bookings:**~~ *Done in Stage B1: `20261020200000_protect_booking_history` (and the payments' own keys since `20261031010000_payment_records`).* `on delete cascade` from `player_profiles` and `activities` would erase booking history. Switch to `restrict`/`set null` plus soft deletes.
 - The last-owner guard is check-then-write: two owners removing each other at the same moment can leave none. Enforce it in the DB.
 - Deleting a branch that ever had a session fails (23503) and shows the raw Postgres text. Map it to a message, like `activityInUse`.
 - No upper bound on money input (above int4 poisha gives a 500). A one-emoji venue name passes the JS 2-character check but fails the DB CHECK.

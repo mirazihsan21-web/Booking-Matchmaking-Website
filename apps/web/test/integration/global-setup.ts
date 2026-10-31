@@ -3,7 +3,7 @@ import { supabaseStatus } from '../../scripts/supabase-status.mjs';
 
 const DB_URL = process.env.SUPABASE_DB_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 
-/** Turns the database's 10-second job tick on or off (it would otherwise race these tests' senders). */
+/** Turns the database's every-minute job tick on or off (it would otherwise race these tests' senders). */
 async function setTick(active: boolean): Promise<void> {
   const db = new pg.Client({ connectionString: DB_URL });
   await db.connect();

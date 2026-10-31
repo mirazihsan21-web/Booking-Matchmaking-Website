@@ -17,7 +17,7 @@ const MATCHES_PER_TICK = 10;
 const REFILLS_PER_TICK = 50;
 
 /**
- * One run of the timed work, called every 10 seconds by pg_cron through POST /api/jobs/tick. Every
+ * One run of the timed work, called every minute by pg_cron through POST /api/jobs/tick. Every
  * step is capped and safe to repeat, so overlapping ticks are harmless, and each runs on its own: a
  * failing step is logged and the next one still runs. Order: pass on expired offers, offer any free
  * seat whose hand-off was lost, match sessions that reached their cut-off, close sessions that started,

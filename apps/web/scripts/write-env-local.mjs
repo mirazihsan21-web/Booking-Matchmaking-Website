@@ -1,5 +1,5 @@
 // Writes apps/web/.env.local from the running local Supabase stack, and points the database's
-// 10-second job tick at this app (Vault: app_url + job_secret). Run: pnpm env:local
+// every-minute job tick at this app (Vault: app_url + job_secret). Run: pnpm env:local
 import { randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

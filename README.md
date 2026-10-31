@@ -250,12 +250,15 @@ beside the hosted database: functions in Seoul (`icn1`), and only `main` deploys
 
 1. *You:* a Gmail account for the brand, with 2-Step Verification and an **App Password**.
 2. *You:* `pnpm dlx vercel@65.4.0 login`; then `cd apps/web && pnpm dlx vercel@65.4.0 link` (project `chattoturf`,
-   root directory `apps/web`, connect the GitHub repo). Note the production address.
+   connect the GitHub repo). In Vercel → Settings → Build and Deployment, check **Root Directory** is `apps/web`
+   with "Include files outside the root directory" on (the app uses the workspace's `packages/`). The address is the
+   project's production domain (Settings → Domains, e.g. `chattoturf.vercel.app`) — never a deployment's own URL,
+   which sits behind Vercel's login and would turn the job tick away.
 3. The hosted outbox holds no old mail: `pnpm exec supabase db query --linked "select email_status, count(*) from
    public.notifications group by 1"` shows no `pending` or `sending`.
 4. `pnpm env:vercel --host <address> --gmail <brand gmail>`. In a real terminal it asks for the App Password
    without showing it; anywhere else, add `SMTP_PASS` in Vercel (Settings → Environment Variables, Production,
-   Sensitive). It also points the hosted job tick at the site (Vault `app_url`, `job_secret`).
+   type Secret). It also points the hosted job tick at the site (Vault `app_url`, `job_secret`).
 5. *You:* `pnpm exec supabase db push --yes`.
 6. *You:* in the Supabase dashboard —
    - Authentication → URL Configuration: Site URL `https://<address>`; redirect URLs `https://<address>/**` and
@@ -279,12 +282,14 @@ beside the hosted database: functions in Seoul (`icn1`), and only `main` deploys
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`*, `NEXT_PUBLIC_ROOT_DOMAIN`,
 `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED`, `BRAND_SLUG`, `JOB_SECRET`*, `EMAIL_TRANSPORT`, `SMTP_HOST`, `SMTP_PORT`,
 `SMTP_USER`, `SMTP_PASS`*, `EMAIL_FROM`, `ENABLE_EXPERIMENTAL_COREPACK`. Re-running it replaces them all and makes a
-new job secret (in Vercel and the Vault together); redeploy afterwards so the site picks them up.
+new job secret (in Vercel and the Vault together); then redeploy (Vercel → Deployments → the latest → ⋯ →
+**Redeploy**) so the site picks them up.
 
 **After launch:** push `main` to deploy; other branches never deploy (they would run against the live database).
 Roll back with Vercel → Deployments → an earlier one → **Promote to Production**. Stop the job tick without touching
-the site: `pnpm exec supabase db query --linked "delete from vault.secrets where name = 'app_url'"`; `pnpm
-env:vercel` starts it again.
+the site: `pnpm exec supabase db query --linked "delete from vault.secrets where name = 'app_url'"`. To start it
+again after a long stop, first close the games that started meanwhile without telling anyone (`pnpm exec supabase
+db query --linked "select private.close_past_sessions_quietly()"`), then run `pnpm env:vercel` and redeploy.
 
 **Free-plan limits behind this:** Hobby includes 1,000,000 function calls and 4 CPU-hours a month and pauses the site
 for 30 days past them. The tick runs every minute (about 43,000 calls), but it isn't the only cost: every open home,
