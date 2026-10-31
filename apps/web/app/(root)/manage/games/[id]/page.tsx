@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { cn } from "cn";
-import { ActionButton, ActionForm } from "@/components/forms/action-form";
+import { ActionButton, ActionForm, FieldError } from "@/components/forms/action-form";
 import { ConfirmAction } from "@/components/manage/confirm-action";
 import { sectionStyle } from "@/components/site/section-style";
+import { Input } from "@/components/ui/input";
 import { formatNight, formatShortTime } from "@/lib/format";
 import { cancelQuestion } from "@/lib/manage/cancel";
 import { amountInput, formatBdt } from "@/lib/money";
@@ -132,9 +133,20 @@ async function Game({ params }: { params: Promise<{ id: string }> }) {
                                 {paid ? (
                                   <ActionButton action={voidPaymentAction.bind(null, paid.id)} label={desk.undoPayment} variant="ghost" />
                                 ) : (
-                                  <ActionForm action={recordPaymentAction.bind(null, "seat", p.bookingId)} submitLabel={`${desk.paid} ${formatBdt(seat?.price ?? session.pricePoisha)}`} className="flex-row">
-                                    <input type="hidden" name="amount" value={amountInput(seat?.price ?? session.pricePoisha)} />
-                                  </ActionForm>
+                                  (seat?.price ?? session.pricePoisha) > 0 ? (
+                                    <ActionForm action={recordPaymentAction.bind(null, "seat", p.bookingId)} submitLabel={`${desk.paid} ${formatBdt(seat?.price ?? session.pricePoisha)}`} className="flex-row">
+                                      <input type="hidden" name="amount" value={amountInput(seat?.price ?? session.pricePoisha)} />
+                                    </ActionForm>
+                                  ) : (
+                                    // Priced at the venue: the desk types what was paid (as Today's panel does).
+                                    <ActionForm action={recordPaymentAction.bind(null, "seat", p.bookingId)} submitLabel={desk.markPaid} variant="section" className="w-full max-w-xs">
+                                      <label htmlFor={`seat-amount-${p.bookingId}`} className="text-sm font-medium">
+                                        {desk.paidInCash} · {desk.amount}
+                                      </label>
+                                      <Input id={`seat-amount-${p.bookingId}`} name="amount" inputMode="decimal" />
+                                      <FieldError name="amount" />
+                                    </ActionForm>
+                                  )
                                 )}
                                 {live && (
                                   <ConfirmAction

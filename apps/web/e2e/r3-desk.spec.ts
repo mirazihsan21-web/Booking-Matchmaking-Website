@@ -102,6 +102,52 @@ test('the owner books a walk-in, checks them in, takes cash and sees it in Takin
   }
 });
 
+test('the desk takes cash for a seat in a game priced at the venue', async ({ page }) => {
+  const { db, slug } = localAdmin();
+  const turf = await brandSection(slug, 'turf');
+  const { data: pitch } = await db.from('resources').select('id').eq('section_id', turf.sectionId).eq('name', 'Pitch 2').single();
+  const { data: activity } = await db.from('activities').select('id').eq('section_id', turf.sectionId).eq('active', true).limit(1).single();
+  const { data: player } = await db.from('player_profiles').select('id').eq('organization_id', turf.orgId).limit(1).single();
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date(Date.now() + 4 * 86_400_000));
+  // A matched game whose seats are priced at the venue (৳0), with one player seated.
+  const { data: made, error } = await db.rpc('schedule_open_play', {
+    p_organization_id: turf.orgId,
+    p_section_id: turf.sectionId,
+    p_activity_id: activity!.id,
+    p_resource_ids: [pitch!.id],
+    p_starts_at: [`${day}T21:00:00+06:00`],
+    p_duration_min: 60,
+    p_seat_price_poisha: 0,
+  });
+  if (error) throw error;
+  const session = (made as string[])[0]!;
+  let group: string | undefined;
+  let seat: string | undefined;
+  try {
+    await db.from('open_play_sessions').update({ status: 'matched' }).eq('id', session);
+    group = (await db.from('groups').insert({ organization_id: turf.orgId, session_id: session, resource_id: pitch!.id, activity_id: activity!.id, capacity: 10 }).select('id').single()).data!.id;
+    seat = (await db.from('bookings').insert({ organization_id: turf.orgId, session_id: session, group_id: group, profile_id: player!.id, seat_no: 1, price_poisha: 0 }).select('id').single()).data!.id;
+
+    await signIn(page, OWNER, '/manage');
+    await page.goto(`/manage/games/${session}`);
+    const row = page.locator('main li').filter({ has: page.locator('input[name="amount"]') });
+    // Without an amount the desk is told what to enter; with one, the cash is recorded.
+    await row.getByRole('button', { name: 'Mark paid' }).click();
+    await expect(page.getByText('Enter an amount from ৳1 to ৳100,000')).toBeVisible();
+    await row.locator('input[name="amount"]').fill('300');
+    await row.getByRole('button', { name: 'Mark paid' }).click();
+    await expect(page.getByText('Paid ৳300 in cash')).toBeVisible();
+  } finally {
+    await db.rpc('cancel_open_play_session', { p_session_id: session });
+    if (seat) await db.from('payments').delete().eq('seat_booking_id', seat);
+    await db.from('events').delete().eq('session_id', session);
+    if (seat) await db.from('bookings').delete().eq('id', seat);
+    if (group) await db.from('groups').delete().eq('id', group);
+    await db.from('resource_reservations').delete().eq('source', 'session').eq('source_id', session);
+    await db.from('open_play_sessions').delete().eq('id', session);
+  }
+});
+
 test('a turf-only staff member sees only turf', async ({ page }) => {
   const { db, slug } = localAdmin();
   const turf = await brandSection(slug, 'turf');
