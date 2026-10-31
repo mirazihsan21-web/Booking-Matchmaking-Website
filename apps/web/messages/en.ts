@@ -166,6 +166,7 @@ export const en = {
       cannotMark: 'This booking can no longer be marked.',
       marked: 'Saved.',
       notFound: 'That booking no longer exists.',
+      notYourSection: "You don't run this section any more. Reload the page.",
       walkIn: 'Walk-in',
       status: { confirmed: 'Booked', attended: 'Arrived', no_show: 'No-show', cancelled: 'Cancelled' } as Record<string, string>,
       paid: 'Paid',

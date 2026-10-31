@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cancelQuestion } from '../lib/manage/cancel';
+import { deskRefusal } from '../lib/manage/refusal';
 import { accentReadability } from '../lib/manage/colour';
 import { oldManagePath } from '../lib/manage/paths';
 import { brandBusinessDate, deskWindow, freeGaps, placeOnTimeline } from '../lib/manage/today';
@@ -124,5 +125,15 @@ describe('cancelQuestion', () => {
     expect(cancelQuestion('seat', { count: 1, poisha: 30000 })).toBe('Paid ৳300 in cash. Give it back before cancelling');
     expect(cancelQuestion('game', { count: 1, poisha: 30000 })).toBe('1 seat paid ৳300 in cash. Give it back before cancelling');
     expect(cancelQuestion('game', { count: 2, poisha: 60000 })).toBe('2 seats paid ৳600 in cash. Give it back before cancelling');
+  });
+});
+
+describe('deskRefusal', () => {
+  it('says the booking is gone only when it is', () => {
+    expect(deskRefusal(null, ['turf'])).toBe('That booking no longer exists.');
+  });
+
+  it('tells staff whose sections changed mid-shift that this one is no longer theirs', () => {
+    expect(deskRefusal('cafe', ['turf'])).toBe("You don't run this section any more. Reload the page.");
   });
 });
