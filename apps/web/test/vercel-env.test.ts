@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { envSummary, vaultSql, vercelAddArgs, vercelEnvironment } from '../scripts/vercel-env-core.mjs';
+import { commandLine, envSummary, vaultSql, vercelAddArgs, vercelEnvironment } from '../scripts/vercel-env-core.mjs';
 
 const secrets = {
   secretKey: 'sb_secret_TESTONLY0000',
@@ -56,8 +56,9 @@ describe('vercelEnvironment', () => {
   });
 
   it('tells the Vercel CLI the type of each variable, so plain ones stay readable (final review, Important 1)', () => {
-    expect(vercelAddArgs({ name: 'SMTP_USER', sensitive: false })).toEqual(['env', 'add', 'SMTP_USER', 'production', '--no-sensitive']);
-    expect(vercelAddArgs({ name: 'SMTP_PASS', sensitive: true })).toEqual(['env', 'add', 'SMTP_PASS', 'production', '--sensitive']);
+    // --force replaces an existing value in one step, so a failure part-way never leaves a variable removed.
+    expect(vercelAddArgs({ name: 'SMTP_USER', sensitive: false })).toEqual(['env', 'add', 'SMTP_USER', 'production', '--no-sensitive', '--force']);
+    expect(vercelAddArgs({ name: 'SMTP_PASS', sensitive: true })).toEqual(['env', 'add', 'SMTP_PASS', 'production', '--sensitive', '--force']);
     for (const v of vars) expect(vercelAddArgs(v)).toContain(v.sensitive ? '--sensitive' : '--no-sensitive');
   });
 
@@ -65,6 +66,19 @@ describe('vercelEnvironment', () => {
     const summary = envSummary(vars);
     for (const v of vars) expect(summary).toContain(v.name);
     for (const s of Object.values(secrets)) expect(summary).not.toContain(s);
+  });
+});
+
+describe('commandLine', () => {
+  it('joins fixed words into one shell command, quoting a path with a space', () => {
+    expect(commandLine(['pnpm', 'exec', 'supabase', 'db', 'query', '--linked', '-f', 'C:/Users/A B/Temp/vault.sql'])).toBe(
+      'pnpm exec supabase db query --linked -f "C:/Users/A B/Temp/vault.sql"',
+    );
+  });
+
+  it('refuses anything a shell could read as more than one word', () => {
+    expect(() => commandLine(['pnpm', 'x"; rm -rf /'])).toThrow();
+    expect(() => commandLine(['pnpm', 'a&b'])).toThrow();
   });
 });
 

@@ -38,7 +38,24 @@ export function vercelEnvironment(input) {
  * @param {{ name: string, sensitive: boolean }} v
  */
 export function vercelAddArgs(v) {
-  return ['env', 'add', v.name, 'production', v.sensitive ? '--sensitive' : '--no-sensitive'];
+  // --force replaces an existing value in one step, so a failure part-way never leaves a variable removed.
+  return ['env', 'add', v.name, 'production', v.sensitive ? '--sensitive' : '--no-sensitive', '--force'];
+}
+
+/**
+ * One shell command from fixed words (pnpm is a .cmd on Windows, so it needs a shell). A word with a space — a
+ * temp path — is quoted; anything a shell could read as more than one word is refused. Values never pass here:
+ * they go on stdin.
+ *
+ * @param {string[]} parts
+ */
+export function commandLine(parts) {
+  return parts
+    .map((part) => {
+      if (!/^[\w@./:\\ -]+$/.test(part)) throw new Error(`Unsafe command word: ${part}`);
+      return part.includes(' ') ? `"${part}"` : part;
+    })
+    .join(' ');
 }
 
 /**

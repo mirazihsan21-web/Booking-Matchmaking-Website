@@ -17,7 +17,7 @@ import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { hostedProject } from './hosted-keys.mjs';
 import { repoRoot } from './supabase-status.mjs';
-import { envSummary, vaultSql, vercelAddArgs, vercelEnvironment } from './vercel-env-core.mjs';
+import { commandLine, envSummary, vaultSql, vercelAddArgs, vercelEnvironment } from './vercel-env-core.mjs';
 
 const VERCEL = ['dlx', 'vercel@65.4.0'];
 const webDir = fileURLToPath(new URL('..', import.meta.url));
@@ -40,11 +40,11 @@ async function hidden(question) {
   return answer;
 }
 
-/** Runs pnpm with fixed arguments; `input` (a secret) goes on stdin. Fails loudly, without echoing input. */
-function pnpm(args, { cwd, input, allowFailure = false } = {}) {
-  const run = spawnSync('pnpm', args, { cwd, input, shell: true, encoding: 'utf8', stdio: ['pipe', 'ignore', 'pipe'] });
-  if (run.status !== 0 && !allowFailure) throw new Error(`pnpm ${args.join(' ')} failed:\n${run.stderr}`);
-  return run.status === 0;
+/** Runs pnpm with fixed arguments as one command line; `input` (a secret) goes on stdin. Fails loudly, without echoing input. */
+function pnpm(args, { cwd, input } = {}) {
+  const command = commandLine(['pnpm', ...args]);
+  const run = spawnSync(command, { cwd, input, shell: true, encoding: 'utf8', stdio: ['pipe', 'ignore', 'pipe'] });
+  if (run.status !== 0) throw new Error(`${command} failed:\n${run.stderr}`);
 }
 
 const host = flag('host');
@@ -67,10 +67,7 @@ const vars = vercelEnvironment({
   gmailAppPassword,
 }).filter((v) => v.name !== 'SMTP_PASS' || v.value);
 
-for (const v of vars) {
-  pnpm([...VERCEL, 'env', 'rm', v.name, 'production', '--yes'], { cwd: webDir, allowFailure: true });
-  pnpm([...VERCEL, ...vercelAddArgs(v)], { cwd: webDir, input: v.value });
-}
+for (const v of vars) pnpm([...VERCEL, ...vercelAddArgs(v)], { cwd: webDir, input: v.value });
 console.log(`Vercel production variables set:\n${envSummary(vars)}`);
 if (!gmailAppPassword) console.log('SMTP_PASS not set (no terminal to ask in): add it in Vercel → Settings → Environment Variables, Production, Sensitive.');
 
@@ -78,8 +75,7 @@ const dir = mkdtempSync(join(tmpdir(), 'env-vercel-'));
 try {
   const file = join(dir, 'vault.sql');
   writeFileSync(file, vaultSql({ appUrl: `https://${host}`, jobSecret }), { mode: 0o600 });
-  // Quoted: the shell joins arguments with spaces, and a temp folder may contain one.
-  pnpm(['exec', 'supabase', 'db', 'query', '--linked', '-f', `"${file}"`], { cwd: repoRoot });
+  pnpm(['exec', 'supabase', 'db', 'query', '--linked', '-f', file], { cwd: repoRoot });
   console.log(`Vault: app_url, job_secret set (the tick now calls https://${host}/api/jobs/tick every minute)`);
 } finally {
   rmSync(dir, { recursive: true, force: true });
