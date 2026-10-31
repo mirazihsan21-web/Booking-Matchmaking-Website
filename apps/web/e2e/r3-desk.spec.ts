@@ -53,6 +53,13 @@ test('the owner books a walk-in, checks them in, takes cash and sees it in Takin
     // must never take their clicks.
     await page.goto('/manage');
     await expect(page.getByLabel('Now').first()).toHaveCSS('pointer-events', 'none');
+    // Each booking appears in the timeline and in the phone list; no element id may repeat (a repeated id
+    // sends the phone list's labels to the hidden timeline copy).
+    const repeatedIds = await page.evaluate(() => {
+      const ids = [...document.querySelectorAll('[id]')].map((e) => e.id);
+      return [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
+    });
+    expect(repeatedIds).toEqual([]);
     await page.getByRole('button', { name: new RegExp(guest) }).first().click();
     const panel = page.locator('dialog[open]');
     const amount = taka(await panel.locator('input[name="amount"]').inputValue());

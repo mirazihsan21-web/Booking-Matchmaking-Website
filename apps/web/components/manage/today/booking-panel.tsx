@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { ActionButton, ActionForm, FieldError, type FormAction } from "@/components/forms/action-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,8 @@ export interface PanelActions {
  */
 export function BookingPanel({ booking, actions, timeZone, className, children }: { booking: PanelBooking; actions: PanelActions; timeZone: string; className?: string; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  // The same booking's panel is on the page twice (timeline and phone list), so ids come from useId.
+  const amountId = `${useId()}-amount`;
   const [confirming, setConfirming] = useState(false);
   const p = m.manage.panel;
   const desk = m.manage.desk;
@@ -93,10 +95,10 @@ export function BookingPanel({ booking, actions, timeZone, className, children }
             ) : (
               <ActionForm action={actions.pay} submitLabel={desk.markPaid} variant="section" className="rounded-lg bg-raised p-3">
                 {/* Its own id: every booking's panel is on the page at once. */}
-                <label htmlFor={`amount-${booking.id}`} className="text-sm font-medium">
+                <label htmlFor={amountId} className="text-sm font-medium">
                   {desk.paidInCash} · {desk.amount}
                 </label>
-                <Input id={`amount-${booking.id}`} name="amount" inputMode="decimal" defaultValue={amountInput(booking.pricePoisha)} required />
+                <Input id={amountId} name="amount" inputMode="decimal" defaultValue={amountInput(booking.pricePoisha)} required />
                 <FieldError name="amount" />
               </ActionForm>
             ))}
