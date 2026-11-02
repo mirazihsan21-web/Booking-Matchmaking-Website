@@ -19,7 +19,8 @@ export function notificationEmail(input: {
 }): { subject: string; html: string; text: string } {
   const { title, body } = renderNotification({ kind: input.kind, payload: input.payload }, input.timeZone);
   const url = `${input.siteUrl}${input.link}`;
-  const settingsUrl = `${input.siteUrl}/me`;
+  // The email setting is on the profile's edit page (/me only shows the profile).
+  const settingsUrl = `${input.siteUrl}/me/edit`;
   const colour = HEX.test(input.primaryColour) ? input.primaryColour : PLATFORM_PALETTE.primary;
   const e = escapeHtml;
 

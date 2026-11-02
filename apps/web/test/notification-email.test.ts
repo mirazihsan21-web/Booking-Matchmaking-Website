@@ -20,7 +20,9 @@ describe('notificationEmail', () => {
     const { html, text } = notificationEmail(base);
     expect(html).toContain('href="http://localhost:3000/me/bookings"');
     expect(text).toContain('http://localhost:3000/me/bookings');
-    expect(text).toContain('http://localhost:3000/me');
+    // The email setting is on the profile's edit page (/me is read-only).
+    expect(html).toContain('href="http://localhost:3000/me/edit"');
+    expect(text).toContain('http://localhost:3000/me/edit');
     expect(text).toContain('Pitch 1, Fri 23 Oct, 8pm–9pm. Pay ৳2,500 at the venue.');
   });
 
