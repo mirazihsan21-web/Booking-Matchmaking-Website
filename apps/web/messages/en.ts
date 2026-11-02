@@ -773,6 +773,8 @@ export const en = {
     } as Record<string, string>,
   },
   chat: {
+    today: 'Today',
+    yesterday: 'Yesterday',
     errors: {
       empty: 'Write something first.',
       tooLong: (max: number) => `Keep it to ${max} characters.`,
