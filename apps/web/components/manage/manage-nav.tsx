@@ -66,9 +66,9 @@ export function ManageNav({
       className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm", on("/manage/account") ? "bg-raised" : "hover:bg-raised")}
     >
       <Avatar name={me.name} src={me.avatarUrl} />
-      <span className="min-w-0">
-        <span className="block truncate font-semibold">{me.name}</span>
-        <span className="block text-xs text-muted-foreground">{roleLabel}</span>
+      <span className="min-w-0 truncate">
+        <span className="font-semibold">{me.name}</span>
+        <span className="text-muted-foreground"> · {roleLabel}</span>
       </span>
     </Link>
   );

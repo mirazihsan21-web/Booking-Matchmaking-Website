@@ -18,7 +18,7 @@ import { findSection } from "@/lib/site/home";
 import { teamDeskHref } from "@/lib/manage/team-links";
 import { kindWords } from "@/lib/site/kinds";
 import { bookPath, sectionPath } from "@/lib/site/paths";
-import { getSitePlayer } from "@/lib/tenancy/player";
+import { getSitePlayer, getTeamSectionIds } from "@/lib/tenancy/player";
 import { m } from "@/messages";
 import { bookSpaceAction } from "./actions";
 
@@ -64,20 +64,9 @@ async function Book({ params, searchParams }: { params: Promise<{ section: strin
   // Junk or foreign ?resource= falls back to the first space; a date outside the window to today.
   const space = spaces.find((s) => s.id === one(query.resource)) ?? spaces[0]!;
 
-  // Team logins are venue-only: the page says where the desk books instead of offering Book.
-  if (player.isTeam) {
-    return (
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-1">
-          <Link href={sectionPath(section.slug)} className="font-display text-xl uppercase tracking-wide text-section hover:underline">
-            {section.name}
-          </Link>
-          <h1 className="font-display text-4xl uppercase tracking-wide sm:text-5xl">{kindWords(section.kind).book}</h1>
-        </div>
-        <TeamNote brandName={brand.name} link={teamDeskHref({ kind: "space", sectionId: section.id, resourceId: space.id }, player.teamSectionIds)} />
-      </div>
-    );
-  }
+  // Team logins are venue-only: they can still pick a space, but the page says where the desk books it
+  // instead of showing the day and slots.
+  const teamLink = player.isTeam ? teamDeskHref({ kind: "space", sectionId: section.id, resourceId: space.id }, await getTeamSectionIds(player)) : null;
   // After midnight at a late-night section, "today" is still last night's business day.
   const today = currentBusinessDate(section.openingHours, new Date(), brand.timezone);
   const lastDay = addDays(today, section.rules.bookingHorizonDays);
@@ -86,7 +75,7 @@ async function Book({ params, searchParams }: { params: Promise<{ section: strin
   // The day strip shows the week (from today, in steps of 7) that holds the chosen day.
   const weekOffset = Math.floor((Date.parse(date) - Date.parse(today)) / DAY_MS / 7) * 7;
   const strip = dayWindow(today, section.rules.bookingHorizonDays, addDays(today, weekOffset));
-  const day = await spaceDay(db, { organizationId: brand.id, resourceId: space.id, date, withNames: false });
+  const day = teamLink ? null : await spaceDay(db, { organizationId: brand.id, resourceId: space.id, date, withNames: false });
 
   const price =
     space.price_per_hour_poisha === null ? m.bookings.priceAtVenue : m.bookings.perSlot(formatBdt(Math.round((space.price_per_hour_poisha * space.slot_minutes) / 60)));
@@ -111,53 +100,59 @@ async function Book({ params, searchParams }: { params: Promise<{ section: strin
         ))}
       </nav>
 
-      <nav aria-label={m.bookings.day} className="flex items-center gap-2">
-        {strip.prev ? (
-          <Link href={bookPath(section.slug, { resource: space.id, date: strip.prev })} aria-label={m.bookings.previousDay} className="rounded-full p-2 hover:bg-raised">
-            <ChevronLeft className="size-5" />
-          </Link>
-        ) : (
-          <span className="w-9" />
-        )}
-        <div className="grid flex-1 grid-cols-7 gap-1.5">
-          {strip.days.map((d) => {
-            const { weekday, day: n } = dayParts(d);
-            return (
-              <Link
-                key={d}
-                href={bookPath(section.slug, { resource: space.id, date: d })}
-                aria-current={d === date ? "date" : undefined}
-                className={cn(
-                  "press flex flex-col items-center rounded-xl border py-2 text-xs",
-                  d === date ? "border-section bg-section text-on-section" : "border-border bg-card hover:border-section",
-                )}
-              >
-                <span className="font-semibold uppercase">{weekday}</span>
-                <span className="font-display text-xl">{n}</span>
+      {teamLink ? (
+        <TeamNote brandName={brand.name} link={teamLink} />
+      ) : (
+        <>
+          <nav aria-label={m.bookings.day} className="flex items-center gap-2">
+            {strip.prev ? (
+              <Link href={bookPath(section.slug, { resource: space.id, date: strip.prev })} aria-label={m.bookings.previousDay} className="rounded-full p-2 hover:bg-raised">
+                <ChevronLeft className="size-5" />
               </Link>
-            );
-          })}
-        </div>
-        {strip.next ? (
-          <Link href={bookPath(section.slug, { resource: space.id, date: strip.next })} aria-label={m.bookings.nextDay} className="rounded-full p-2 hover:bg-raised">
-            <ChevronRight className="size-5" />
-          </Link>
-        ) : (
-          <span className="w-9" />
-        )}
-      </nav>
+            ) : (
+              <span className="w-9" />
+            )}
+            <div className="grid flex-1 grid-cols-7 gap-1.5">
+              {strip.days.map((d) => {
+                const { weekday, day: n } = dayParts(d);
+                return (
+                  <Link
+                    key={d}
+                    href={bookPath(section.slug, { resource: space.id, date: d })}
+                    aria-current={d === date ? "date" : undefined}
+                    className={cn(
+                      "press flex flex-col items-center rounded-xl border py-2 text-xs",
+                      d === date ? "border-section bg-section text-on-section" : "border-border bg-card hover:border-section",
+                    )}
+                  >
+                    <span className="font-semibold uppercase">{weekday}</span>
+                    <span className="font-display text-xl">{n}</span>
+                  </Link>
+                );
+              })}
+            </div>
+            {strip.next ? (
+              <Link href={bookPath(section.slug, { resource: space.id, date: strip.next })} aria-label={m.bookings.nextDay} className="rounded-full p-2 hover:bg-raised">
+                <ChevronRight className="size-5" />
+              </Link>
+            ) : (
+              <span className="w-9" />
+            )}
+          </nav>
 
-      <SlotPicker
-        key={`${space.id}-${date}`}
-        action={bookSpaceAction.bind(null, space.id)}
-        slotMinutes={space.slot_minutes}
-        priceLabel={price}
-        slots={(day?.slots ?? []).map((s) => ({
-          start: s.start.toISOString(),
-          label: `${formatShortTime(s.start.toISOString(), brand.timezone)}–${formatShortTime(s.end.toISOString(), brand.timezone)}`,
-          state: s.state,
-        }))}
-      />
+          <SlotPicker
+            key={`${space.id}-${date}`}
+            action={bookSpaceAction.bind(null, space.id)}
+            slotMinutes={space.slot_minutes}
+            priceLabel={price}
+            slots={(day?.slots ?? []).map((s) => ({
+              start: s.start.toISOString(),
+              label: `${formatShortTime(s.start.toISOString(), brand.timezone)}–${formatShortTime(s.end.toISOString(), brand.timezone)}`,
+              state: s.state,
+            }))}
+          />
+        </>
+      )}
     </div>
   );
 }

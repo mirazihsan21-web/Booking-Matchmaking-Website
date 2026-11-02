@@ -15,7 +15,7 @@ import { playerSessionView, seatCounts, type PlayerSessionView } from "@/lib/ope
 import { createServiceClient } from "@/lib/service-client";
 import { sectionPath } from "@/lib/site/paths";
 import { getBrand } from "@/lib/tenancy/brand";
-import { getSitePlayer } from "@/lib/tenancy/player";
+import { getSitePlayer, getTeamSectionIds } from "@/lib/tenancy/player";
 import { m } from "@/messages";
 import { cancelSeatAction } from "../../me/bookings/actions";
 import { requestSeatAction, withdrawAction } from "./actions";
@@ -159,7 +159,7 @@ async function SessionDetail({ params }: { params: Promise<{ id: string }> }) {
           hasProfile={Boolean(player?.profileId)}
           team={
             player?.isTeam
-              ? { brandName: brand.name, link: teamDeskHref({ kind: "game", sectionId: session.sectionId, sessionId: session.id }, player.teamSectionIds) }
+              ? { brandName: brand.name, link: teamDeskHref({ kind: "game", sectionId: session.sectionId, sessionId: session.id }, await getTeamSectionIds(player)) }
               : null
           }
         />

@@ -185,14 +185,43 @@ test("the owner's account is the venue's: Manage on the site, My account, no boo
     await page.getByLabel('Name', { exact: true }).fill(name);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Saved.')).toBeVisible();
-    await expect(page.locator('aside a[href="/manage/account"]')).toContainText(name);
+    // The sidebar card reads "<name> · Owner".
+    await expect(page.locator('aside a[href="/manage/account"]')).toContainText(`${name} · Owner`);
 
-    // A booking page tells the team where to book instead of offering Book.
+    // On the site, the photo-less avatar shows the saved name's initials.
+    await page.goto('/');
+    await expect(page.locator('header a[href="/manage/account"]')).toHaveText(`O${name.split(' ')[1]!.charAt(0).toUpperCase()}`);
+
+    // A booking page tells the team where to book instead of offering Book, and still lets them pick the space.
     await page.goto('/turf/book');
     await expect(page.getByText('Book walk-ins from Today')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Book', exact: true })).toHaveCount(0);
+    const { data: turfSection } = await db.from('sections').select('id').eq('organization_id', org!.id).eq('slug', 'turf').single();
+    const { data: pitch2 } = await db.from('resources').select('id').eq('section_id', turfSection!.id).eq('name', 'Pitch 2').single();
+    await page.getByRole('link', { name: 'Pitch 2', exact: true }).click();
+    await expect(page.getByRole('link', { name: 'Open this space on Today' })).toHaveAttribute('href', `/manage?book=${pitch2!.id}`);
   } finally {
     await db.from('organization_members').update(before!).eq('organization_id', org!.id).eq('user_id', ownerId);
+  }
+});
+
+test('a staff member with no sections yet is sent to Today and told so (Review Focus 2)', async ({ page }) => {
+  const { db, slug } = localAdmin();
+  const turf = await brandSection(slug, 'turf');
+  const email = `e2e-staff-${randomUUID().slice(0, 8)}@example.test`;
+  const { data: created, error } = await db.auth.admin.createUser({ email, email_confirm: true });
+  if (error) throw error;
+  const userId = created.user!.id;
+  try {
+    await db.from('organization_members').insert({ organization_id: turf.orgId, user_id: userId, role: 'staff' });
+    await signIn(page, email, '/manage');
+    await page.goto('/manage/account');
+    await expect(page.getByText('No sections yet.')).toBeVisible();
+    await page.goto('/turf/book');
+    await expect(page.getByRole('link', { name: 'Go to Today' })).toHaveAttribute('href', '/manage');
+  } finally {
+    await db.from('organization_members').delete().eq('user_id', userId);
+    await db.auth.admin.deleteUser(userId);
   }
 });
 
