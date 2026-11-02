@@ -88,7 +88,7 @@ select row_eq(
 select is(public.remove_chat_message(gen_random_uuid(), pg_temp.id('b4'), true), 'not_found', 'a missing message');
 
 select ok(
-  not has_function_privilege('authenticated', 'public.post_chat_message(uuid, uuid, text)', 'execute')
+  not has_function_privilege('authenticated', 'public.post_chat_message(uuid, uuid, text, text)', 'execute')
   and not has_function_privilege('authenticated', 'public.remove_chat_message(uuid, uuid, boolean)', 'execute')
   and not has_function_privilege('authenticated', 'private.chat_guard(uuid, uuid, uuid)', 'execute'),
   'only the server can call these');
