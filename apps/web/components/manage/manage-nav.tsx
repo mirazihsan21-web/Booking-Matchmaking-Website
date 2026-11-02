@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, CalendarClock, CalendarRange, CircleUserRound, ExternalLink, LayoutGrid, ListChecks, LogOut, Menu, Store, Users, type LucideIcon } from "lucide-react";
+import { Banknote, CalendarClock, CalendarRange, CircleUserRound, ExternalLink, LayoutGrid, ListChecks, LogOut, Menu, MessagesSquare, Store, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -25,24 +25,28 @@ const OWNER: Item[] = [
 /**
  * The manage area's navigation. Laptop: a left sidebar with the brand, every page this person may open,
  * their own account card, the public site and Sign out. Phone: a bottom bar with Today, Bookings, Schedule
- * and More (My account first, then the rest).
+ * and More (My account first, then the rest). Chat shows how many reported messages wait, e.g. "Chat (3)".
  */
 export function ManageNav({
   isOwner,
   brandName,
   logoUrl,
   me,
+  chatReports = 0,
 }: {
   isOwner: boolean;
   brandName: string;
   logoUrl: string | null;
   /** The signed-in person, for the card that opens My account. */
   me: { name: string; role: "owner" | "staff"; avatarUrl: string | null };
+  /** Messages with open reports, for the Chat item's count. */
+  chatReports?: number;
 }) {
   const path = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const on = (href: string) => (href === "/manage" ? path === "/manage" : path === href || path.startsWith(`${href}/`));
   const owner = isOwner ? OWNER : [];
+  const chat: Item = { href: "/manage/chat", label: chatReports > 0 ? `${m.manage.nav.chat} (${chatReports})` : m.manage.nav.chat, Icon: MessagesSquare };
   const link = (item: Item, onClick?: () => void) => (
     <Link
       key={item.href}
@@ -97,6 +101,7 @@ export function ManageNav({
         </Link>
         <nav aria-label={m.manage.nav.label} className="flex flex-1 flex-col gap-1">
           {DESK.map((item) => link(item))}
+          {link(chat)}
           {owner.length > 0 && <div className="my-2 border-t border-border" />}
           {owner.map((item) => link(item))}
         </nav>
@@ -110,6 +115,7 @@ export function ManageNav({
         {moreOpen && (
           <div className="flex flex-col gap-1 border-b border-border px-3 py-3">
             {link({ href: "/manage/account", label: m.manage.nav.account, Icon: CircleUserRound }, () => setMoreOpen(false))}
+            {link(chat, () => setMoreOpen(false))}
             {owner.map((item) => link(item, () => setMoreOpen(false)))}
             {extras}
           </div>

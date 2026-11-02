@@ -1,5 +1,7 @@
 import { Suspense, type ReactNode } from "react";
 import { ManageNav } from "@/components/manage/manage-nav";
+import { openReportCount } from "@/lib/chat/moderation";
+import { createServiceClient } from "@/lib/service-client";
 import { logoUrl } from "@/lib/tenancy/urls";
 import { getManager } from "@/lib/tenancy/manager";
 import { m } from "@/messages";
@@ -25,6 +27,7 @@ async function Shell({ children }: { children: ReactNode }) {
         brandName={manager.org.name}
         logoUrl={logoUrl(manager.org.branding.logo_path)}
         me={{ name: manager.displayName, role: manager.role, avatarUrl: manager.user.avatarUrl }}
+        chatReports={await openReportCount(createServiceClient(), manager.org.id)}
       />
       <main className="min-w-0 flex-1 px-4 pt-6 pb-28 md:px-8 md:pb-10">{children}</main>
     </div>

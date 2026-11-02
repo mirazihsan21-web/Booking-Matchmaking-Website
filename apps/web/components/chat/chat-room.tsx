@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { removeMyMessageAction } from "@/app/(site)/chat/actions";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { markRoomRead } from "@/lib/chat/reads";
 import { cardsFor, roomPage } from "@/lib/chat/room";
 import { cardFromRow, mergeMessages, messageFromRow, type ChatCard, type ChatMessage } from "@/lib/chat/rows";
@@ -13,6 +12,7 @@ import { m } from "@/messages";
 import { CardItem } from "./card-item";
 import { CardStrip } from "./card-strip";
 import { Composer } from "./composer";
+import { MessageMenu } from "./message-menu";
 import { MessageItem } from "./message-item";
 
 export interface ChatMe {
@@ -58,7 +58,6 @@ export function ChatRoom({
   const [connected, setConnected] = useState(true);
   const [unseen, setUnseen] = useState(false);
   const [now, setNow] = useState(() => new Date(renderedAt));
-  const [error, setError] = useState<string | null>(null);
 
   // The strip: the server's open cards, kept current by live card changes until the page re-reads them.
   const fromServer = (list: typeof openCards) => new Map(list.map(({ seatsLeft, ...card }) => [card.id, { card: card as ChatCard, seatsLeft }]));
@@ -222,14 +221,6 @@ export function ChatRoom({
     setUnseen(false);
   }
 
-  function remove(messageId: string) {
-    setError(null);
-    startTransition(async () => {
-      const result = await removeMyMessageAction(messageId);
-      if (!result?.ok) setError(result?.message ?? null);
-    });
-  }
-
   const stripCards = [...strip.values()].sort((a, b) => a.card.startsAt.localeCompare(b.card.startsAt));
 
   return (
@@ -256,7 +247,7 @@ export function ChatRoom({
             if (message.cardId && !card) return null;
             if (card) {
               return (
-                <MessageItem key={message.id} message={message} mine={mine} timeZone={timeZone} now={now}>
+                <MessageItem key={message.id} message={message} mine={mine} timeZone={timeZone} now={now} actions={<MessageMenu message={message} me={me} />}>
                   <CardItem card={card} timeZone={timeZone} mine={card.posterUserId === me.userId} seatsLeft={strip.get(card.id)?.seatsLeft ?? null} />
                 </MessageItem>
               );
@@ -268,13 +259,7 @@ export function ChatRoom({
                 mine={mine}
                 timeZone={timeZone}
                 now={now}
-                actions={
-                  mine && !message.cardId && message.state === "visible" ? (
-                    <button type="button" onClick={() => remove(message.id)} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
-                      {m.chat.remove}
-                    </button>
-                  ) : null
-                }
+                actions={<MessageMenu message={message} me={me} />}
               />
             );
           })}
@@ -288,11 +273,6 @@ export function ChatRoom({
         >
           {m.chat.newMessages}
         </button>
-      )}
-      {error && (
-        <p role="status" className="text-sm text-destructive">
-          {error}
-        </p>
       )}
       {box.kind === "open" && <Composer onSent={() => void catchUp().catch(() => undefined)} />}
       {box.kind === "no_profile" && (

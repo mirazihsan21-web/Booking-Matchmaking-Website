@@ -39,7 +39,8 @@ test('the players chat is live between two players, with the unread dot, the fil
     await expect(pageA.getByText('what the ●●●')).toBeVisible();
 
     const mine = pageA.getByRole('listitem').filter({ hasText: 'what the ●●●' });
-    await mine.getByRole('button', { name: 'Remove' }).click();
+    await mine.getByRole('button', { name: 'Message options' }).click();
+    await mine.getByRole('button', { name: 'Remove', exact: true }).click();
     await expect(pageB.getByText('Message removed')).toBeVisible({ timeout: 5_000 });
     await expect(pageB.getByText('what the ●●●')).toHaveCount(0);
 
