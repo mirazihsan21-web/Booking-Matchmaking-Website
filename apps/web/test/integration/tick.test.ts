@@ -191,3 +191,61 @@ describe('runTick', () => {
     expect(report.matched).toContain(due);
   });
 });
+
+describe('runTick and the players chat', () => {
+  async function card(fields: Record<string, unknown>): Promise<string> {
+    return must(
+      await db
+        .from('chat_cards')
+        .insert({
+          organization_id: orgId,
+          poster_user_id: player.id,
+          poster_profile_id: profileId,
+          poster_name: 'Tick',
+          section_id: sectionId,
+          section_name: 'Main',
+          section_kind: 'turf',
+          section_accent: '#43a66b',
+          title: 'Pitch 1',
+          ...fields,
+        })
+        .select('id')
+        .single(),
+    ).id;
+  }
+
+  it('closes a card whose booking was cancelled, and a session card once the session has no seats left', async () => {
+    const booking = must(
+      await db
+        .from('resource_bookings')
+        .insert({ organization_id: orgId, resource_id: pitchId, profile_id: profileId, period: `[${inHours(200)},${inHours(201)})`, price_poisha: 0, status: 'cancelled' })
+        .select('id')
+        .single(),
+    ).id;
+    const bookingCard = await card({ kind: 'booking', resource_booking_id: booking, starts_at: inHours(200), ends_at: inHours(201), spots_needed: 3 });
+    const full = await session(100); // more than the 6-hour cut-off away, so the tick doesn't match it
+    await squadRequests(full); // 10 requests for a 10-player game: no seats left
+    const sessionCard = await card({ kind: 'session', session_id: full, starts_at: inHours(100), ends_at: inHours(101) });
+
+    const report = await runTick({ db, createSender: () => recordingSender(), now: new Date('2026-11-03T10:30:00Z') });
+
+    expect(report.chat.closed).toBeGreaterThanOrEqual(2);
+    expect(report.chat.purged).toBe(false);
+    expect(must(await db.from('chat_cards').select('status').eq('id', bookingCard).single()).status).toBe('cancelled');
+    expect(must(await db.from('chat_cards').select('status').eq('id', sessionCard).single()).status).toBe('full');
+  });
+
+  it('purges old chat once an hour, on the hour', async () => {
+    const old = must(
+      await db
+        .from('chat_messages')
+        .insert({ organization_id: orgId, author_user_id: player.id, author_profile_id: profileId, author_kind: 'player', author_name: 'Tick', body: 'old', created_at: inHours(-24 * 31) })
+        .select('id')
+        .single(),
+    ).id;
+    const onTheHour = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000);
+    const report = await runTick({ db, createSender: () => recordingSender(), now: onTheHour });
+    expect(report.chat.purged).toBe(true);
+    expect((await db.from('chat_messages').select('id').eq('id', old)).data).toEqual([]);
+  });
+});
