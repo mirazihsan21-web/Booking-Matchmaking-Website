@@ -26,10 +26,14 @@ export function requestOrigin(host: string | null, requestUrl: string, rootDomai
   return `${fallback.protocol}//${h}`;
 }
 
+/** Whether a same-site path is in the manage area (`/manage`, `/manage/…`, `/manage?…`), not one that only starts like it. */
+const isManagePath = (path: string) => /^\/manage(?:[/?#]|$)/.test(path);
+
 /**
- * Where someone goes after signing in: the brand's owners and staff with no page in mind (`next` is the
- * default "/") go to the manage area; everyone else, and anyone heading somewhere, keeps `next`.
+ * Where someone goes after signing in. Team logins are venue-only: the brand's owners and staff go to `next`
+ * when it is a manage page, otherwise to the manage area. Players keep `next`.
  */
 export function landingAfterSignIn(next: string, isTeam: boolean): string {
-  return next === '/' && isTeam ? '/manage' : next;
+  if (!isTeam) return next;
+  return isManagePath(next) ? next : '/manage';
 }

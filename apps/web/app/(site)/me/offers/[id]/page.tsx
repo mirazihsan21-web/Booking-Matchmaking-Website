@@ -1,15 +1,14 @@
 import { Suspense } from "react";
 import { OfferCard, OfferGone, offerIsOpen } from "@/components/open-play/offer-card";
-import { requireUser } from "@/lib/auth/dal";
 import { findOffer } from "@/lib/open-play/open-play";
 import { createServiceClient } from "@/lib/service-client";
-import { getSitePlayer } from "@/lib/tenancy/player";
+import { getSitePlayer, requirePlayer } from "@/lib/tenancy/player";
 import { respondMyOfferAction } from "./actions";
 
 /** A signed-in player's own seat offer (the in-app link from the bell). */
 async function MyOffer({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireUser(`/me/offers/${id}`);
+  await requirePlayer(`/me/offers/${id}`);
   const player = await getSitePlayer();
   if (!player) return null;
   const offer = player.profileId ? await findOffer(createServiceClient(), { offerId: id, profileId: player.profileId, organizationId: player.brand.id }) : null;

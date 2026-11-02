@@ -55,9 +55,25 @@ describe('landingAfterSignIn', () => {
     expect(landingAfterSignIn('/', true)).toBe('/manage');
   });
 
-  it('keeps everyone else, and anyone heading somewhere, where they were going', () => {
+  it('keeps a team account heading to a manage page there', () => {
+    expect(landingAfterSignIn('/manage', true)).toBe('/manage');
+    expect(landingAfterSignIn('/manage/bookings', true)).toBe('/manage/bookings');
+    expect(landingAfterSignIn('/manage?book=x', true)).toBe('/manage?book=x');
+  });
+
+  it('sends a team account heading to a player page to the manage area (team logins are venue-only)', () => {
+    expect(landingAfterSignIn('/me', true)).toBe('/manage');
+    expect(landingAfterSignIn('/sessions/abc', true)).toBe('/manage');
+  });
+
+  it("doesn't count a path that only starts like a manage page (Review Focus 1)", () => {
+    expect(landingAfterSignIn('/managers', true)).toBe('/manage');
+    expect(landingAfterSignIn('/manage-x', true)).toBe('/manage');
+  });
+
+  it('keeps players where they were going', () => {
     expect(landingAfterSignIn('/', false)).toBe('/');
-    expect(landingAfterSignIn('/sessions/abc', true)).toBe('/sessions/abc');
     expect(landingAfterSignIn('/me', false)).toBe('/me');
+    expect(landingAfterSignIn('/sessions/abc', false)).toBe('/sessions/abc');
   });
 });

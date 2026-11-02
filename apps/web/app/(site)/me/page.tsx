@@ -3,18 +3,17 @@ import { ActionForm, Field, FieldError } from "@/components/forms/action-form";
 import { AvailabilityEditor, type AvailabilityValue } from "@/components/profile/availability-editor";
 import { RatingPicker } from "@/components/profile/rating-picker";
 import { MeTabs } from "@/components/site/me-tabs";
-import { requireUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
-import { getBrand } from "@/lib/tenancy/brand";
+import { requirePlayer } from "@/lib/tenancy/player";
 import { m } from "@/messages";
 import { saveProfileAction } from "./actions";
 
 const hhmm = (t: string) => t.slice(0, 5);
 
 async function Profile() {
-  const user = await requireUser("/me");
-  const brand = await getBrand();
-  if (!brand) return null; // the layout shows "Not open yet"
+  const player = await requirePlayer("/me");
+  if (!player) return null; // the layout shows "Not open yet"
+  const { user, brand } = player;
   const supabase = await createClient();
   const [{ data: profile }, { data: activities }] = await Promise.all([
     supabase

@@ -1,9 +1,10 @@
 "use client";
 
-import { Dices, Gamepad2, Goal, House, UserRound, type LucideIcon } from "lucide-react";
+import { Dices, Gamepad2, Goal, House, LayoutDashboard, UserRound, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "cn";
+import { Avatar } from "@/components/account/avatar";
 import { Bell } from "@/components/notifications/bell";
 import type { BusinessType } from "@/presets/types";
 import { m } from "@/messages";
@@ -21,22 +22,23 @@ export interface NavSection {
 /**
  * The site's navigation. Phones: a slim top bar (brand, bell) and a bottom tab bar Home · sections · Me,
  * the current tab tinted. Desktop: one top bar with the brand, the sections in their colours, My bookings,
- * the bell and Profile / Sign in.
+ * the bell and Profile / Sign in. The brand's team (venue-only logins) get Manage and their photo instead of
+ * My bookings, the bell and Profile, and a Manage tab instead of Me.
  */
 export function SiteNav({
   brandName,
   logoUrl,
   sections,
   signedIn,
-  showManage,
+  team,
   bell,
 }: {
   brandName: string;
   logoUrl: string | null;
   sections: NavSection[];
   signedIn: boolean;
-  /** The brand's owners and staff get a way into the manage area. */
-  showManage: boolean;
+  /** The signed-in owner or staff member (null for players and visitors): the menu leads to Manage. */
+  team: { name: string; avatarUrl: string | null } | null;
   bell: { profileId: string; organizationId: string; unread: number } | null;
 }) {
   const path = usePathname();
@@ -65,20 +67,28 @@ export function SiteNav({
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2 text-sm">
-            {showManage && (
-              <Link href="/manage" className="rounded-lg px-3 py-1.5 font-semibold hover:bg-raised">
-                {m.site.nav.manage}
-              </Link>
+            {team ? (
+              <>
+                <Link href="/manage" className="rounded-lg px-3 py-1.5 font-semibold hover:bg-raised">
+                  {m.site.nav.manage}
+                </Link>
+                <Link href="/manage/account" aria-label={m.manage.nav.account} className="hidden rounded-full md:inline-flex">
+                  <Avatar name={team.name} src={team.avatarUrl} />
+                </Link>
+              </>
+            ) : (
+              <>
+                {signedIn && (
+                  <Link href="/me/bookings" className="hidden rounded-lg px-3 py-1.5 hover:bg-raised md:inline-block">
+                    {m.site.nav.myBookings}
+                  </Link>
+                )}
+                {bell && <Bell key={bell.unread} profileId={bell.profileId} organizationId={bell.organizationId} initialUnread={bell.unread} />}
+                <Link href={meHref} className="hidden rounded-lg px-3 py-1.5 font-semibold hover:bg-raised md:inline-block">
+                  {signedIn ? m.site.nav.profile : m.site.nav.signIn}
+                </Link>
+              </>
             )}
-            {signedIn && (
-              <Link href="/me/bookings" className="hidden rounded-lg px-3 py-1.5 hover:bg-raised md:inline-block">
-                {m.site.nav.myBookings}
-              </Link>
-            )}
-            {bell && <Bell key={bell.unread} profileId={bell.profileId} organizationId={bell.organizationId} initialUnread={bell.unread} />}
-            <Link href={meHref} className="hidden rounded-lg px-3 py-1.5 font-semibold hover:bg-raised md:inline-block">
-              {signedIn ? m.site.nav.profile : m.site.nav.signIn}
-            </Link>
           </div>
         </div>
       </header>
@@ -89,7 +99,11 @@ export function SiteNav({
           {sections.map((s) => (
             <Tab key={s.slug} href={`/${s.slug}`} label={s.name} Icon={KIND_ICON[s.kind]} active={on(`/${s.slug}`)} accent={s.accent} />
           ))}
-          <Tab href={meHref} label={m.site.nav.me} Icon={UserRound} active={on("/me") || on("/signin")} />
+          {team ? (
+            <Tab href="/manage" label={m.site.nav.manage} Icon={LayoutDashboard} active={on("/manage")} />
+          ) : (
+            <Tab href={meHref} label={m.site.nav.me} Icon={UserRound} active={on("/me") || on("/signin")} />
+          )}
         </ul>
       </nav>
     </>

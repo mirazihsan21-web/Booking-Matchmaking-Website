@@ -5,14 +5,13 @@ import { ActionButton } from "@/components/forms/action-form";
 import { MeTabs } from "@/components/site/me-tabs";
 import { sectionStyle } from "@/components/site/section-style";
 import { buttonVariants } from "@/components/ui/button";
-import { requireUser } from "@/lib/auth/dal";
 import { listMyBookings, type MyBooking } from "@/lib/bookings/bookings";
 import { formatNight, formatShortTime } from "@/lib/format";
 import { formatBdt } from "@/lib/money";
 import { listMySeats, type MySeat } from "@/lib/open-play/open-play";
 import type { Section } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
-import { getSitePlayer } from "@/lib/tenancy/player";
+import { getSitePlayer, requirePlayer } from "@/lib/tenancy/player";
 import { m } from "@/messages";
 import { cancelMyBookingAction, cancelSeatAction } from "./actions";
 
@@ -92,7 +91,7 @@ function List({ title, empty, children }: { title: string; empty: string; childr
 }
 
 async function MyBookings() {
-  await requireUser("/me/bookings");
+  await requirePlayer("/me/bookings");
   const player = await getSitePlayer();
   if (!player) return null;
   if (!player.profileId) {

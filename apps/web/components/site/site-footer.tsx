@@ -11,6 +11,7 @@ export function SiteFooter({
   address,
   sections,
   signedIn,
+  team,
   year,
 }: {
   brandName: string;
@@ -18,6 +19,8 @@ export function SiteFooter({
   address: string;
   sections: Array<{ slug: string; name: string }>;
   signedIn: boolean;
+  /** An owner or staff member: the account links lead to Manage. */
+  team: boolean;
   year: number;
 }) {
   return (
@@ -42,7 +45,16 @@ export function SiteFooter({
         </nav>
         <nav aria-label={m.site.landing.footerAccount} className="flex flex-col gap-2 text-sm">
           <p className="font-semibold">{m.site.landing.footerAccount}</p>
-          {signedIn ? (
+          {team ? (
+            <>
+              <Link href="/manage" className={link}>
+                {m.site.nav.manage}
+              </Link>
+              <Link href="/manage/account" className={link}>
+                {m.manage.nav.account}
+              </Link>
+            </>
+          ) : signedIn ? (
             <>
               <Link href="/me/bookings" className={link}>
                 {m.site.nav.myBookings}

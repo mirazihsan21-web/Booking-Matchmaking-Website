@@ -4,17 +4,16 @@ import { cn } from "cn";
 import { MarkAllRead } from "@/components/notifications/mark-all-read";
 import { MeTabs } from "@/components/site/me-tabs";
 import { sectionStyle } from "@/components/site/section-style";
-import { requireUser } from "@/lib/auth/dal";
 import { formatNight } from "@/lib/format";
 import { listNotifications } from "@/lib/notifications/inbox";
 import { renderNotification } from "@/lib/notifications/render";
 import { createClient } from "@/lib/supabase/server";
-import { getSitePlayer } from "@/lib/tenancy/player";
+import { getSitePlayer, requirePlayer } from "@/lib/tenancy/player";
 import { m } from "@/messages";
 import { markAllReadAction } from "./actions";
 
 async function Notifications() {
-  await requireUser("/me/notifications");
+  await requirePlayer("/me/notifications");
   const player = await getSitePlayer();
   const items = player?.profileId ? await listNotifications(await createClient(), player.profileId, player.brand.id) : [];
   const tz = player?.brand.timezone ?? "Asia/Dhaka";

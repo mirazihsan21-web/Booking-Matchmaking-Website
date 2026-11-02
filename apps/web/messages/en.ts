@@ -25,6 +25,7 @@ export const en = {
   manage: {
     nav: {
       label: 'Manage',
+      account: 'My account',
       today: 'Today',
       bookings: 'Bookings',
       schedule: 'Schedule',
