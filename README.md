@@ -34,7 +34,7 @@ Everything is on one host (`localhost:3000` locally):
 |---|---|
 | `/` | The landing page: a hero made of the three sections' photos, our services (price from, spaces, today's hours, games, book / join), how it works, games coming up, why play here, hours and location |
 | `/<section>` (`/turf`, `/cafe`, `/lounge`) | The section: its photo, open games, what you can play, the week's hours |
-| `/<section>/book` | Book a space: space tags, a 7-day strip, the slot grid and a sticky **Book** bar |
+| `/<section>/book` | Book a space: space tags, a 7-day strip, the slot grid with a key (Free · Taken · Open play · Started) and a sticky **Book** bar. Anyone can look; signed-out visitors get **Sign in to book**, players without a profile **Create your profile to book**. Refreshes every 30 s. |
 | `/sessions/<id>` | A game: seats left, request a seat / join the waitlist, your team once matched |
 | `/offers/<token>`, `/me/offers/<id>` | A seat offer (from the email link, or the bell) |
 | `/signin` | One sign-in for players and staff (email link; Google when enabled) |
@@ -70,7 +70,7 @@ section whose games have passed). Its owner is `owner@demo-arena.test`; to manag
 gets an owner invite, accepted at its first sign-in).
 
 Sign in at http://localhost:3000/signin with any email address; the link lands in Mailpit at
-http://127.0.0.1:54324 (nothing leaves your machine). Set your level per section at `/me`, then book a space
+http://127.0.0.1:54324 (nothing leaves your machine). Set your level per section at `/me/edit`, then book a space
 or ask for a seat in a game. Staff go to http://localhost:3000/manage.
 
 ### Using the hosted Supabase project
@@ -172,7 +172,7 @@ address (`lib/manage/paths.ts`).
 
 ### Bookings, notifications and the job tick
 
-- Players book a space at `/<section>/book` (after creating a profile at `/me`), see their
+- Players book a space at `/<section>/book` (anyone can see the free slots; booking needs a profile, made at `/me/edit`), see their
   bookings at `/me/bookings`, and get a live bell plus an email for each booking change.
 - Staff see every booking, add walk-ins (name + phone) and mark attendance on **Today** (`/manage`) and `/manage/bookings`.
 - Every minute the database (`pg_cron` → `pg_net`) calls `POST /api/jobs/tick` with a shared secret,
