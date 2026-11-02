@@ -10,6 +10,8 @@ import { formatNight } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeSignedIn } from "@/lib/supabase/realtime";
 import { m } from "@/messages";
+import { CardItem } from "./card-item";
+import { CardStrip } from "./card-strip";
 import { Composer } from "./composer";
 import { MessageItem } from "./message-item";
 
@@ -37,6 +39,7 @@ export function ChatRoom({
   me,
   box,
   initial,
+  openCards,
   renderedAt,
 }: {
   organizationId: string;
@@ -44,6 +47,8 @@ export function ChatRoom({
   me: ChatMe;
   box: ChatBox;
   initial: { messages: ChatMessage[]; cards: ChatCard[] };
+  /** The open cards for the strip, with seats left for games (re-read by the page every minute). */
+  openCards: Array<ChatCard & { seatsLeft: number | null }>;
   renderedAt: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -54,6 +59,15 @@ export function ChatRoom({
   const [unseen, setUnseen] = useState(false);
   const [now, setNow] = useState(() => new Date(renderedAt));
   const [error, setError] = useState<string | null>(null);
+
+  // The strip: the server's open cards, kept current by live card changes until the page re-reads them.
+  const fromServer = (list: typeof openCards) => new Map(list.map(({ seatsLeft, ...card }) => [card.id, { card: card as ChatCard, seatsLeft }]));
+  const [stripSource, setStripSource] = useState(openCards);
+  const [strip, setStrip] = useState(() => fromServer(openCards));
+  if (stripSource !== openCards) {
+    setStripSource(openCards);
+    setStrip(fromServer(openCards));
+  }
 
   const scroller = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
@@ -69,6 +83,14 @@ export function ChatRoom({
     setCards((previous) => {
       const next = new Map(previous);
       for (const card of incoming) next.set(card.id, card);
+      return next;
+    });
+    setStrip((previous) => {
+      const next = new Map(previous);
+      for (const card of incoming) {
+        if (card.status === "open" && new Date(card.startsAt) > new Date()) next.set(card.id, { card, seatsLeft: previous.get(card.id)?.seatsLeft ?? null });
+        else next.delete(card.id);
+      }
       return next;
     });
   }, []);
@@ -208,8 +230,11 @@ export function ChatRoom({
     });
   }
 
+  const stripCards = [...strip.values()].sort((a, b) => a.card.startsAt.localeCompare(b.card.startsAt));
+
   return (
     <section className="relative flex flex-col gap-3">
+      <CardStrip cards={stripCards} timeZone={timeZone} />
       {!connected && (
         <p role="status" className="text-sm text-muted-foreground">
           {m.chat.reconnecting}
@@ -229,6 +254,13 @@ export function ChatRoom({
             const mine = message.authorUserId === me.userId;
             const card = message.cardId ? cards.get(message.cardId) : undefined;
             if (message.cardId && !card) return null;
+            if (card) {
+              return (
+                <MessageItem key={message.id} message={message} mine={mine} timeZone={timeZone} now={now}>
+                  <CardItem card={card} timeZone={timeZone} mine={card.posterUserId === me.userId} seatsLeft={strip.get(card.id)?.seatsLeft ?? null} />
+                </MessageItem>
+              );
+            }
             return (
               <MessageItem
                 key={message.id}
