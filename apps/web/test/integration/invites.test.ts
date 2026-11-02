@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { completeSignIn } from '@/lib/auth/complete-sign-in';
-import { acceptPendingInvites, cancelInvite, inviteMember } from '@/lib/orgs/invites';
+import { acceptPendingInvites, cancelInvite, declineInvites, inviteMember, openInviteFor, type InviteToEmail } from '@/lib/orgs/invites';
 import { anonClient, createTestUser, deleteTestUser, emailLinkTo, serviceDb, type TestUser } from './helpers';
 
 const db = serviceDb();
@@ -80,7 +80,7 @@ describe('staff invites', () => {
   it('the invite email signs the invitee in on the root site, and the invite becomes a membership', async () => {
     const email = `invitee-${randomUUID().slice(0, 8)}@example.test`;
     const result = await inviteMember(db, { organizationId: orgId, email, role: 'staff', sectionIds: [turf], invitedBy: owner.id, redirectTo: 'http://localhost:3000/auth/callback?next=/manage' });
-    expect(result).toEqual({ status: 'invited', emailSent: true });
+    expect(result).toEqual({ status: 'invited', existingAccount: false, emailSent: true });
     users.push(await userIdByEmail(email));
 
     // What the invitee clicks: our callback with a one-time token hash (PKCE can't be used for admin invites)
@@ -135,5 +135,95 @@ describe('staff invites', () => {
   it('inviting an existing member reports already_member', async () => {
     const result = await inviteMember(db, { organizationId: orgId, email: owner.email.toUpperCase(), role: 'staff', sectionIds: [turf], invitedBy: owner.id, redirectTo: 'http://localhost:3000/auth/callback' });
     expect(result.status).toBe('already_member');
+  });
+});
+
+describe('inviting someone who already has an account', () => {
+  const callback = 'http://localhost:3000/auth/callback?next=/manage';
+  const memberCount = async (userId: string, organizationId = orgId) =>
+    (await db.from('organization_members').select('*', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('user_id', userId)).count;
+
+  it("gets our own email in place of Supabase's, and the invite waits on the site until they say yes", async () => {
+    const user = await createTestUser(db);
+    users.push(user.id);
+    const sent: InviteToEmail[] = [];
+    const result = await inviteMember(
+      db,
+      { organizationId: orgId, email: user.email.toUpperCase(), role: 'staff', sectionIds: [turf], invitedBy: owner.id, redirectTo: callback },
+      async (invite) => {
+        sent.push(invite);
+      },
+    );
+    expect(result).toEqual({ status: 'invited', existingAccount: true, emailSent: true });
+    expect(sent).toEqual([{ email: user.email, role: 'staff', sectionIds: [turf] }]);
+    expect(await openInviteFor(db, orgId, user.email.toUpperCase())).toMatchObject({ role: 'staff', sectionIds: [turf] });
+    expect(await memberCount(user.id)).toBe(0); // not on the team until they choose to join
+  });
+
+  it('says so when our email fails, and the invite still stands', async () => {
+    const user = await createTestUser(db);
+    users.push(user.id);
+    const result = await inviteMember(db, { organizationId: orgId, email: user.email, role: 'owner', sectionIds: [], invitedBy: owner.id, redirectTo: callback }, async () => {
+      throw new Error('SMTP down');
+    });
+    expect(result).toEqual({ status: 'invited', existingAccount: true, emailSent: false });
+    expect(await openInviteFor(db, orgId, user.email)).toMatchObject({ role: 'owner', sectionIds: [] });
+  });
+
+  it("a new address gets Supabase's invite email, not ours", async () => {
+    const email = `fresh-${randomUUID().slice(0, 8)}@example.test`;
+    const sent: InviteToEmail[] = [];
+    const result = await inviteMember(db, { organizationId: orgId, email, role: 'staff', sectionIds: [turf], invitedBy: owner.id, redirectTo: callback }, async (invite) => {
+      sent.push(invite);
+    });
+    users.push(await userIdByEmail(email));
+    expect(result).toEqual({ status: 'invited', existingAccount: false, emailSent: true });
+    expect(sent).toEqual([]);
+  });
+
+  it('saying no deletes the invite, so it can never be accepted', async () => {
+    const user = await createTestUser(db);
+    users.push(user.id);
+    await inviteMember(db, { organizationId: orgId, email: user.email, role: 'staff', sectionIds: [turf], invitedBy: owner.id, redirectTo: callback }, async () => {});
+    expect(await declineInvites(db, orgId, user.email.toUpperCase())).toBe(1);
+    expect(await declineInvites(db, orgId, user.email)).toBe(0);
+    expect(await openInviteFor(db, orgId, user.email)).toBeNull();
+    expect(await acceptPendingInvites(db, user.id, user.email)).toBe(0);
+  });
+
+  it('an expired invite is no longer open', async () => {
+    const user = await createTestUser(db);
+    users.push(user.id);
+    await db.from('organization_invites').insert({
+      organization_id: orgId,
+      email: user.email,
+      role: 'staff',
+      section_ids: [turf],
+      expires_at: new Date(Date.now() - 60_000).toISOString(),
+    });
+    expect(await openInviteFor(db, orgId, user.email)).toBeNull();
+  });
+
+  it("joining one venue's team takes only that venue's invite", async () => {
+    const user = await createTestUser(db);
+    users.push(user.id);
+    const { data: other, error } = await db
+      .from('organizations')
+      .insert({ slug: `inv2-${randomUUID().slice(0, 8)}`, name: 'Other Turf', business_type: 'turf', created_by: owner.id })
+      .select('id')
+      .single();
+    if (error) throw error;
+    try {
+      await db.from('organization_members').insert({ organization_id: other.id, user_id: owner.id, role: 'owner' });
+      await inviteMember(db, { organizationId: orgId, email: user.email, role: 'owner', sectionIds: [], invitedBy: owner.id, redirectTo: callback }, async () => {});
+      await inviteMember(db, { organizationId: other.id, email: user.email, role: 'owner', sectionIds: [], invitedBy: owner.id, redirectTo: callback }, async () => {});
+
+      expect(await acceptPendingInvites(db, user.id, user.email, orgId)).toBe(1);
+      expect(await memberCount(user.id)).toBe(1);
+      expect(await memberCount(user.id, other.id)).toBe(0);
+      expect(await openInviteFor(db, other.id, user.email)).not.toBeNull();
+    } finally {
+      await db.from('organizations').delete().eq('id', other.id);
+    }
   });
 });

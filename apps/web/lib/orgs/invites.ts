@@ -34,17 +34,32 @@ export async function memberEmails(db: SupabaseClient, organizationId: string): 
   return emails;
 }
 
+/** What an invite email to someone who already has an account needs: who, as what, and (staff) which sections. */
+export interface InviteToEmail {
+  email: string;
+  role: Role;
+  sectionIds: string[];
+}
+
+export type InviteResult =
+  | { status: 'invited'; existingAccount: boolean; emailSent: boolean }
+  | { status: 'already_member' }
+  | { status: 'no_sections' };
+
 /**
- * Records an open invite (the source of truth) and asks Supabase Auth to email a sign-in link.
- * Existing accounts get no email — the invite is accepted the next time they sign in on the root site.
- * `emailSent` is false when Auth couldn't send (existing account, rate limit); the invite still stands.
- * Staff get the sections named in `sectionIds` (at least one of this organization's, or 'no_sections');
- * owners run every section, so `sectionIds` is ignored for them.
+ * Records an open invite (the source of truth) and emails the person:
+ * - a new address gets Supabase Auth's invite email, whose link signs them in and accepts the invite;
+ * - an address that already has an account gets nothing from Auth, so `emailExisting` sends ours. The invite
+ *   then waits on the site (`openInviteFor`) until they join or say no.
+ * `emailSent` is false when the email didn't go (Auth refused, or `emailExisting` threw or wasn't given); the
+ * invite still stands. Staff get the sections named in `sectionIds` (at least one of this organization's, or
+ * 'no_sections'); owners run every section, so `sectionIds` is ignored for them.
  */
 export async function inviteMember(
   db: SupabaseClient,
   input: { organizationId: string; email: string; role: Role; sectionIds: string[]; invitedBy: string; redirectTo: string },
-): Promise<{ status: 'invited'; emailSent: boolean } | { status: 'already_member' } | { status: 'no_sections' }> {
+  emailExisting?: (invite: InviteToEmail) => Promise<void>,
+): Promise<InviteResult> {
   const email = input.email.trim().toLowerCase();
   const members = await memberEmails(db, input.organizationId);
   if ([...members.values()].includes(email)) return { status: 'already_member' };
@@ -62,7 +77,54 @@ export async function inviteMember(
   if (error) throw error;
 
   const { error: mailError } = await db.auth.admin.inviteUserByEmail(email, { redirectTo: input.redirectTo });
-  return { status: 'invited', emailSent: !mailError };
+  if (!mailError) return { status: 'invited', existingAccount: false, emailSent: true };
+  // Auth only invites addresses without an account; for one that has signed up it answers email_exists.
+  if (mailError.code !== 'email_exists') {
+    console.error('Staff invite email was not sent:', mailError.message);
+    return { status: 'invited', existingAccount: false, emailSent: false };
+  }
+  if (!emailExisting) return { status: 'invited', existingAccount: true, emailSent: false };
+  try {
+    await emailExisting({ email, role: input.role, sectionIds });
+    return { status: 'invited', existingAccount: true, emailSent: true };
+  } catch (error) {
+    console.error('Staff invite email was not sent:', error instanceof Error ? error.message : error);
+    return { status: 'invited', existingAccount: true, emailSent: false };
+  }
+}
+
+/** An open invite waiting for someone on the site. */
+export interface OpenInvite {
+  id: string;
+  role: Role;
+  sectionIds: string[];
+}
+
+/** This email's open, unexpired invite to the organization (at most one is open at a time), or null. */
+export async function openInviteFor(db: SupabaseClient, organizationId: string, email: string): Promise<OpenInvite | null> {
+  const { data, error } = await db
+    .from('organization_invites')
+    .select('id, role, section_ids')
+    .eq('organization_id', organizationId)
+    .eq('email', email.trim().toLowerCase())
+    .is('accepted_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle();
+  if (error) throw error;
+  return data ? { id: data.id as string, role: data.role as Role, sectionIds: data.section_ids as string[] } : null;
+}
+
+/** The person says no: their open invites to the organization are deleted, so they can never be accepted. Returns how many. */
+export async function declineInvites(db: SupabaseClient, organizationId: string, email: string): Promise<number> {
+  const { data, error } = await db
+    .from('organization_invites')
+    .delete()
+    .eq('organization_id', organizationId)
+    .eq('email', email.trim().toLowerCase())
+    .is('accepted_at', null)
+    .select('id');
+  if (error) throw error;
+  return data.length;
 }
 
 /** Withdraws an open invite of this organization (e.g. sent to a mistyped address) so it can never be accepted. */
@@ -79,16 +141,18 @@ export async function cancelInvite(db: SupabaseClient, organizationId: string, i
 }
 
 /**
- * Turns the user's open, unexpired invites into memberships, with the invite's sections for staff
- * (skipping sections deleted since). Returns how many were accepted. Idempotent.
+ * Turns the user's open, unexpired invites (only this organization's, when given) into memberships, with the
+ * invite's sections for staff (skipping sections deleted since). Returns how many were accepted. Idempotent.
  */
-export async function acceptPendingInvites(db: SupabaseClient, userId: string, email: string): Promise<number> {
-  const { data: invites, error } = await db
+export async function acceptPendingInvites(db: SupabaseClient, userId: string, email: string, organizationId?: string): Promise<number> {
+  let query = db
     .from('organization_invites')
     .select('id, organization_id, role, section_ids')
     .eq('email', email.toLowerCase())
     .is('accepted_at', null)
     .gt('expires_at', new Date().toISOString());
+  if (organizationId) query = query.eq('organization_id', organizationId);
+  const { data: invites, error } = await query;
   if (error) throw error;
 
   for (const invite of invites) {

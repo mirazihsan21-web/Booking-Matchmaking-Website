@@ -252,7 +252,15 @@ export const en = {
     role: 'Role',
     roles: { owner: 'Owner', staff: 'Staff' } as Record<string, string>,
     invite: 'Send invite',
-    invited: (email: string) => `Invited ${email}. They'll join when they sign in with that email.`,
+    /** After Send invite: a new address gets Supabase's invite email; an existing account gets ours and sees the invite on the site. */
+    inviteSent: (email: string, sent: { existingAccount: boolean; emailSent: boolean }) =>
+      sent.existingAccount
+        ? sent.emailSent
+          ? `Invited ${email}. They already have an account, so we've emailed them, and they'll see the invite when they open the site.`
+          : `Invited ${email}. They already have an account. The email didn't go out, but they'll see the invite when they open the site.`
+        : sent.emailSent
+          ? `Invited ${email}. We've emailed them a link to join.`
+          : `Invited ${email}, but the email didn't go out. They'll see the invite when they sign in with that address.`,
     alreadyMember: 'That person is already on your team.',
     pendingInvites: 'Pending invites',
     staffSections: 'Sections they run',
@@ -437,6 +445,26 @@ export const en = {
     openGame: 'Open this game in Manage',
     goToday: 'Go to Today',
     refused: "Team accounts can't book, take seats or keep a player profile here. Use Manage.",
+  },
+  /** An invite to the brand's team waiting for someone who already has an account (the bar, /join and our email). */
+  join: {
+    bar: (brand: string) => `${brand} invited you to join its team.`,
+    seeInvite: 'See the invite',
+    title: (brand: string) => `Join ${brand}'s team`,
+    invitation: (brand: string, role: 'owner' | 'staff', sections: string[]) =>
+      role === 'owner'
+        ? `${brand} invited you to join its team as an owner.`
+        : sections.length > 0
+          ? `${brand} invited you to join its team as staff, running ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(sections)}.`
+          : `${brand} invited you to join its team as staff.`,
+    teamLogin: 'Team logins are for running the venue. Once you join, this account opens Manage instead of booking and playing here.',
+    join: 'Join the team',
+    decline: 'No thanks',
+    none: (email: string) => `No invite is waiting for ${email}. If you were invited at a different address, sign in with that one.`,
+    gone: 'That invite has expired or was cancelled.',
+    home: 'Back to the home page',
+    emailTitle: "You've been invited to the team",
+    emailHow: 'Sign in with this email address to join, or to say no.',
   },
   profile: {
     editTitle: 'Edit your profile',

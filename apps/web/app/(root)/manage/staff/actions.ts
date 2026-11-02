@@ -3,8 +3,11 @@
 import { refresh } from "next/cache";
 import { z } from "zod";
 import type { FormState } from "@/components/forms/action-form";
-import { cancelInvite, inviteMember, ownSections } from "@/lib/orgs/invites";
+import { createEmailSender } from "@/lib/email/sender";
+import { teamInviteEmail } from "@/lib/email/team-invite-email";
+import { cancelInvite, inviteMember, ownSections, type InviteToEmail } from "@/lib/orgs/invites";
 import { changeRole, removeMember, setStaffSections } from "@/lib/orgs/members";
+import { loadSections } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { requireManager } from "@/lib/tenancy/manager";
 import { rootUrl } from "@/lib/tenancy/urls";
@@ -16,23 +19,43 @@ const sectionIdsOf = (form: FormData) => form.getAll("sectionIds").map(String);
 
 const inviteSchema = z.object({ email: z.email(m.forms.required), role: z.enum(["owner", "staff"]) });
 
-/** Invites someone by email as owner or staff (staff with the sections ticked). */
+/**
+ * Invites someone by email as owner or staff (staff with the sections ticked). Supabase emails a new address;
+ * someone who already has an account gets the site's own email (Gmail), pointing at the invite on /join.
+ */
 export async function inviteStaffAction(_state: FormState, form: FormData): Promise<FormState> {
   const { org, user } = await requireManager("owner");
   const parsed = inviteSchema.safeParse({ email: String(form.get("email") ?? "").trim(), role: form.get("role") });
   if (!parsed.success) return { ok: false, errors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
-  const result = await inviteMember(createServiceClient(), {
-    organizationId: org.id,
-    email: parsed.data.email,
-    role: parsed.data.role,
-    sectionIds: sectionIdsOf(form),
-    invitedBy: user.id,
-    redirectTo: rootUrl("/auth/callback?next=/manage"),
-  });
+  const db = createServiceClient();
+  const emailExisting = async (invite: InviteToEmail) => {
+    const sender = createEmailSender(process.env);
+    const sectionNames = (await loadSections(db, org.id)).filter((s) => invite.sectionIds.includes(s.id)).map((s) => s.name);
+    const email = teamInviteEmail({
+      venueName: org.name,
+      primaryColour: org.branding.primary ?? "",
+      role: invite.role,
+      sectionNames,
+      joinUrl: rootUrl("/join"),
+    });
+    await sender.send({ to: invite.email, ...email });
+  };
+  const result = await inviteMember(
+    db,
+    {
+      organizationId: org.id,
+      email: parsed.data.email,
+      role: parsed.data.role,
+      sectionIds: sectionIdsOf(form),
+      invitedBy: user.id,
+      redirectTo: rootUrl("/auth/callback?next=/manage"),
+    },
+    emailExisting,
+  );
   if (result.status === "already_member") return { ok: false, message: m.manage.alreadyMember };
   if (result.status === "no_sections") return pickSections;
   refresh();
-  return { ok: true, message: m.manage.invited(parsed.data.email.toLowerCase()) };
+  return { ok: true, message: m.manage.inviteSent(parsed.data.email.toLowerCase(), result) };
 }
 
 export async function cancelInviteAction(inviteId: string, _state: FormState, _form: FormData): Promise<FormState> {

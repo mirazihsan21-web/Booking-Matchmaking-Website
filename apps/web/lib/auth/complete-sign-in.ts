@@ -4,6 +4,14 @@ import type { EmailOtpType, SupabaseClient } from '@supabase/supabase-js';
 const TOKEN_TYPES: ReadonlySet<string> = new Set<EmailOtpType>(['invite', 'magiclink', 'email']);
 
 /**
+ * Whether the link is the staff invite email's ("Accept the invite"): clicking it is saying yes, so the callback
+ * accepts the invite. Any other sign-in (Google, an email sign-in link) leaves the invite waiting on the site.
+ */
+export function isInviteLink(params: URLSearchParams): boolean {
+  return Boolean(params.get('token_hash')) && params.get('type') === 'invite';
+}
+
+/**
  * Finishes a sign-in from the link a person clicked:
  * - `?code=` — the PKCE flow (sign-in links the browser asked for), or
  * - `?token_hash=&type=` — links Supabase sends on our behalf (staff invites), which can't use PKCE.
