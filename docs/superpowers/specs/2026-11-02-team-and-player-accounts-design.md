@@ -52,9 +52,10 @@ a visitor would, but where **Book**, **Request a seat** or **Join the waitlist**
 - game page: to the game in Manage (`/manage/games/<id>`) when they run its section; otherwise to Today.
 
 **The server refuses too.** `bookSpaceAction`, `requestSeatAction` (seat or waitlist),
-`respondMyOfferAction`, `respondByTokenAction` and `saveProfileAction` return "Team accounts can't book,
-take seats or keep a player profile here. Use Manage." for a team account, before anything is written.
-`withdrawAction` (leaving a game) still works, so an old seat can be given up.
+`respondMyOfferAction` and `saveProfileAction` return "Team accounts can't book, take seats or keep a
+player profile here. Use Manage." for a team account, before anything is written. `withdrawAction`
+(leaving a game) still works, so an old seat can be given up. `respondByTokenAction` (the emailed offer
+link) is left alone: it acts for the player the offer was sent to, not for whoever is signed in.
 
 **A player who later joins the team:** their past bookings and seats stay where they are (the venue's
 Bookings and games list them as before); their login becomes a team login.
