@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, type Page } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -108,4 +109,25 @@ export async function removeTestGame(db: SupabaseClient, sessionId: string): Pro
   await db.rpc('cancel_open_play_session', { p_session_id: sessionId });
   await db.from('resource_reservations').delete().eq('source', 'session').eq('source_id', sessionId);
   await db.from('open_play_sessions').delete().eq('id', sessionId);
+}
+
+/** A player with a profile at the brand, ready to sign in by email link. */
+export async function chatPlayer(db: SupabaseClient, organizationId: string, name: string, phone?: string): Promise<{ email: string; userId: string; profileId: string }> {
+  const email = `e2e-chat-${name.toLowerCase()}-${randomUUID().slice(0, 8)}@example.test`;
+  const { data, error } = await db.auth.admin.createUser({ email, email_confirm: true });
+  if (error) throw error;
+  const { data: profile, error: profileError } = await db
+    .from('player_profiles')
+    .insert({ organization_id: organizationId, user_id: data.user.id, display_name: name, phone: phone ?? null })
+    .select('id')
+    .single();
+  if (profileError) throw profileError;
+  return { email, userId: data.user.id, profileId: profile.id };
+}
+
+/** Types into the chat box and sends (one message every 3 seconds, so callers wait between their own sends). */
+export async function send(page: Page, text: string): Promise<void> {
+  await page.getByRole('textbox', { name: 'Message' }).fill(text);
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue('');
 }

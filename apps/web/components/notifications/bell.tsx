@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { unreadCount } from "@/lib/notifications/inbox";
 import { createClient } from "@/lib/supabase/client";
+import { subscribeSignedIn } from "@/lib/supabase/realtime";
 import { m } from "@/messages";
 
 /**
@@ -18,15 +19,14 @@ export function Bell({ profileId, organizationId, initialUnread }: { profileId: 
 
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase
-      .channel(`bell:${profileId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `profile_id=eq.${profileId}` }, () => {
-        unreadCount(supabase, profileId, organizationId).then(setUnread, () => undefined);
-      })
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(channel);
-    };
+    return subscribeSignedIn(supabase, (suffix) =>
+      supabase
+        .channel(`bell:${profileId}:${suffix}`)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `profile_id=eq.${profileId}` }, () => {
+          unreadCount(supabase, profileId, organizationId).then(setUnread, () => undefined);
+        })
+        .subscribe(),
+    );
   }, [profileId, organizationId]);
 
   return (

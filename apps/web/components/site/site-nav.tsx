@@ -1,10 +1,11 @@
 "use client";
 
-import { Dices, Gamepad2, Goal, House, LayoutDashboard, UserRound, type LucideIcon } from "lucide-react";
+import { Dices, Gamepad2, Goal, House, LayoutDashboard, MessagesSquare, UserRound, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "cn";
 import { Avatar } from "@/components/account/avatar";
+import { useChatUnread, type ChatLinkState } from "@/components/chat/chat-link";
 import { Bell } from "@/components/notifications/bell";
 import type { BusinessType } from "@/presets/types";
 import { m } from "@/messages";
@@ -23,7 +24,8 @@ export interface NavSection {
  * The site's navigation. Phones: a slim top bar (brand, bell) and a bottom tab bar Home · sections · Me,
  * the current tab tinted. Desktop: one top bar with the brand, the sections in their colours, My bookings,
  * the bell and Profile / Sign in. The brand's team (venue-only logins) get Manage and their photo instead of
- * My bookings, the bell and Profile, and a Manage tab instead of Me.
+ * My bookings, the bell and Profile, and a Manage tab instead of Me. Everyone gets Chat, with a dot for room
+ * messages they haven't seen (signed-in people only — visitors can't read the room).
  */
 export function SiteNav({
   brandName,
@@ -32,6 +34,7 @@ export function SiteNav({
   signedIn,
   team,
   bell,
+  chat,
 }: {
   brandName: string;
   logoUrl: string | null;
@@ -40,9 +43,12 @@ export function SiteNav({
   /** The signed-in owner or staff member (null for players and visitors): the menu leads to Manage. */
   team: { name: string; avatarUrl: string | null } | null;
   bell: { profileId: string; organizationId: string; unread: number } | null;
+  chat: ChatLinkState | null;
 }) {
   const path = usePathname();
   const on = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`));
+  const chatUnread = useChatUnread(chat, on("/chat"));
+  const chatLabel = chatUnread ? m.chat.linkUnread : undefined;
   const meHref = signedIn ? "/me" : "/signin";
 
   return (
@@ -65,6 +71,10 @@ export function SiteNav({
                 {s.name}
               </Link>
             ))}
+            <Link href="/chat" aria-label={chatLabel} className={cn("relative hover:underline", on("/chat") && "underline underline-offset-8")}>
+              {m.site.nav.chat}
+              {chatUnread && <span aria-hidden className="absolute -right-2.5 top-0 size-2 rounded-full bg-primary" />}
+            </Link>
           </nav>
           <div className="ml-auto flex items-center gap-2 text-sm">
             {team ? (
@@ -99,6 +109,7 @@ export function SiteNav({
           {sections.map((s) => (
             <Tab key={s.slug} href={`/${s.slug}`} label={s.name} Icon={KIND_ICON[s.kind]} active={on(`/${s.slug}`)} accent={s.accent} />
           ))}
+          <Tab href="/chat" label={m.site.nav.chat} ariaLabel={chatLabel} Icon={MessagesSquare} active={on("/chat")} dot={chatUnread} />
           {team ? (
             <Tab href="/manage" label={m.site.nav.manage} Icon={LayoutDashboard} active={on("/manage")} />
           ) : (
@@ -110,19 +121,37 @@ export function SiteNav({
   );
 }
 
-function Tab({ href, label, Icon, active, accent }: { href: string; label: string; Icon: LucideIcon; active: boolean; accent?: string }) {
+function Tab({
+  href,
+  label,
+  Icon,
+  active,
+  accent,
+  ariaLabel,
+  dot = false,
+}: {
+  href: string;
+  label: string;
+  Icon: LucideIcon;
+  active: boolean;
+  accent?: string;
+  ariaLabel?: string;
+  dot?: boolean;
+}) {
   return (
     <li className="flex-1">
       <Link
         href={href}
         style={accent ? sectionStyle(accent) : undefined}
         aria-current={active ? "page" : undefined}
+        aria-label={ariaLabel}
         className={cn(
-          "press flex flex-col items-center gap-0.5 px-1 py-2 text-[11px] font-semibold",
+          "press relative flex flex-col items-center gap-0.5 px-1 py-2 text-[11px] font-semibold",
           active ? (accent ? "text-section" : "text-foreground") : "text-muted-foreground",
         )}
       >
         <Icon aria-hidden className="size-5" />
+        {dot && <span aria-hidden className="absolute right-1/4 top-1.5 size-2 rounded-full bg-primary" />}
         <span className="max-w-full truncate">{label}</span>
       </Link>
     </li>
