@@ -12,7 +12,13 @@ export type NotificationKind =
   | 'offer_expired'
   | 'seat_cancelled'
   | 'session_cancelled'
-  | 'no_seat';
+  | 'no_seat'
+  | 'chat_join_request'
+  | 'chat_join_accepted'
+  | 'chat_join_declined'
+  | 'chat_join_left'
+  | 'chat_card_closed'
+  | 'chat_game_cancelled';
 
 const str = (value: unknown) => (typeof value === 'string' ? value : '');
 
@@ -79,6 +85,24 @@ export function renderNotification(n: { kind: NotificationKind; payload: Record<
       return { title: t.sessionCancelled, body: t.sessionCancelledBody(sessionAt(n.payload, timeZone)) };
     case 'no_seat':
       return { title: n.payload.reason === 'not_enough_players' ? t.notEnoughPlayers : t.noSeat, body: `${sessionAt(n.payload, timeZone)}.` };
+    case 'chat_join_request':
+      return { title: t.chatJoinRequest(str(n.payload.player_name)), body: `${spaceAndTime(n.payload, timeZone)}.` };
+    case 'chat_join_accepted':
+      return { title: t.chatJoinAccepted(str(n.payload.poster_name)), body: `${spaceAndTime(n.payload, timeZone)}. ${t.chatNumberOnPage}` };
+    case 'chat_join_declined':
+      return {
+        title: n.payload.after_accept ? t.chatJoinRemoved(str(n.payload.poster_name)) : t.chatJoinDeclined(str(n.payload.poster_name)),
+        body: `${spaceAndTime(n.payload, timeZone)}.`,
+      };
+    case 'chat_join_left':
+      return { title: t.chatJoinLeft(str(n.payload.player_name)), body: `${spaceAndTime(n.payload, timeZone)}. ${t.chatSpotOpen}` };
+    case 'chat_card_closed':
+      return {
+        title: n.payload.reason === 'full' ? t.chatCardFull(str(n.payload.poster_name)) : t.chatCardClosed(str(n.payload.poster_name)),
+        body: `${spaceAndTime(n.payload, timeZone)}.`,
+      };
+    case 'chat_game_cancelled':
+      return { title: t.chatGameCancelled(str(n.payload.poster_name)), body: `${spaceAndTime(n.payload, timeZone)}.` };
     default:
       return { title: t.update, body: '' };
   }

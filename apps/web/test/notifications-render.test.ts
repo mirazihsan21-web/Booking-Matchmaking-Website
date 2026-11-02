@@ -90,3 +90,36 @@ describe('renderNotification for open play', () => {
     expect(render('session_cancelled', { ...session, activity_name: null }).body).toBe('Open play, Fri 23 Oct, 8pm was cancelled by the venue.');
   });
 });
+
+describe('renderNotification for the players chat', () => {
+  const card = { player_name: 'Tanvir', poster_name: 'Sami', resource_name: 'Pitch 1', section_name: 'Turf', starts_at: '2026-10-23T14:00:00Z', ends_at: '2026-10-23T15:00:00Z' };
+  const at = 'Pitch 1 (Turf), Fri 23 Oct, 8pm–9pm';
+  const show = (kind: Parameters<typeof renderNotification>[0]['kind'], extra: Record<string, unknown> = {}) =>
+    renderNotification({ kind, payload: { ...card, ...extra } }, zone);
+
+  it('tells the poster someone wants to join', () => {
+    expect(show('chat_join_request')).toEqual({ title: 'Tanvir wants to join your game', body: `${at}.` });
+  });
+
+  it('tells a player they were accepted, and where the number is', () => {
+    expect(show('chat_join_accepted')).toEqual({ title: 'Sami accepted you', body: `${at}. Their number is on the game page.` });
+  });
+
+  it('tells a player kindly when it did not work out, or when they were taken off', () => {
+    expect(show('chat_join_declined', { after_accept: false })).toEqual({ title: "Sami's game didn't work out", body: `${at}.` });
+    expect(show('chat_join_declined', { after_accept: true })).toEqual({ title: 'Sami took you off the game', body: `${at}.` });
+  });
+
+  it('tells the poster when someone cannot make it', () => {
+    expect(show('chat_join_left')).toEqual({ title: "Tanvir can't make it any more", body: `${at}. A spot is open again.` });
+  });
+
+  it('tells waiting players a card filled or closed', () => {
+    expect(show('chat_card_closed', { reason: 'full' })).toEqual({ title: "Sami's game is full", body: `${at}.` });
+    expect(show('chat_card_closed', { reason: 'closed' })).toEqual({ title: 'Sami closed their game', body: `${at}.` });
+  });
+
+  it('tells everyone involved a game was cancelled', () => {
+    expect(show('chat_game_cancelled')).toEqual({ title: "Sami's game was cancelled", body: `${at}.` });
+  });
+});
