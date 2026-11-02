@@ -177,7 +177,7 @@ RLS (`to authenticated`):
 - [ ] **Step 4: Run** `pnpm db:test` and `pnpm db:lint` — Expected: PASS, no issues.
 - [ ] **Step 5: Commit** — `feat(db): private conversations, blocks and the chat-photos bucket`.
 
-### Task 3: (folded) — the C2 notification words
+### Task 3: Words for the private-message notification
 
 **Files:** Modify `apps/web/lib/notifications/render.ts`, `apps/web/messages/en.ts`. Test: `apps/web/test/notifications-render.test.ts`.
 
@@ -371,7 +371,7 @@ RLS (`to authenticated`):
 - Modify:
   - `apps/web/components/chat/composer.tsx`: props `{ action, hidden?: Record<string, string>, userId: string, onSent: (result: FormState & { conversationId?: string }) => void }`, plus the photo picker and a hidden `photoPath`;
   - `components/chat/message-item.tsx`: shows the photo above the caption;
-  - `components/chat/chat-room.tsx`: drops private rows (`isRoomMessage`) from live events;
+  - `components/chat/chat-room.tsx`: drops private rows (`isRoomMessage`) from live events, and passes `action={sendMessageAction}` and `userId={me.userId}` to the Composer;
   - `components/chat/report-dialog.tsx`: an "Inappropriate photo" reason when the message has a photo;
   - `app/(site)/chat/actions.ts`: `sendMessageAction` passes `photoPath`;
   - `messages/en.ts`.
@@ -412,6 +412,11 @@ RLS (`to authenticated`):
   - `components/site/site-chrome.tsx` (reads `privateUnread` for players);
   - `messages/en.ts`.
 - Test: `apps/web/e2e/c2-chat-private.spec.ts`
+
+**Copy** (`m.chat`):
+- `blockedLine: (n) => n === 1 ? '1 message from someone you blocked' : `${n} messages from someone you blocked``
+- `linkPrivate: (n) => n === 1 ? 'Chat — 1 unread private message' : `Chat — ${n} unread private messages``
+- `private: { everyone: 'Everyone', title: 'Private', none: "No private messages yet. Tap a player's name in the chat to message them.", teamNote: "Team logins don't send private messages.", message: 'Message', block: 'Block', unblock: 'Unblock', plays: (sections: string) => `Plays: ${sections}`, photoOnly: 'Photo' }`
 
 **Interfaces — Produces** (`private/actions.ts`):
 - `sendPrivateAction(state, fd): Promise<FormState & { conversationId?: string }>`, with fields `toProfileId`, `body` and `photoPath`;
