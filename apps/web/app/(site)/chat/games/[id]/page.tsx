@@ -30,7 +30,7 @@ const AddYourNumber = () => (
 );
 
 /** What the poster does: answer requests, see who's in (with their numbers), take someone off, close the card. */
-function PosterPanel({ view, live, myPhone, timeZone }: { view: CardView; live: boolean; myPhone: string | null; timeZone: string }) {
+function PosterPanel({ view, live, lineupOpen, myPhone, timeZone }: { view: CardView; live: boolean; lineupOpen: boolean; myPhone: string | null; timeZone: string }) {
   const { card } = view;
   return (
     <>
@@ -67,7 +67,7 @@ function PosterPanel({ view, live, myPhone, timeZone }: { view: CardView; live: 
               <li key={p.profileId} className="flex flex-wrap items-center gap-3 rounded-xl bg-card p-3">
                 <span className="font-semibold">{p.name}</span>
                 <Phone phone={p.phone} />
-                {live && (
+                {lineupOpen && (
                   <span className="ml-auto">
                     <ActionButton action={removePlayerAction.bind(null, card.id, p.profileId)} label={m.chat.game.remove} />
                   </span>
@@ -84,7 +84,23 @@ function PosterPanel({ view, live, myPhone, timeZone }: { view: CardView; live: 
 }
 
 /** Everyone else: an accepted player (the poster's number, Can't make it), someone waiting, or I'm in. */
-function PlayerPanel({ view, live, signedIn, hasProfile, isTeam, myPhone }: { view: CardView; live: boolean; signedIn: boolean; hasProfile: boolean; isTeam: boolean; myPhone: string | null }) {
+function PlayerPanel({
+  view,
+  live,
+  lineupOpen,
+  signedIn,
+  hasProfile,
+  isTeam,
+  myPhone,
+}: {
+  view: CardView;
+  live: boolean;
+  lineupOpen: boolean;
+  signedIn: boolean;
+  hasProfile: boolean;
+  isTeam: boolean;
+  myPhone: string | null;
+}) {
   const { card } = view;
   if (card.kind === "session") {
     return live ? (
@@ -102,7 +118,7 @@ function PlayerPanel({ view, live, signedIn, hasProfile, isTeam, myPhone }: { vi
           <Phone phone={view.posterPhone} />
         </p>
         {!myPhone && <AddYourNumber />}
-        {live && <ActionButton action={leaveAction.bind(null, card.id)} label={m.chat.game.cantMakeIt} />}
+        {lineupOpen && <ActionButton action={leaveAction.bind(null, card.id)} label={m.chat.game.cantMakeIt} />}
       </section>
     );
   }
@@ -147,17 +163,33 @@ async function Game({ params }: { params: Promise<{ id: string }> }) {
   const brand = await getBrand();
   if (!brand) return null; // the layout shows "Not open yet"
   const player = await getSitePlayer();
+  if (!player) {
+    // The chat is for signed-in people only, its game pages too.
+    return (
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-4 py-8 sm:px-6">
+        <section className="flex flex-col items-start gap-3 rounded-xl bg-card p-6">
+          <p className="text-lg font-semibold">{m.chat.signInToSee}</p>
+          <Link href={`/signin?next=${encodeURIComponent(`/chat/games/${id}`)}`} className="rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground">
+            {m.chat.signIn}
+          </Link>
+        </section>
+      </main>
+    );
+  }
   const db = createServiceClient();
   const view = await cardView(db, {
     organizationId: brand.id,
     cardId: id,
-    viewer: { userId: player?.user.id ?? "", profileId: player?.profileId ?? null, isTeam: player?.isTeam ?? false },
+    viewer: { userId: player.user.id, profileId: player.profileId, isTeam: player.isTeam },
   });
   if (!view) notFound();
   const { card } = view;
-  const live = (card.status === "open" || card.status === "full") && new Date(card.startsAt) > new Date();
+  const ahead = new Date(card.startsAt) > new Date();
+  const live = (card.status === "open" || card.status === "full") && ahead;
+  // Even after the poster closes the card, who's in can change until the game starts.
+  const lineupOpen = (live || card.status === "closed") && ahead;
   const myPhone =
-    player?.profileId && (view.role === "poster" || view.role === "accepted")
+    player.profileId && (view.role === "poster" || view.role === "accepted")
       ? (((await db.from("player_profiles").select("phone").eq("id", player.profileId).maybeSingle()).data?.phone as string | null) ?? null)
       : null;
 
@@ -178,9 +210,9 @@ async function Game({ params }: { params: Promise<{ id: string }> }) {
         <p className="font-semibold text-section">{cardLeft(card, null)}</p>
       </section>
       {view.role === "poster" && card.kind === "booking" ? (
-        <PosterPanel view={view} live={live} myPhone={myPhone} timeZone={brand.timezone} />
+        <PosterPanel view={view} live={live} lineupOpen={lineupOpen} myPhone={myPhone} timeZone={brand.timezone} />
       ) : (
-        <PlayerPanel view={view} live={live} signedIn={Boolean(player)} hasProfile={Boolean(player?.profileId)} isTeam={player?.isTeam ?? false} myPhone={myPhone} />
+        <PlayerPanel view={view} live={live} lineupOpen={lineupOpen} signedIn hasProfile={Boolean(player.profileId)} isTeam={player.isTeam} myPhone={myPhone} />
       )}
       <AutoRefresh seconds={20} />
     </main>

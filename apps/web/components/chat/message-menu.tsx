@@ -2,7 +2,7 @@
 
 import { MoreHorizontal } from "lucide-react";
 import { startTransition, useState } from "react";
-import { muteAction, removeAsVenueAction, removeMyMessageAction } from "@/app/(site)/chat/actions";
+import { closeMyCardAction, muteAction, removeAsVenueAction, removeMyMessageAction } from "@/app/(site)/chat/actions";
 import type { ChatMessage } from "@/lib/chat/rows";
 import { m } from "@/messages";
 import type { ChatMe } from "./chat-room";
@@ -11,11 +11,11 @@ import { ReportDialog } from "./report-dialog";
 const MUTE_LENGTHS = ["1", "7", "forever"] as const;
 
 /**
- * A message's ⋯ menu. Your own message: Remove (a card is closed on its page instead). Someone else's (players):
+ * A message's ⋯ menu. Your own message: Remove; your own open card: Close card. Someone else's (players):
  * Report. The team: Remove message, and Mute for a player's message. Nothing for removed or hidden messages —
  * except the last word of what you just did (a report that hid the message still says thanks).
  */
-export function MessageMenu({ message, me }: { message: ChatMessage; me: ChatMe }) {
+export function MessageMenu({ message, me, cardOpen = false }: { message: ChatMessage; me: ChatMe; cardOpen?: boolean }) {
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
@@ -27,8 +27,9 @@ export function MessageMenu({ message, me }: { message: ChatMessage; me: ChatMe 
   if (message.state !== "visible") return said || null;
   const mine = message.authorUserId === me.userId;
   const canRemoveOwn = mine && !message.cardId && !me.isTeam;
+  const canCloseOwn = mine && message.cardId !== null && cardOpen;
   const canReport = !mine && !me.isTeam && me.profileId !== null;
-  if (!canRemoveOwn && !canReport && !me.isTeam) return null;
+  if (!canRemoveOwn && !canCloseOwn && !canReport && !me.isTeam) return null;
 
   const run = (action: () => Promise<{ ok: boolean; message?: string } | null>, done?: string) => {
     setStatus(null);
@@ -63,6 +64,11 @@ export function MessageMenu({ message, me }: { message: ChatMessage; me: ChatMe 
           {canRemoveOwn && (
             <button type="button" className={item} onClick={() => run(() => removeMyMessageAction(message.id))}>
               {m.chat.remove}
+            </button>
+          )}
+          {canCloseOwn && (
+            <button type="button" className={item} onClick={() => run(() => closeMyCardAction(message.cardId!))}>
+              {m.chat.game.close}
             </button>
           )}
           {me.isTeam && (

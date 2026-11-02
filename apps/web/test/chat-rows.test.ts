@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardFromRow, mergeMessages, messageFromRow, type ChatMessage } from '../lib/chat/rows';
+import { cardFromRow, mergeMessages, mergeUpdates, messageFromRow, type ChatMessage } from '../lib/chat/rows';
 
 const message = (id: string, createdAt: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({
   id,
@@ -38,6 +38,27 @@ describe('mergeMessages', () => {
     const y = message('y', '2026-11-02T10:00:00Z');
     const x = message('x', '2026-11-02T10:00:00Z');
     expect(mergeMessages([y], [x]).map((m) => m.id)).toEqual(['x', 'y']);
+  });
+});
+
+describe('mergeUpdates (a live change to a message)', () => {
+  const b = message('b', '2026-11-02T10:01:00Z');
+  const c = message('c', '2026-11-02T10:02:00Z');
+
+  it('replaces a message the room shows', () => {
+    const removed = { ...b, body: null, state: 'removed_by_venue' as const };
+    expect(mergeUpdates([b, c], [removed])).toEqual([removed, c]);
+  });
+
+  it('ignores a change to a message older than the room has loaded, so Load earlier still reaches everything in between', () => {
+    const old = message('old', '2026-11-01T08:00:00Z', { state: 'hidden_by_reports', body: null });
+    expect(mergeUpdates([b, c], [old]).map((m) => m.id)).toEqual(['b', 'c']);
+  });
+
+  it('keeps a changed message newer than the oldest one shown (it may have been missed)', () => {
+    const between = message('between', '2026-11-02T10:01:30Z');
+    expect(mergeUpdates([b, c], [between]).map((m) => m.id)).toEqual(['b', 'between', 'c']);
+    expect(mergeUpdates([], [between]).map((m) => m.id)).toEqual(['between']);
   });
 });
 

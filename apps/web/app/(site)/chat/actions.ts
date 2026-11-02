@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import type { FormState } from "@/components/forms/action-form";
-import { postBookingCard, postSessionCard } from "@/lib/chat/cards";
+import { closeCard, postBookingCard, postSessionCard } from "@/lib/chat/cards";
 import { mutePlayer, reportMessage } from "@/lib/chat/moderation";
 import { parseCardForm, parseChatMessageForm, parseMuteForm, parseReportForm } from "@/lib/forms/chat";
 import { postMessage, removeMessage } from "@/lib/chat/messages";
@@ -77,4 +77,12 @@ export async function muteAction(profileId: string, length: string): Promise<For
   if (!parsed.ok) return { ok: false, message: m.chat.refusal.invalid };
   const result = await mutePlayer(createServiceClient(), { organizationId: player.brand.id, userId: player.user.id, ...parsed.value });
   return result === "muted" ? { ok: true } : { ok: false, message: m.chat.refusal[result] };
+}
+
+/** Closes one of your own cards (a booking card or an open-play game you shared) from the room. */
+export async function closeMyCardAction(cardId: string): Promise<FormState> {
+  const player = await getSitePlayer();
+  if (!player) return { ok: false, message: m.chat.signInToSee };
+  const result = await closeCard(createServiceClient(), { cardId, userId: player.user.id });
+  return result === "closed" ? { ok: true } : { ok: false, message: m.chat.refusal[result] };
 }

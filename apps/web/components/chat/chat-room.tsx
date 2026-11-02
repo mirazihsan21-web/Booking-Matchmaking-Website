@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { markRoomRead } from "@/lib/chat/reads";
-import { cardsFor, roomPage } from "@/lib/chat/room";
-import { cardFromRow, mergeMessages, messageFromRow, type ChatCard, type ChatMessage } from "@/lib/chat/rows";
+import { cardsFor, roomPage, roomSince } from "@/lib/chat/room";
+import { cardFromRow, mergeMessages, mergeUpdates, messageFromRow, type ChatCard, type ChatMessage } from "@/lib/chat/rows";
 import { formatNight } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeSignedIn } from "@/lib/supabase/realtime";
@@ -95,9 +95,18 @@ export function ChatRoom({
   }, []);
 
   const addMessages = useCallback(
-    (incoming: ChatMessage[], incomingCards: ChatCard[] = []) => {
+    (incoming: ChatMessage[], incomingCards: ChatCard[] = [], changes = false) => {
       addCards(incomingCards);
-      setMessages((previous) => mergeMessages(previous, incoming));
+      setMessages((previous) => (changes ? mergeUpdates(previous, incoming) : mergeMessages(previous, incoming)));
+      // A card whose message is removed or hidden leaves the strip.
+      const gone = incoming.filter((msg) => msg.cardId && msg.state !== "visible").map((msg) => msg.cardId!);
+      if (gone.length > 0) {
+        setStrip((previous) => {
+          const next = new Map(previous);
+          for (const id of gone) next.delete(id);
+          return next;
+        });
+      }
       // A card's message can arrive before its card does: fetch any card the room doesn't have yet.
       const known = new Set([...cardsRef.current.keys(), ...incomingCards.map((c) => c.id)]);
       const missing = incoming.filter((msg) => msg.cardId && !known.has(msg.cardId));
@@ -106,21 +115,36 @@ export function ChatRoom({
     [addCards, supabase],
   );
 
+  // Everything since the newest message shown; after a long sleep (more than ten pages) start again from the newest.
   const catchUp = useCallback(async () => {
-    const page = await roomPage(supabase, { organizationId, after: newest.current?.createdAt });
-    addMessages(page.messages, page.cards);
-  }, [addMessages, organizationId, supabase]);
+    const after = newest.current?.createdAt;
+    if (!after) {
+      const page = await roomPage(supabase, { organizationId });
+      addMessages(page.messages, page.cards);
+      return;
+    }
+    const since = await roomSince(supabase, { organizationId, after });
+    if (since.complete) {
+      addMessages(since.messages, since.cards);
+      return;
+    }
+    const page = await roomPage(supabase, { organizationId });
+    addCards(page.cards);
+    setMessages(page.messages);
+    setHasMore(true);
+  }, [addCards, addMessages, organizationId, supabase]);
 
   // Live rows.
   useEffect(() => {
     const filter = `organization_id=eq.${organizationId}`;
     const onMessage = (payload: { new: Record<string, unknown> }) => addMessages([messageFromRow(payload.new)]);
+    const onMessageChange = (payload: { new: Record<string, unknown> }) => addMessages([messageFromRow(payload.new)], [], true);
     const onCard = (payload: { new: Record<string, unknown> }) => addCards([cardFromRow(payload.new)]);
     return subscribeSignedIn(supabase, (suffix) =>
       supabase
         .channel(`chat:${organizationId}:${suffix}`)
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter }, onMessage)
-        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_messages", filter }, onMessage)
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_messages", filter }, onMessageChange)
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_cards", filter }, onCard)
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_cards", filter }, onCard)
         .subscribe((status) => {
@@ -250,7 +274,7 @@ export function ChatRoom({
             if (message.cardId && !card) return null;
             if (card) {
               return (
-                <MessageItem key={message.id} message={message} mine={mine} timeZone={timeZone} now={now} actions={<MessageMenu message={message} me={me} />}>
+                <MessageItem key={message.id} message={message} mine={mine} timeZone={timeZone} now={now} actions={<MessageMenu message={message} me={me} cardOpen={card.status === "open" || card.status === "full"} />}>
                   <CardItem card={card} timeZone={timeZone} mine={card.posterUserId === me.userId} seatsLeft={strip.get(card.id)?.seatsLeft ?? null} />
                 </MessageItem>
               );

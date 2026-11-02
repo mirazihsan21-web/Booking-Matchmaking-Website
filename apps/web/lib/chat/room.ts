@@ -33,3 +33,27 @@ export async function cardsFor(db: SupabaseClient, messages: ChatMessage[]): Pro
   if (error) throw error;
   return (data ?? []).map((row) => cardFromRow(row));
 }
+
+/**
+ * Everything from `after` on, a page at a time (a phone that slept can miss more than one page). Stops after
+ * `maxPages`; `complete: false` then means there is more than that — the room starts again from the newest page.
+ */
+export async function roomSince(
+  db: SupabaseClient,
+  input: { organizationId: string; after: string; maxPages?: number },
+): Promise<{ messages: ChatMessage[]; cards: ChatCard[]; complete: boolean }> {
+  const maxPages = input.maxPages ?? 10;
+  let messages: ChatMessage[] = [];
+  let cards: ChatCard[] = [];
+  let cursor = input.after;
+  for (let page = 0; page < maxPages; page += 1) {
+    const next = await roomPage(db, { organizationId: input.organizationId, after: cursor });
+    messages = mergeMessages(messages, next.messages);
+    cards = [...cards, ...next.cards];
+    const last = next.messages.at(-1);
+    if (next.messages.length < 50 || !last) return { messages, cards, complete: true };
+    if (last.createdAt === cursor) break; // a whole page at one moment: give up and start again from the newest
+    cursor = last.createdAt;
+  }
+  return { messages, cards, complete: false };
+}

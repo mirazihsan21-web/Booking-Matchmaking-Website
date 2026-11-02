@@ -103,3 +103,15 @@ export function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]): 
   for (const message of incoming) byId.set(message.id, message);
   return [...byId.values()].sort(order);
 }
+
+/**
+ * The room after live *changes* (removed, hidden, restored) arrive. A change to a message the room shows replaces it;
+ * a change to one newer than the oldest shown is added (it may have been missed); a change to anything older is left
+ * out — adding it would put it at the top and make Load earlier skip everything between it and the room.
+ */
+export function mergeUpdates(current: ChatMessage[], updated: ChatMessage[]): ChatMessage[] {
+  const oldest = current[0];
+  const shown = new Set(current.map((m) => m.id));
+  const keep = updated.filter((m) => shown.has(m.id) || !oldest || order(m, oldest) >= 0);
+  return keep.length === 0 ? current : mergeMessages(current, keep);
+}

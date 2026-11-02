@@ -63,7 +63,7 @@ export const leaveCard = (db: SupabaseClient, input: { cardId: string; userId: s
 export const removeFromCard = (db: SupabaseClient, input: { cardId: string; userId: string; profileId: string }) =>
   call<'removed'>(db, 'remove_from_card', { p_card_id: input.cardId, p_user_id: input.userId, p_profile_id: input.profileId });
 
-/** The open cards for the strip, soonest game first; session cards carry their seats left. */
+/** The open cards for the strip, soonest game first (not hidden ones); session cards carry their seats left. */
 export async function openCards(db: SupabaseClient, input: { organizationId: string; now?: Date }): Promise<Array<ChatCard & { seatsLeft: number | null }>> {
   const now = input.now ?? new Date();
   const { data, error } = await db
@@ -75,7 +75,18 @@ export async function openCards(db: SupabaseClient, input: { organizationId: str
     .order('starts_at', { ascending: true })
     .limit(30);
   if (error) throw error;
-  const cards = (data ?? []).map((row) => cardFromRow(row));
+  let cards = (data ?? []).map((row) => cardFromRow(row));
+  // A card whose message is hidden by reports (or removed) isn't shown.
+  if (cards.length > 0) {
+    const { data: gone, error: goneError } = await db
+      .from('chat_messages')
+      .select('card_id')
+      .in('card_id', cards.map((c) => c.id))
+      .neq('state', 'visible');
+    if (goneError) throw goneError;
+    const hidden = new Set((gone ?? []).map((row) => row.card_id as string));
+    cards = cards.filter((c) => !hidden.has(c.id));
+  }
   const sessionIds = cards.filter((c) => c.kind === 'session').map((c) => c.sessionId!);
   const left = sessionIds.length > 0 ? await seatsLeft(db, { organizationId: input.organizationId, sessionIds }) : new Map<string, number>();
   return cards.map((card) => ({ ...card, seatsLeft: card.kind === 'session' ? (left.get(card.sessionId!) ?? 0) : null }));

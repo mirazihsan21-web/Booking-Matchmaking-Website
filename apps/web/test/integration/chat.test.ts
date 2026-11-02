@@ -4,7 +4,7 @@ import { cardableBookings, cardView, decideRequest, openCards, postBookingCard, 
 import { postMessage } from '@/lib/chat/messages';
 import { listOpenReports, mutePlayer, myMute, openReportCount, reportMessage, setBlockedWord } from '@/lib/chat/moderation';
 import { hasUnreadRoom, markRoomRead } from '@/lib/chat/reads';
-import { roomPage } from '@/lib/chat/room';
+import { roomPage, roomSince } from '@/lib/chat/room';
 import { createTestUser, deleteTestUser, serviceDb, signedInClient, type TestUser } from './helpers';
 
 // Chat Arena (live) with a Turf section (Pitch 1, 14 people) and a 5-a-side open-play game in two days.
@@ -164,4 +164,35 @@ describe('the players chat', () => {
     const newer = await roomPage(asB, { organizationId: orgId, after: page.messages.at(-1)!.createdAt });
     expect(newer.messages.map((m) => m.body)).toContain('anyone else?');
   }, 20_000);
+
+  it('catches up on everything sent while a phone slept, not just the first 50', async () => {
+    const asB = await signedInClient(b.email, b.password);
+    const since = new Date(Date.now() + 60_000).toISOString(); // after everything above
+    const { error } = await db.from('chat_messages').insert(
+      Array.from({ length: 120 }, (_, i) => ({
+        organization_id: orgId,
+        author_user_id: a.id,
+        author_profile_id: pa,
+        author_kind: 'player',
+        author_name: 'Sami',
+        body: `while you slept ${i + 1}`,
+        created_at: new Date(Date.parse(since) + (i + 1) * 1_000).toISOString(),
+      })),
+    );
+    if (error) throw error;
+    const caught = await roomSince(asB, { organizationId: orgId, after: since });
+    expect(caught.complete).toBe(true);
+    expect(caught.messages.map((m) => m.body)).toEqual(Array.from({ length: 120 }, (_, i) => `while you slept ${i + 1}`));
+  });
+
+  it('leaves a card out of the strip while its message is hidden by reports', async () => {
+    const { id: cardId } = must(await db.from('chat_cards').select('id').eq('resource_booking_id', bookingId).single());
+    must(await db.from('chat_messages').update({ state: 'hidden_by_reports' }).eq('card_id', cardId).select('id'));
+    try {
+      expect((await openCards(db, { organizationId: orgId })).map((card) => card.id)).not.toContain(cardId);
+    } finally {
+      must(await db.from('chat_messages').update({ state: 'visible' }).eq('card_id', cardId).select('id'));
+    }
+    expect((await openCards(db, { organizationId: orgId })).map((card) => card.id)).toContain(cardId);
+  });
 });
