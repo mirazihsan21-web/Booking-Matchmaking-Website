@@ -159,8 +159,41 @@ test('the owner signs in from the site and lands in the manage area', async ({ p
   await expect(page).toHaveURL((url) => url.pathname === '/manage');
   // And from anywhere on the site, the menu has a way back in.
   await page.goto('/');
-  await page.getByRole('link', { name: 'Manage', exact: true }).click();
+  await page.locator('header').getByRole('link', { name: 'Manage', exact: true }).click();
   await expect(page).toHaveURL((url) => url.pathname === '/manage');
+});
+
+test("the owner's account is the venue's: Manage on the site, My account, no booking", async ({ page }) => {
+  const { db, slug } = localAdmin();
+  const { data: org } = await db.from('organizations').select('id').eq('slug', slug).single();
+  const { data: users } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const ownerId = users.users.find((u) => u.email === OWNER)!.id;
+  const { data: before } = await db.from('organization_members').select('display_name, phone').eq('organization_id', org!.id).eq('user_id', ownerId).single();
+  const name = `Owner ${randomUUID().slice(0, 4)}`;
+  try {
+    await signIn(page, OWNER, '/manage');
+
+    // The site's menu leads to Manage; the player links are gone.
+    await page.goto('/');
+    await expect(page.locator('header').getByRole('link', { name: 'Manage', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Profile', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'My bookings', exact: true })).toHaveCount(0);
+
+    // The player's pages send the team to My account, where the owner changes their name.
+    await page.goto('/me');
+    await expect(page).toHaveURL((url) => url.pathname === '/manage/account');
+    await page.getByLabel('Name', { exact: true }).fill(name);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Saved.')).toBeVisible();
+    await expect(page.locator('aside a[href="/manage/account"]')).toContainText(name);
+
+    // A booking page tells the team where to book instead of offering Book.
+    await page.goto('/turf/book');
+    await expect(page.getByText('Book walk-ins from Today')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Book', exact: true })).toHaveCount(0);
+  } finally {
+    await db.from('organization_members').update(before!).eq('organization_id', org!.id).eq('user_id', ownerId);
+  }
 });
 
 test('a turf-only staff member sees only turf', async ({ page }) => {
@@ -175,6 +208,8 @@ test('a turf-only staff member sees only turf', async ({ page }) => {
   try {
     await db.from('organization_members').insert({ organization_id: turf.orgId, user_id: userId, role: 'staff' });
     await db.from('section_staff').insert({ organization_id: turf.orgId, section_id: turf.sectionId, user_id: userId });
+    // They played here before joining the team (Review Focus 4): their login is still a team login.
+    await db.from('player_profiles').insert({ organization_id: turf.orgId, user_id: userId, display_name: 'Staff Who Played' });
     await signIn(page, email, '/manage');
 
     await expect(page.getByText('Pitch 1').first()).toBeVisible();
@@ -185,7 +220,18 @@ test('a turf-only staff member sees only turf', async ({ page }) => {
       // Refused like a page that doesn't exist (the 404 is marked noindex).
       await expect(page.locator('meta[name="robots"][content*="noindex"]').first(), path).toBeAttached();
     }
+
+    // On the site: Manage, no Profile and no notifications bell; their own pages lead to My account.
+    await page.goto('/');
+    await expect(page.locator('header').getByRole('link', { name: 'Manage', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Profile', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /unread notification/ })).toHaveCount(0);
+    await page.goto('/me');
+    await expect(page).toHaveURL((url) => url.pathname === '/manage/account');
+    await expect(page.locator('main').getByText('Turf', { exact: true })).toBeVisible();
+    await expect(page.getByText('The owner chooses your sections on the Staff page.')).toBeVisible();
   } finally {
+    await db.from('player_profiles').delete().eq('user_id', userId);
     await db.from('section_staff').delete().eq('user_id', userId);
     await db.from('organization_members').delete().eq('user_id', userId);
     await db.auth.admin.deleteUser(userId);

@@ -24,7 +24,9 @@ test('a player signs in once, books a space and joins a game in each section', a
     await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
     await expect(page.getByText('Check your email')).toBeVisible();
     await page.goto(await signInLink(address));
-    await expect(page).toHaveURL(/\/me$/);
+    // No profile yet: the profile page sends a new player to the form.
+    await expect(page).toHaveURL(/\/me\/edit$/);
+    await expect(page.getByRole('heading', { name: 'Set up your player profile' })).toBeVisible();
     // Players have no way into the manage area.
     await expect(page.getByRole('link', { name: 'Manage', exact: true })).toHaveCount(0);
     const signedInAt = visited.length;
@@ -35,6 +37,8 @@ test('a player signs in once, books a space and joins a game in each section', a
       await page.getByRole('group', { name: `How good are you at ${section.name}?` }).getByText('3 · Solid').click();
     }
     await page.getByRole('button', { name: 'Save profile' }).click();
+    // Saving shows the profile itself.
+    await expect(page).toHaveURL(/\/me\?saved=1$/);
     await expect(page.getByRole('status')).toHaveText('Profile saved.');
 
     for (const section of SECTIONS) {
@@ -64,6 +68,12 @@ test('a player signs in once, books a space and joins a game in each section', a
 
     // 4. Signed in once: nothing sent the player back to sign in.
     expect(visited.slice(signedInAt)).not.toContain('/signin');
+
+    // 5. The profile shows who they are here: their levels and their play.
+    await page.goto('/me');
+    await expect(page.getByText('Turf · 3 Solid')).toBeVisible();
+    await expect(page.getByText('Games played')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Edit profile' })).toBeVisible();
   } finally {
     // Each run is a new player; they and their bookings go, so later runs find tomorrow's slots free.
     await removeTestPlayer(db, address);

@@ -127,6 +127,14 @@ pnpm env:local                                               # .env.local → ba
 - **One sign-in:** `/signin?next=…` for everyone (staff invite emails send `next=/manage`). It works even while
   the brand isn't live, so staff can sign in to set it up and publish it; the other public pages then say
   "Not open yet".
+- **Team logins are venue-only.** Owners and staff land in `/manage` after signing in (a manage page in `next` is
+  kept). On the site their menu, phone tabs and footer show **Manage** and **My account** instead of the player
+  links and bell; the player's own pages send them to My account; booking and game pages show "You're signed in
+  as <brand>'s team. Book walk-ins from Today." with a link, and the booking, seat, offer and profile actions
+  refuse them. A staff member who wants to play uses another email.
+- **Profile:** `/me` is the player's profile to read (photo, name, email, mobile, a level per section, games
+  played, spaces booked, Next up, favourites, usual times); **Edit profile** opens the form at `/me/edit`. A first
+  visit goes straight to the form, with the name filled in from Google.
 
 ### The manage area (R3)
 
@@ -145,6 +153,7 @@ address (`lib/manage/paths.ts`).
 | `/manage/sections/<slug>` | owner | Tabs: Spaces · Games · Hours & rules (incl. how long a seat offer waits) · **Website** |
 | `/manage/staff` | owner | The team: each staff member's sections (edit them), roles, remove, invites |
 | `/manage/brand` | owner | Name, address, logo; **Publish** while the site isn't live |
+| `/manage/account` | team | **My account:** photo, name and mobile (editable), email, sign-in method, role, sections, team since, Sign out. The sidebar ends with this card. |
 
 - **Cash** is recorded per booking or game seat in `payments` (`lib/payments/payments.ts`), through the person's
   own client, so RLS decides who may. A payment is never deleted: Undo voids it, cancelling a booking, a seat or a
