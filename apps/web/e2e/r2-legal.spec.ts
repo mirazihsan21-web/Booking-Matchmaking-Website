@@ -15,11 +15,15 @@ test('the privacy policy and terms are on the site, linked from every page and f
   // Locally the site sends email as bookings@localhost (EMAIL_FROM), so that's who to write to.
   await expect(page.getByRole('link', { name: 'bookings@localhost' })).toHaveAttribute('href', 'mailto:bookings@localhost');
   await expect(page.getByText('Google also shares your name and profile photo with us')).toBeVisible();
+  // The players chat: what's kept, for how long, and who sees a mobile number.
+  await expect(page.getByText('Chat messages are deleted after 30 days')).toBeVisible();
+  await expect(page.getByText('the two of you see each other')).toBeVisible();
 
   await page.getByRole('contentinfo').getByRole('link', { name: 'Terms' }).click();
   await expect(page).toHaveURL((url) => url.pathname === '/terms');
   await expect(page.getByRole('heading', { level: 1, name: 'Terms of use' })).toBeVisible();
   await expect(page.getByText(`This website is run by ${brand!.name}, ${brand!.address}.`)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The chat' })).toBeVisible();
 
   // Sign-in says what signing in agrees to (its footer has the links too).
   await page.goto('/signin');

@@ -136,9 +136,12 @@ export function ChatRoom({
 
   // "Today" moves on.
   useEffect(() => {
-    setNow(new Date());
+    const first = window.setTimeout(() => setNow(new Date()), 0); // the server's clock rendered the page
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(timer);
+    };
   }, []);
 
   // Scrolling: stay at the bottom for new messages (or offer a button if you've scrolled up), and keep your place

@@ -22,8 +22,13 @@ export function useChatUnread(chat: ChatLinkState | null, onChat: boolean): bool
   const onChatRef = useRef(onChat);
   useEffect(() => {
     onChatRef.current = onChat;
-    if (onChat) setUnread(false);
   }, [onChat]);
+  // Opening the chat clears the dot (adjusted while rendering, the way React suggests for state that follows a prop).
+  const [wasOnChat, setWasOnChat] = useState(onChat);
+  if (onChat !== wasOnChat) {
+    setWasOnChat(onChat);
+    if (onChat) setUnread(false);
+  }
 
   const organizationId = chat?.organizationId;
   const userId = chat?.userId;

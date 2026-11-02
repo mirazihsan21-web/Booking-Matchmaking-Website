@@ -493,7 +493,7 @@ export const en = {
   },
   /** /privacy and /terms (Google needs both before the sign-in app can be published), and their links. */
   legal: {
-    updated: 'Last updated 2 November 2026',
+    updated: 'Last updated 3 November 2026',
     privacyLink: 'Privacy',
     termsLink: 'Terms',
     signInAgree: { before: 'By signing in you agree to the ', terms: 'Terms', and: ' and the ', privacy: 'Privacy policy', after: '.' },
@@ -512,13 +512,15 @@ export const en = {
             "Your player profile: the name you show, your mobile number if you add one, the activities you like, when you're usually free, the skill level you pick for each section, and whether you want emails from us.",
             'What you do here: your bookings, the games you join or ask to join, waiting lists, payments taken at the venue, and the notifications we send you.',
             "If you're on the venue's team: your name, your mobile number if you add one, and the sections you run.",
+            'The chat: your messages, the "Need players" cards you post, who asks to join them and who you accept, any reports you make, and mutes the venue sets. Signed-in people can read the chat.',
           ],
         },
         {
           heading: 'Why we keep it, and who sees it',
           paragraphs: [
             'To take and run your bookings, to put you in games with players at a similar level, and to tell you when something changes, by email and on the site.',
-            "The venue's team sees your bookings, your name and your mobile number so they can run the day. Other players in a game see the name you show, and nothing else.",
+            "The venue's team sees your bookings, your name and your mobile number so they can run the day. Other players in an open-play game see the name you show, and nothing else.",
+            "When you accept someone for your game, or someone accepts you, the two of you see each other's mobile number (if you've saved one), so you can sort out the details. Nobody else sees it. If someone reports a message, the venue's team sees a copy of it.",
           ],
         },
         {
@@ -541,6 +543,7 @@ export const en = {
           heading: 'How long we keep it, and your choices',
           paragraphs: [
             'We keep your information while you have an account. You can see and change your profile at any time, and turn our emails off. Ask us and we will send you a copy of your information, or delete your account and the information linked to it.',
+            'Chat messages are deleted after 30 days, and cards 30 days after the game.',
             'If we change this policy, we will update this page and the date at the top.',
           ],
         },
@@ -572,6 +575,14 @@ export const en = {
           heading: 'Open play games',
           paragraphs: [
             "When you ask for a seat in a game, players are placed by level. If you're offered a seat, accept it in time or it goes to the next player. A game may have a price per seat, paid at the venue.",
+          ],
+        },
+        {
+          heading: 'The chat',
+          paragraphs: [
+            "Be friendly. No spam, no selling, and no sharing other people's personal details.",
+            'The venue can remove messages and mute players who break these rules.',
+            'You decide who joins your game and who you meet; take care, as you would anywhere.',
           ],
         },
         {
