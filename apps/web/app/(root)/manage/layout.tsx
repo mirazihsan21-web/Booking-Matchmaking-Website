@@ -20,7 +20,12 @@ async function Shell({ children }: { children: ReactNode }) {
   }
   return (
     <div className="flex min-h-full flex-1">
-      <ManageNav isOwner={manager.role === "owner"} brandName={manager.org.name} logoUrl={logoUrl(manager.org.branding.logo_path)} />
+      <ManageNav
+        isOwner={manager.role === "owner"}
+        brandName={manager.org.name}
+        logoUrl={logoUrl(manager.org.branding.logo_path)}
+        me={{ name: manager.displayName, role: manager.role, avatarUrl: manager.user.avatarUrl }}
+      />
       <main className="min-w-0 flex-1 px-4 pt-6 pb-28 md:px-8 md:pb-10">{children}</main>
     </div>
   );

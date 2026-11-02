@@ -1,10 +1,11 @@
 "use client";
 
-import { Banknote, CalendarClock, CalendarRange, ExternalLink, LayoutGrid, ListChecks, LogOut, Menu, Store, Users, type LucideIcon } from "lucide-react";
+import { Banknote, CalendarClock, CalendarRange, CircleUserRound, ExternalLink, LayoutGrid, ListChecks, LogOut, Menu, Store, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { cn } from "cn";
+import { Avatar } from "@/components/account/avatar";
 import { m } from "@/messages";
 
 type Item = { href: string; label: string; Icon: LucideIcon; ownerOnly?: boolean };
@@ -23,9 +24,21 @@ const OWNER: Item[] = [
 
 /**
  * The manage area's navigation. Laptop: a left sidebar with the brand, every page this person may open,
- * the public site and Sign out. Phone: a bottom bar with Today, Bookings, Schedule and More (the rest).
+ * their own account card, the public site and Sign out. Phone: a bottom bar with Today, Bookings, Schedule
+ * and More (My account first, then the rest).
  */
-export function ManageNav({ isOwner, brandName, logoUrl }: { isOwner: boolean; brandName: string; logoUrl: string | null }) {
+export function ManageNav({
+  isOwner,
+  brandName,
+  logoUrl,
+  me,
+}: {
+  isOwner: boolean;
+  brandName: string;
+  logoUrl: string | null;
+  /** The signed-in person, for the card that opens My account. */
+  me: { name: string; role: "owner" | "staff"; avatarUrl: string | null };
+}) {
   const path = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const on = (href: string) => (href === "/manage" ? path === "/manage" : path === href || path.startsWith(`${href}/`));
@@ -43,6 +56,20 @@ export function ManageNav({ isOwner, brandName, logoUrl }: { isOwner: boolean; b
     >
       <item.Icon aria-hidden className="size-4" />
       {item.label}
+    </Link>
+  );
+  const roleLabel = m.manage.roles[me.role];
+  const accountCard = (
+    <Link
+      href="/manage/account"
+      aria-current={on("/manage/account") ? "page" : undefined}
+      className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm", on("/manage/account") ? "bg-raised" : "hover:bg-raised")}
+    >
+      <Avatar name={me.name} src={me.avatarUrl} />
+      <span className="min-w-0">
+        <span className="block truncate font-semibold">{me.name}</span>
+        <span className="block text-xs text-muted-foreground">{roleLabel}</span>
+      </span>
     </Link>
   );
   const extras = (
@@ -73,12 +100,16 @@ export function ManageNav({ isOwner, brandName, logoUrl }: { isOwner: boolean; b
           {owner.length > 0 && <div className="my-2 border-t border-border" />}
           {owner.map((item) => link(item))}
         </nav>
-        <div className="flex flex-col gap-1">{extras}</div>
+        <div className="flex flex-col gap-1">
+          {accountCard}
+          {extras}
+        </div>
       </aside>
 
       <nav aria-label={m.manage.nav.label} className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         {moreOpen && (
           <div className="flex flex-col gap-1 border-b border-border px-3 py-3">
+            {link({ href: "/manage/account", label: m.manage.nav.account, Icon: CircleUserRound }, () => setMoreOpen(false))}
             {owner.map((item) => link(item, () => setMoreOpen(false)))}
             {extras}
           </div>

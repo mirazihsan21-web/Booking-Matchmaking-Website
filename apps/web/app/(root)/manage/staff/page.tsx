@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { ActionButton, ActionForm, Field, FieldError, SelectField } from "@/components/forms/action-form";
 import { ConfirmAction } from "@/components/manage/confirm-action";
-import { sectionStyle } from "@/components/site/section-style";
+import { SectionChips as Chips } from "@/components/manage/section-chips";
 import { listMembers } from "@/lib/orgs/members";
 import { loadSections, type Section } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
@@ -13,19 +13,6 @@ const roleOptions = [
   { value: "staff", label: m.manage.roles.staff! },
   { value: "owner", label: m.manage.roles.owner! },
 ];
-
-/** Section chips in their colours. */
-function Chips({ sections }: { sections: Section[] }) {
-  return (
-    <span className="flex flex-wrap gap-1.5">
-      {sections.map((s) => (
-        <span key={s.id} style={sectionStyle(s.accent)} className="rounded-full border border-section px-2 py-0.5 text-xs font-semibold text-section">
-          {s.name}
-        </span>
-      ))}
-    </span>
-  );
-}
 
 /** Tick boxes for the brand's sections (`sectionIds`), with the ticked ones given. */
 function SectionBoxes({ sections, checked }: { sections: Section[]; checked: (id: string) => boolean }) {
@@ -88,8 +75,13 @@ async function Staff() {
           return (
             <li key={member.userId} className="flex flex-col gap-3 rounded-xl bg-card p-4">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="font-semibold">{email}</span>
-                {member.userId === user.id && <span className="text-sm text-muted-foreground">{m.manage.you}</span>}
+                <span className="flex flex-col">
+                  <span className="font-semibold">
+                    {member.name}
+                    {member.userId === user.id && <span className="ml-2 text-sm font-normal text-muted-foreground">{m.manage.you}</span>}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{email}</span>
+                </span>
                 <span className="rounded-full bg-raised px-2 py-0.5 text-xs font-semibold">{m.manage.roles[member.role]}</span>
                 {isOwner ? (
                   <span className="text-sm text-muted-foreground">{m.manage.allSections}</span>
