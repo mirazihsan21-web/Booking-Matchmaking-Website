@@ -235,6 +235,21 @@ describe('runTick and the players chat', () => {
     expect(must(await db.from('chat_cards').select('status').eq('id', sessionCard).single()).status).toBe('full');
   });
 
+  it('deletes queued chat photos from Storage and forgets them', async () => {
+    const path = `${player.id}/${randomUUID()}.jpg`;
+    const bucket = db.storage.from('chat-photos');
+    const upload = await bucket.upload(path, new Blob([new Uint8Array([255, 216, 255, 217])], { type: 'image/jpeg' }), { contentType: 'image/jpeg' });
+    if (upload.error) throw upload.error;
+    must(await db.from('chat_photo_trash').insert({ path, organization_id: orgId }).select('path'));
+
+    const report = await runTick({ db, createSender: () => recordingSender(), now: new Date('2026-11-03T10:30:00Z') });
+
+    expect(report.chat.photosDeleted).toBeGreaterThanOrEqual(1);
+    expect((await db.from('chat_photo_trash').select('path').eq('path', path)).data).toEqual([]);
+    const { data: listed } = await bucket.list(player.id);
+    expect((listed ?? []).map((f) => f.name)).not.toContain(path.split('/')[1]);
+  });
+
   it('purges old chat once an hour, on the hour', async () => {
     const old = must(
       await db

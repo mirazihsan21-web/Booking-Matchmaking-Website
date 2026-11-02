@@ -8,8 +8,11 @@ export interface TickReport {
   /** Sessions matched this tick. */
   matched: string[];
   closed: number;
-  /** Chat cards closed this tick, and whether old chat was purged (once an hour, on the hour). */
-  chat: { closed: number; purged: boolean };
+  /**
+   * Chat cards closed this tick, whether old chat was purged (once an hour, on the hour), unread private-message
+   * reminders written, and photos deleted from Storage.
+   */
+  chat: { closed: number; purged: boolean; reminders: number; photosDeleted: number };
   emails: { sent: number; skipped: number; failed: number } | { error: string };
 }
 
@@ -34,7 +37,7 @@ export async function runTick(deps: { db: SupabaseClient; createSender: () => Em
     offers: { expired: 0, offered: 0 },
     matched: [],
     closed: 0,
-    chat: { closed: 0, purged: false },
+    chat: { closed: 0, purged: false, reminders: 0, photosDeleted: 0 },
     emails: { sent: 0, skipped: 0, failed: 0 },
   };
 
@@ -103,6 +106,26 @@ export async function runTick(deps: { db: SupabaseClient; createSender: () => Em
     const { error } = await db.rpc('purge_chat', { p_now: now.toISOString() });
     if (error) throw error;
     report.chat.purged = true;
+  });
+
+  await step('chat reminders', async () => {
+    const { data, error } = await db.rpc('due_private_message_reminders');
+    if (error) throw error;
+    report.chat.reminders = data as number;
+  });
+
+  await step('chat photos', async () => {
+    // Photos the database queued (removed, purged, never posted) are deleted through Storage, then forgotten. If
+    // Storage fails, nothing is forgotten and the next tick tries again; a path Storage no longer has is gone already.
+    const { data, error } = await db.rpc('take_chat_photo_trash', { p_limit: 100 });
+    if (error) throw error;
+    const paths = data as string[];
+    if (paths.length === 0) return;
+    const removed = await db.storage.from('chat-photos').remove(paths);
+    if (removed.error) throw removed.error;
+    const forgot = await db.rpc('forget_chat_photo_trash', { p_paths: paths });
+    if (forgot.error) throw forgot.error;
+    report.chat.photosDeleted = (removed.data ?? []).length;
   });
 
   await step('emails', async () => {
