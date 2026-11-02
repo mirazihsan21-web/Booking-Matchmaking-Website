@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { ChatPhoto } from "@/components/chat/chat-photo";
 import { ActionButton, ActionForm, Field } from "@/components/forms/action-form";
 import { blockedWords, listMutes, listOpenReports } from "@/lib/chat/moderation";
 import { chatTime } from "@/lib/chat/time";
@@ -38,8 +39,10 @@ async function ChatAdmin() {
                 <div className="flex flex-col gap-1">
                   <p className="text-xs text-muted-foreground">
                     <span className="font-semibold text-foreground">{r.authorName}</span> · {chatTime(r.createdAt, org.timezone, now)}
+                    {r.isPrivate && <span className="ml-2 rounded bg-raised px-1.5 py-0.5 font-semibold uppercase tracking-wide">{t.privateLabel}</span>}
                   </p>
-                  <p className="whitespace-pre-wrap break-words">{r.bodyCopy ?? t.noText}</p>
+                  {r.photoPath && <ChatPhoto path={r.photoPath} alt={t.photoAlt} />}
+                  {(r.bodyCopy || !r.photoPath) && <p className="whitespace-pre-wrap break-words">{r.bodyCopy ?? t.noText}</p>}
                   {r.state === "hidden_by_reports" && <p className="text-xs font-semibold text-destructive">{t.hidden}</p>}
                 </div>
                 <ul className="flex flex-col gap-1 text-sm text-muted-foreground">

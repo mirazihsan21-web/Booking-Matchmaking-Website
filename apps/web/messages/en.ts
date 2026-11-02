@@ -47,6 +47,8 @@ export const en = {
       hidden: 'Hidden from players until you decide (3 or more reports).',
       noText: '(no text)',
       reportedBy: (name: string, reason: string) => `${name}: ${reason}`,
+      privateLabel: 'Private message',
+      photoAlt: 'The reported photo',
       remove: 'Remove message',
       dismiss: 'Dismiss',
       mutesTitle: 'Muted players',
@@ -513,6 +515,7 @@ export const en = {
             'What you do here: your bookings, the games you join or ask to join, waiting lists, payments taken at the venue, and the notifications we send you.',
             "If you're on the venue's team: your name, your mobile number if you add one, and the sections you run.",
             'The chat: your messages, the "Need players" cards you post, who asks to join them and who you accept, any reports you make, and mutes the venue sets. Signed-in people can read the chat.',
+            'Private messages between players, photos you share in the chat, and who you have blocked.',
           ],
         },
         {
@@ -521,11 +524,13 @@ export const en = {
             'To take and run your bookings, to put you in games with players at a similar level, and to tell you when something changes, by email and on the site.',
             "The venue's team sees your bookings, your name and your mobile number so they can run the day. Other players in an open-play game see the name you show, and nothing else.",
             "When you accept someone for your game, or someone accepts you, the two of you see each other's mobile number (if you've saved one), so you can sort out the details. Nobody else sees it. If someone reports a message, the venue's team sees a copy of it.",
+            "A private message is seen only by the two of you. If one of you reports it, the venue's team sees a copy of that message, and its photo, until they decide. Photos in the chat are seen by signed-in people; photos in a private message only by the two of you.",
           ],
         },
         {
           heading: 'Emails',
           paragraphs: [
+            "If a private message waits unread for 15 minutes, we email you once to say so (never what it says), at most once every 12 hours for each conversation.",
             "We email you about your bookings and games from the venue's Gmail address. You can turn these emails off on your profile. Sign-in links and team invites are always sent, because you asked for them.",
           ],
         },
@@ -543,7 +548,7 @@ export const en = {
           heading: 'How long we keep it, and your choices',
           paragraphs: [
             'We keep your information while you have an account. You can see and change your profile at any time, and turn our emails off. Ask us and we will send you a copy of your information, or delete your account and the information linked to it.',
-            'Chat messages are deleted after 30 days, and cards 30 days after the game.',
+            'Chat messages, private messages and their photos are deleted after 30 days, and cards 30 days after the game.',
             'If we change this policy, we will update this page and the date at the top.',
           ],
         },
@@ -583,6 +588,7 @@ export const en = {
             "Be friendly. No spam, no selling, and no sharing other people's personal details.",
             'The venue can remove messages and mute players who break these rules.',
             'You decide who joins your game and who you meet; take care, as you would anywhere.',
+            'Only share photos you have the right to share, and nothing indecent.',
           ],
         },
         {
