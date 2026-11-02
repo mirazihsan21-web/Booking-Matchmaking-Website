@@ -43,7 +43,8 @@ async function Profile({ searchParams }: { searchParams: Promise<Record<string, 
   const db = createServiceClient();
   const [bookings, seats, query] = await Promise.all([
     listMyBookings(db, { organizationId: brand.id, profileId: profile.id }),
-    listMySeats(db, { organizationId: brand.id, profileId: profile.id }),
+    // Every past seat, not My bookings' recent 20: "Games played" counts them all.
+    listMySeats(db, { organizationId: brand.id, profileId: profile.id, pastLimit: null }),
     searchParams,
   ]);
   const summary = summariseProfile([...bookings.upcoming, ...bookings.past], [...seats.upcoming, ...seats.past], new Date());

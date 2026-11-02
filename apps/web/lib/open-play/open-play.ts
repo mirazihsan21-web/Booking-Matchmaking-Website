@@ -647,7 +647,8 @@ export async function staffSessionView(
 /** A player's open-play seats at one venue: upcoming (soonest first) and the last 20 past ones. */
 export async function listMySeats(
   db: SupabaseClient,
-  input: { organizationId: string; profileId: string; now?: Date },
+  /** `pastLimit`: how many past seats, most recent first (My bookings shows 20); null for all (the profile counts them). */
+  input: { organizationId: string; profileId: string; now?: Date; pastLimit?: number | null },
 ): Promise<{ upcoming: MySeat[]; past: MySeat[] }> {
   if (!UUID.test(input.organizationId) || !UUID.test(input.profileId)) return { upcoming: [], past: [] };
   const { data, error } = await db
@@ -686,9 +687,8 @@ export async function listMySeats(
   const live = await livePayments(db, { spaceBookingIds: [], seatBookingIds: seats.map((s) => s.bookingId) });
   for (const seat of seats) seat.paid = live.has(seat.bookingId);
   const upcoming = seats.filter((s) => s.status === 'confirmed' && Date.parse(s.startsAt) > now).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-  const past = seats
-    .filter((s) => !upcoming.includes(s))
-    .sort((a, b) => b.startsAt.localeCompare(a.startsAt))
-    .slice(0, 20);
+  const pastLimit = input.pastLimit === undefined ? 20 : input.pastLimit;
+  const past = seats.filter((s) => !upcoming.includes(s)).sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+  if (pastLimit !== null) past.splice(pastLimit);
   return { upcoming, past };
 }
