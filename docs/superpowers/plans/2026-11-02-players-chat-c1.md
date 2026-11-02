@@ -424,6 +424,7 @@ RLS (`to authenticated` unless noted; `anon` gets nothing):
 ```ts
 type ChatMessageState = 'visible' | 'removed_by_author' | 'removed_by_venue' | 'hidden_by_reports';
 type ChatCardStatus = 'open' | 'full' | 'closed' | 'cancelled' | 'started';
+type ChatJoinStatus = 'pending' | 'accepted' | 'declined' | 'withdrawn' | 'left' | 'removed' | 'expired';
 interface ChatMessage { id: string; authorKind: 'player' | 'team'; authorUserId: string; authorProfileId: string | null;
   authorName: string; body: string | null; cardId: string | null; state: ChatMessageState; createdAt: string }
 interface ChatCard { id: string; kind: 'booking' | 'session'; sessionId: string | null; posterUserId: string; posterProfileId: string | null;
@@ -455,7 +456,7 @@ mergeMessages(current: ChatMessage[], incoming: ChatMessage[]): ChatMessage[]
 *Cards (`cards.ts`, server-only):*
 - **Posting and closing:**
   - `postBookingCard(db, { organizationId, userId, bookingId, spots, note })`, which masks the note;
-  - `postSessionCard(db, { organizationId, userId, sessionId, note })`;
+  - `postSessionCard(db, { organizationId, userId, sessionId, note })`, which masks the note too;
   - `closeCard(db, { cardId, userId })`.
 - **Join requests:**
   - `requestToJoin(db, { cardId, userId })` and `withdrawRequest(db, { cardId, userId })`;
@@ -541,6 +542,7 @@ mergeMessages(current: ChatMessage[], incoming: ChatMessage[]): ChatMessage[]
   - "Set up your player profile to chat" (link `/me/edit?next=/chat`) when `profileId` is null and the person isn't on the team;
   - the mute line (`m.chat.mutedUntil(time)` or `m.chat.mutedForever`) when muted;
   - otherwise the composer (Enter sends, Shift+Enter makes a new line).
+- **Messages:** each shows the sender's name, `chatTime`, and a **Team** badge when `authorKind = 'team'`. **Load earlier** at the top calls `roomPage({ before: oldest.createdAt })` in the browser and merges the result.
 
 **Live updates:** one channel, `chat:${organizationId}`, takes `postgres_changes` INSERT and UPDATE on `chat_messages` and `chat_cards`, each filtered by `organization_id=eq.${organizationId}`.
 - Every time the channel reaches `SUBSCRIBED`, the room calls `roomPage({ after: newest.createdAt })` and merges the result.
