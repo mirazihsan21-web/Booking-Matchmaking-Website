@@ -9,7 +9,7 @@ import { m } from "@/messages";
  * Report a message: spam, rude or abusive, or other, with an optional note. `onReported` gets the thanks, so the
  * menu can keep showing it even when this report is the one that hides the message (and the form goes away).
  */
-export function ReportDialog({ messageId, onReported }: { messageId: string; onReported: (thanks: string) => void }) {
+export function ReportDialog({ messageId, hasPhoto = false, onReported }: { messageId: string; hasPhoto?: boolean; onReported: (thanks: string) => void }) {
   const [state, action, pending] = useActionState(reportAction, null);
   const reported = useRef(onReported);
   useEffect(() => {
@@ -30,7 +30,7 @@ export function ReportDialog({ messageId, onReported }: { messageId: string; onR
       <input type="hidden" name="messageId" value={messageId} />
       <fieldset className="flex flex-col gap-1.5">
         <legend className="mb-1 font-semibold">{m.chat.reportTitle}</legend>
-        {(["spam", "abuse", "other"] as const).map((reason) => (
+        {(hasPhoto ? (["spam", "abuse", "photo", "other"] as const) : (["spam", "abuse", "other"] as const)).map((reason) => (
           <label key={reason} className="flex items-center gap-2">
             <input type="radio" name="reason" value={reason} defaultChecked={reason === "spam"} className="accent-foreground" />
             {m.chat.reasons[reason]}

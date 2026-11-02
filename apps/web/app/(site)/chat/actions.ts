@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import type { SendResult } from "@/components/chat/composer";
 import type { FormState } from "@/components/forms/action-form";
 import { closeCard, postBookingCard, postSessionCard } from "@/lib/chat/cards";
 import { mutePlayer, reportMessage } from "@/lib/chat/moderation";
@@ -13,7 +14,7 @@ import { m } from "@/messages";
 // The room updates live (Realtime), so sending and removing don't refresh the page.
 
 /** Sends a message to the room as the signed-in player (or, for the team, as the brand). */
-export async function sendMessageAction(_state: FormState, formData: FormData): Promise<FormState> {
+export async function sendMessageAction(_state: SendResult, formData: FormData): Promise<SendResult> {
   const player = await getSitePlayer();
   if (!player) return { ok: false, message: m.chat.signInToSee };
   const parsed = parseChatMessageForm(formData);

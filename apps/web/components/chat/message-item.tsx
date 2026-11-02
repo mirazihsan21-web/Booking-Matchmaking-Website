@@ -5,6 +5,7 @@ import { cn } from "cn";
 import type { ChatMessage } from "@/lib/chat/rows";
 import { chatTime } from "@/lib/chat/time";
 import { m } from "@/messages";
+import { ChatPhoto } from "./chat-photo";
 
 const GONE: Record<Exclude<ChatMessage["state"], "visible">, string> = {
   removed_by_author: m.chat.removed,
@@ -48,7 +49,12 @@ export function MessageItem({
       {gone ? (
         <p className="text-sm italic text-muted-foreground">{gone}</p>
       ) : (
-        (children ?? <p className="whitespace-pre-wrap break-words text-sm">{message.body}</p>)
+        (children ?? (
+          <>
+            {message.photoPath && <ChatPhoto path={message.photoPath} alt={m.chat.photo.alt(message.authorName)} />}
+            {message.body && <p className="whitespace-pre-wrap break-words text-sm">{message.body}</p>}
+          </>
+        ))
       )}
     </li>
   );

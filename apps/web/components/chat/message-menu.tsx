@@ -93,6 +93,7 @@ export function MessageMenu({ message, me, cardOpen = false }: { message: ChatMe
             (reporting ? (
               <ReportDialog
                 messageId={message.id}
+                hasPhoto={message.photoPath !== null}
                 onReported={(thanks) => {
                   setOpen(false);
                   setReporting(false);

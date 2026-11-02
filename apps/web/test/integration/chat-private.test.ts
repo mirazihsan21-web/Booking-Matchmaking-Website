@@ -24,7 +24,7 @@ const JPEG = Uint8Array.from(
 
 let orgId: string;
 let a: TestUser, b: TestUser, c: TestUser, t: TestUser;
-let pa: string, pb: string, pc: string, pt: string;
+let pa: string, pb: string, pt: string;
 let conversationId: string;
 
 beforeAll(async () => {
@@ -44,7 +44,7 @@ beforeAll(async () => {
       .select('id, display_name'),
   );
   const id = (name: string) => profiles.find((p) => p.display_name === name)!.id as string;
-  [pa, pb, pc, pt] = [id('Sami'), id('Tanvir'), id('Nadia'), id('Tee')];
+  [pa, pb, pt] = [id('Sami'), id('Tanvir'), id('Tee')];
   must(await db.from('profile_section_skills').insert({ organization_id: orgId, profile_id: pb, section_id: section, skill: 3 }));
 }, 30_000);
 

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { markRoomRead } from "@/lib/chat/reads";
-import { cardsFor, roomPage, roomSince } from "@/lib/chat/room";
+import { sendMessageAction } from "@/app/(site)/chat/actions";
+import { cardsFor, isRoomMessage, roomPage, roomSince } from "@/lib/chat/room";
 import { cardFromRow, mergeMessages, mergeUpdates, messageFromRow, type ChatCard, type ChatMessage } from "@/lib/chat/rows";
 import { formatNight } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
@@ -137,8 +138,15 @@ export function ChatRoom({
   // Live rows.
   useEffect(() => {
     const filter = `organization_id=eq.${organizationId}`;
-    const onMessage = (payload: { new: Record<string, unknown> }) => addMessages([messageFromRow(payload.new)]);
-    const onMessageChange = (payload: { new: Record<string, unknown> }) => addMessages([messageFromRow(payload.new)], [], true);
+    // The brand's channel carries private messages too (to their two people): the room shows only its own.
+    const onMessage = (payload: { new: Record<string, unknown> }) => {
+      const message = messageFromRow(payload.new);
+      if (isRoomMessage(message)) addMessages([message]);
+    };
+    const onMessageChange = (payload: { new: Record<string, unknown> }) => {
+      const message = messageFromRow(payload.new);
+      if (isRoomMessage(message)) addMessages([message], [], true);
+    };
     const onCard = (payload: { new: Record<string, unknown> }) => addCards([cardFromRow(payload.new)]);
     return subscribeSignedIn(supabase, (suffix) =>
       supabase
@@ -301,7 +309,7 @@ export function ChatRoom({
           {m.chat.newMessages}
         </button>
       )}
-      {box.kind === "open" && <Composer onSent={() => void catchUp().catch(() => undefined)} />}
+      {box.kind === "open" && <Composer action={sendMessageAction} userId={me.userId} onSent={() => void catchUp().catch(() => undefined)} />}
       {box.kind === "no_profile" && (
         <Link href="/me/edit?next=/chat" className="rounded-xl bg-card p-4 text-center font-semibold hover:bg-raised">
           {m.chat.setUpProfile}
