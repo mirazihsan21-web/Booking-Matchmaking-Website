@@ -5,6 +5,7 @@ import { requireUser, type SessionUser } from '@/lib/auth/dal';
 import { createServiceClient } from '@/lib/service-client';
 import { createClient } from '@/lib/supabase/server';
 import type { BusinessType } from '@/presets';
+import { readTeamMembership } from './membership';
 import { allowedSectionIds } from './sections-access';
 
 export type OrgRole = 'owner' | 'staff';
@@ -43,16 +44,17 @@ export const getManager = cache(async (): Promise<Manager | null> => {
   const supabase = await createClient();
   const { data: org } = await supabase.from('organizations').select('id, slug, name, status, business_type, timezone, branding').eq('slug', slug).maybeSingle();
   if (!org) return null;
-  const { data: member } = await supabase.from('organization_members').select('role, display_name, phone, created_at').eq('organization_id', org.id).eq('user_id', user.id).maybeSingle();
+  // Throws on a failed read (e.g. code ahead of its migration) rather than showing "not on the team".
+  const member = await readTeamMembership(supabase, org.id, user.id);
   if (!member) return null;
   const sectionIds = await allowedSectionIds(createServiceClient(), { organizationId: org.id, userId: user.id });
   return {
     user,
-    role: member.role as OrgRole,
+    role: member.role,
     sectionIds,
-    displayName: member.display_name as string,
-    phone: (member.phone as string | null) ?? null,
-    memberSince: member.created_at as string,
+    displayName: member.displayName,
+    phone: member.phone,
+    memberSince: member.memberSince,
     org: {
       id: org.id,
       slug: org.slug,
