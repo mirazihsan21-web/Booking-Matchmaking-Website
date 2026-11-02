@@ -4,7 +4,7 @@
 -- Org (…23a0); users …23d1–…23d7.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(12);
+select plan(16);
 
 create function pg_temp.u(n int) returns uuid language sql as $$ select ('00000000-0000-4000-8000-0000000023d' || n)::uuid $$;
 create function pg_temp.name_of(n int) returns text language sql as $$
@@ -40,8 +40,19 @@ select throws_ok(
   '23514', null, 'a mobile must be in the +E.164 form the app stores'
 );
 
+select throws_ok(
+  $$ update public.organization_members set display_name = '   ' where user_id = '00000000-0000-4000-8000-0000000023d1' $$,
+  '23514', null, 'a name cannot be blank'
+);
+select throws_ok(
+  $$ update public.organization_members set display_name = repeat('x', 61) where user_id = '00000000-0000-4000-8000-0000000023d1' $$,
+  '23514', null, 'nor longer than 60 characters'
+);
+
 select ok(not has_function_privilege('authenticated', 'private.member_display_name(uuid)', 'execute'), 'signed-in users cannot call the naming helper');
 select ok(not has_function_privilege('authenticated', 'private.fill_member_display_name()', 'execute'), 'nor the trigger function');
+select ok(not has_function_privilege('anon', 'private.member_display_name(uuid)', 'execute'), 'signed-out visitors cannot call the naming helper');
+select ok(not has_function_privilege('anon', 'private.fill_member_display_name()', 'execute'), 'nor the trigger function');
 
 select * from finish();
 rollback;
