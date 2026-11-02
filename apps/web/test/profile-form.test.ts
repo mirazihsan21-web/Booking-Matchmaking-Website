@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseProfileForm } from '../lib/forms/profile';
+import { displayPhone, normalizePhone, parseProfileForm } from '../lib/forms/profile';
 
 const A = '00000000-0000-4000-8000-0000000000a1';
 const B = '00000000-0000-4000-8000-0000000000b1';
@@ -79,5 +79,19 @@ describe('parseProfileForm', () => {
   it("skips a section left as Not rated and ignores ids that are not this brand's sections", () => {
     const result = parseProfileForm(form({ displayName: 'Rafi', [`rating.${TURF}`]: '', [`rating.${CAFE}`]: '5', [`rating.${D}`]: '3' }), SECTIONS);
     expect(result.ok && result.value.ratings).toEqual({ [CAFE]: 5 });
+  });
+});
+
+describe('displayPhone', () => {
+  it('shows a Bangladeshi mobile the local way', () => {
+    expect(displayPhone('+8801712345678')).toBe('01712345678');
+  });
+
+  it('leaves other numbers as stored', () => {
+    expect(displayPhone('+447700900123')).toBe('+447700900123');
+  });
+
+  it('round-trips a mobile typed with dashes and spaces (Review Focus 5)', () => {
+    expect(displayPhone(normalizePhone('017-1234 5678')!)).toBe('01712345678');
   });
 });

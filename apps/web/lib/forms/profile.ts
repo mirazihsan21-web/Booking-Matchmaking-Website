@@ -15,6 +15,11 @@ export function normalizePhone(input: string): string | null {
   return E164.test(compact) ? compact : null;
 }
 
+/** A stored phone as people read it: a Bangladeshi mobile (+880…) the local way (0…), others as stored. */
+export function displayPhone(e164: string): string {
+  return e164.startsWith('+880') ? `0${e164.slice(4)}` : e164;
+}
+
 const schema = z.object({
   displayName: z.string().min(1, m.forms.required).max(60, m.forms.tooLong),
   phone: z.string().refine((p) => p === '' || normalizePhone(p) !== null, m.profile.phoneFormat),
