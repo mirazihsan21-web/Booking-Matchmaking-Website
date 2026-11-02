@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { safeNext } from "@/lib/auth/redirect";
@@ -23,6 +24,17 @@ export default function SignInPage({ searchParams }: PageProps<"/signin">) {
           <Form searchParams={searchParams} />
         </Suspense>
       </div>
+      <p className="text-sm text-muted-foreground">
+        {m.legal.signInAgree.before}
+        <Link href="/terms" className="underline underline-offset-4 hover:text-foreground">
+          {m.legal.signInAgree.terms}
+        </Link>
+        {m.legal.signInAgree.and}
+        <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
+          {m.legal.signInAgree.privacy}
+        </Link>
+        {m.legal.signInAgree.after}
+      </p>
     </main>
   );
 }

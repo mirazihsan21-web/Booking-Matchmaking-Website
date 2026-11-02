@@ -33,7 +33,15 @@ export function SiteFooter({
             {brandName}
           </p>
           {address && <p className="max-w-xs text-sm text-muted-foreground">{address}</p>}
-          <p className="mt-4 text-xs text-muted-foreground">{m.site.landing.rights(brandName, year)}</p>
+          <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>{m.site.landing.rights(brandName, year)}</span>
+            <Link href="/privacy" className={link}>
+              {m.legal.privacyLink}
+            </Link>
+            <Link href="/terms" className={link}>
+              {m.legal.termsLink}
+            </Link>
+          </p>
         </div>
         <nav aria-label={m.site.landing.footerPlay} className="flex flex-col gap-2 text-sm">
           <p className="font-semibold">{m.site.landing.footerPlay}</p>

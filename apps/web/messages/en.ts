@@ -466,6 +466,106 @@ export const en = {
     emailTitle: "You've been invited to the team",
     emailHow: 'Sign in with this email address to join, or to say no.',
   },
+  /** /privacy and /terms (Google needs both before the sign-in app can be published), and their links. */
+  legal: {
+    updated: 'Last updated 2 November 2026',
+    privacyLink: 'Privacy',
+    termsLink: 'Terms',
+    signInAgree: { before: 'By signing in you agree to the ', terms: 'Terms', and: ' and the ', privacy: 'Privacy policy', after: '.' },
+    contactHeading: 'Contact us',
+    contactEmail: 'Questions, or want a copy of your information or your account deleted? Email',
+    contactVenue: (address: string) => `Questions, or want a copy of your information or your account deleted? Ask us at the venue${address ? `: ${address}` : ''}.`,
+    privacy: {
+      title: 'Privacy policy',
+      intro: (brand: string) =>
+        `This is how ${brand} handles your information when you use this website. We keep only what we need to run bookings and games, and we never sell it.`,
+      sections: [
+        {
+          heading: 'What we keep',
+          paragraphs: [
+            'Your account: your email address. If you sign in with Google, Google also shares your name and profile photo with us. Nothing else, and never your password.',
+            "Your player profile: the name you show, your mobile number if you add one, the activities you like, when you're usually free, the skill level you pick for each section, and whether you want emails from us.",
+            'What you do here: your bookings, the games you join or ask to join, waiting lists, payments taken at the venue, and the notifications we send you.',
+            "If you're on the venue's team: your name, your mobile number if you add one, and the sections you run.",
+          ],
+        },
+        {
+          heading: 'Why we keep it, and who sees it',
+          paragraphs: [
+            'To take and run your bookings, to put you in games with players at a similar level, and to tell you when something changes, by email and on the site.',
+            "The venue's team sees your bookings, your name and your mobile number so they can run the day. Other players in a game see the name you show, and nothing else.",
+          ],
+        },
+        {
+          heading: 'Emails',
+          paragraphs: [
+            "We email you about your bookings and games from the venue's Gmail address. You can turn these emails off on your profile. Sign-in links and team invites are always sent, because you asked for them.",
+          ],
+        },
+        {
+          heading: 'Cookies',
+          paragraphs: ['We use cookies only to keep you signed in. There are no advertising or tracking cookies, and no analytics.'],
+        },
+        {
+          heading: 'Where it is stored',
+          paragraphs: [
+            "Your information is stored with Supabase, and the website runs on Vercel, both on servers in Seoul, South Korea. Emails go out through Google's Gmail. These companies store and process it for us.",
+          ],
+        },
+        {
+          heading: 'How long we keep it, and your choices',
+          paragraphs: [
+            'We keep your information while you have an account. You can see and change your profile at any time, and turn our emails off. Ask us and we will send you a copy of your information, or delete your account and the information linked to it.',
+            'If we change this policy, we will update this page and the date at the top.',
+          ],
+        },
+      ],
+    },
+    terms: {
+      title: 'Terms of use',
+      intro: (brand: string, address: string) => `This website is run by ${brand}${address ? `, ${address}` : ''}. By using it, you agree to these terms.`,
+      sections: [
+        {
+          heading: 'Your account',
+          paragraphs: [
+            'Use your own email or Google account, and your real name, so the venue knows who is coming. Keep your sign-in to yourself: you are responsible for bookings made with it.',
+          ],
+        },
+        {
+          heading: 'Booking a space',
+          paragraphs: [
+            'A booking holds a space for the time you pick. You pay at the venue unless the venue tells you otherwise. Each section sets how far ahead you can book and how many upcoming bookings you can hold.',
+          ],
+        },
+        {
+          heading: 'Cancelling',
+          paragraphs: [
+            "You can cancel on the site until the section's cancellation cut-off before the start. After that, contact the venue. If the venue has to cancel a booking, for example because a space is closed, we will tell you by email and on the site.",
+          ],
+        },
+        {
+          heading: 'Open play games',
+          paragraphs: [
+            "When you ask for a seat in a game, players are placed by level. If you're offered a seat, accept it in time or it goes to the next player. A game may have a price per seat, paid at the venue.",
+          ],
+        },
+        {
+          heading: 'Playing fair',
+          paragraphs: [
+            "Be on time, follow the venue's rules and look after the equipment. If you can't come, cancel so someone else can play. The venue may refuse bookings from people who keep not turning up or who misuse the site.",
+            'Owner and staff accounts are for running the venue, not for booking as a player.',
+          ],
+        },
+        {
+          heading: 'The website',
+          paragraphs: [
+            "We work to keep the site running and correct, but it may sometimes be unavailable or wrong. If it is, the venue's own records decide. You play at your own risk, except where the law says otherwise.",
+            'We may update these terms; the date at the top shows the current version. These terms are governed by the laws of Bangladesh.',
+          ],
+        },
+      ],
+    },
+  },
   profile: {
     editTitle: 'Edit your profile',
     setUpTitle: 'Set up your player profile',
