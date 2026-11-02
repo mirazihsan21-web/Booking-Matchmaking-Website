@@ -9,10 +9,12 @@ import { CARD_COLUMNS, cardFromRow, mergeMessages, MESSAGE_COLUMNS, messageFromR
  */
 export async function roomPage(
   db: SupabaseClient,
-  input: { organizationId: string; before?: string; after?: string; limit?: number },
+  input: { organizationId: string; conversationId?: string; before?: string; after?: string; limit?: number },
 ): Promise<{ messages: ChatMessage[]; cards: ChatCard[] }> {
   const limit = input.limit ?? 50;
   let query = db.from('chat_messages').select(MESSAGE_COLUMNS).eq('organization_id', input.organizationId);
+  // A private conversation, or the room (never a private message in the room).
+  query = input.conversationId ? query.eq('conversation_id', input.conversationId) : query.is('conversation_id', null);
   if (input.after) {
     query = query.gte('created_at', input.after).order('created_at', { ascending: true }).order('id', { ascending: true });
   } else {
@@ -40,14 +42,14 @@ export async function cardsFor(db: SupabaseClient, messages: ChatMessage[]): Pro
  */
 export async function roomSince(
   db: SupabaseClient,
-  input: { organizationId: string; after: string; maxPages?: number },
+  input: { organizationId: string; conversationId?: string; after: string; maxPages?: number },
 ): Promise<{ messages: ChatMessage[]; cards: ChatCard[]; complete: boolean }> {
   const maxPages = input.maxPages ?? 10;
   let messages: ChatMessage[] = [];
   let cards: ChatCard[] = [];
   let cursor = input.after;
   for (let page = 0; page < maxPages; page += 1) {
-    const next = await roomPage(db, { organizationId: input.organizationId, after: cursor });
+    const next = await roomPage(db, { organizationId: input.organizationId, conversationId: input.conversationId, after: cursor });
     messages = mergeMessages(messages, next.messages);
     cards = [...cards, ...next.cards];
     const last = next.messages.at(-1);
@@ -57,3 +59,6 @@ export async function roomSince(
   }
   return { messages, cards, complete: false };
 }
+
+/** Is this a room message (not a private one)? Live events for the brand carry both kinds. */
+export const isRoomMessage = (message: ChatMessage) => message.conversationId === null;

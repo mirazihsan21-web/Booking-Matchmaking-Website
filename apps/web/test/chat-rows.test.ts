@@ -9,6 +9,8 @@ const message = (id: string, createdAt: string, extra: Partial<ChatMessage> = {}
   authorName: 'Sami',
   body: `message ${id}`,
   cardId: null,
+  conversationId: null,
+  photoPath: null,
   state: 'visible',
   createdAt,
   ...extra,
@@ -85,6 +87,8 @@ describe('rows from the database (and from Realtime)', () => {
       authorName: 'Chattoturf',
       body: 'Pitch 2 is free at 9',
       cardId: null,
+      conversationId: null,
+      photoPath: null,
       state: 'visible',
       createdAt: '2026-11-02T10:00:00+00:00',
     });

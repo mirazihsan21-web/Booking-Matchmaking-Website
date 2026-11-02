@@ -80,10 +80,10 @@ afterAll(async () => {
 
 describe('the players chat', () => {
   it('masks bad words, the built-in ones and the venue\'s own', async () => {
-    const first = await postMessage(db, { organizationId: orgId, userId: a.id, body: 'what the shit' });
+    const first = await postMessage(db, { organizationId: orgId, userId: a.id, body: 'what the shit', photoPath: null });
     expect(first.status).toBe('posted');
     expect(await setBlockedWord(db, { organizationId: orgId, userId: t.id, word: 'gadha', add: true })).toBe('added');
-    const second = await postMessage(db, { organizationId: orgId, userId: b.id, body: 'tui gadha' });
+    const second = await postMessage(db, { organizationId: orgId, userId: b.id, body: 'tui gadha', photoPath: null });
     const bodies = must(await db.from('chat_messages').select('body').in('id', [first, second].map((r) => ('messageId' in r ? r.messageId : ''))).order('created_at'));
     expect(bodies.map((r) => r.body).sort()).toEqual(['tui ●●●', 'what the ●●●']);
   });
@@ -158,7 +158,7 @@ describe('the players chat', () => {
     await markRoomRead(asB, { organizationId: orgId, userId: b.id, at: page.messages.at(-1)!.createdAt });
     expect(await hasUnreadRoom(asB, { organizationId: orgId, userId: b.id })).toBe(false);
     await pause();
-    expect((await postMessage(db, { organizationId: orgId, userId: a.id, body: 'anyone else?' })).status).toBe('posted');
+    expect((await postMessage(db, { organizationId: orgId, userId: a.id, body: 'anyone else?', photoPath: null })).status).toBe('posted');
     expect(await hasUnreadRoom(asB, { organizationId: orgId, userId: b.id })).toBe(true);
 
     const newer = await roomPage(asB, { organizationId: orgId, after: page.messages.at(-1)!.createdAt });

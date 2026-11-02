@@ -67,6 +67,10 @@ export interface OpenReport {
   authorProfileId: string | null;
   /** What was reported, as the first report copied it. */
   bodyCopy: string | null;
+  /** The reported message's photo, if it has one (the team may see it while the report is open). */
+  photoPath: string | null;
+  /** Reported from a private conversation. */
+  isPrivate: boolean;
   state: ChatMessageState;
   createdAt: string;
   reports: Array<{ reporterName: string; reason: string; note: string | null; createdAt: string }>;
@@ -76,14 +80,20 @@ export interface OpenReport {
 export async function listOpenReports(db: SupabaseClient, organizationId: string): Promise<OpenReport[]> {
   const { data, error } = await db
     .from('chat_reports')
-    .select('message_id, reason, note, body_copy, author_name_copy, created_at, reporter:player_profiles(display_name), chat_messages(state, author_profile_id, created_at)')
+    .select('message_id, reason, note, body_copy, author_name_copy, created_at, reporter:player_profiles(display_name), chat_messages(state, author_profile_id, created_at, photo_path, conversation_id)')
     .eq('organization_id', organizationId)
     .eq('status', 'open')
     .order('created_at', { ascending: false });
   if (error) throw error;
   const byMessage = new Map<string, OpenReport>();
   for (const row of data ?? []) {
-    const message = row.chat_messages as unknown as { state: ChatMessageState; author_profile_id: string | null; created_at: string } | null;
+    const message = row.chat_messages as unknown as {
+      state: ChatMessageState;
+      author_profile_id: string | null;
+      created_at: string;
+      photo_path: string | null;
+      conversation_id: string | null;
+    } | null;
     const reporter = row.reporter as unknown as { display_name: string } | null;
     const entry =
       byMessage.get(row.message_id as string) ??
@@ -93,6 +103,8 @@ export async function listOpenReports(db: SupabaseClient, organizationId: string
           authorName: row.author_name_copy as string,
           authorProfileId: message?.author_profile_id ?? null,
           bodyCopy: (row.body_copy as string | null) ?? null,
+          photoPath: message?.photo_path ?? null,
+          isPrivate: Boolean(message?.conversation_id),
           state: message?.state ?? 'visible',
           createdAt: message?.created_at ?? (row.created_at as string),
           reports: [],

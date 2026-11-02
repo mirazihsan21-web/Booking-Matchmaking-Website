@@ -16,6 +16,10 @@ export interface ChatMessage {
   /** Null once removed or hidden. */
   body: string | null;
   cardId: string | null;
+  /** The private conversation it's in (null: the room). */
+  conversationId: string | null;
+  /** Its photo in the chat-photos bucket, if it has one. */
+  photoPath: string | null;
   state: ChatMessageState;
   createdAt: string;
 }
@@ -43,7 +47,7 @@ export interface ChatCard {
   createdAt: string;
 }
 
-export const MESSAGE_COLUMNS = 'id, author_kind, author_user_id, author_profile_id, author_name, body, card_id, state, created_at';
+export const MESSAGE_COLUMNS = 'id, author_kind, author_user_id, author_profile_id, author_name, body, card_id, conversation_id, photo_path, state, created_at';
 export const CARD_COLUMNS =
   'id, kind, session_id, poster_user_id, poster_profile_id, poster_name, section_id, section_name, section_kind, section_accent, title, starts_at, ends_at, seat_price_poisha, spots_needed, spots_taken, note, status, created_at';
 
@@ -60,6 +64,8 @@ export function messageFromRow(row: Record<string, unknown>): ChatMessage {
     authorName: text(row.author_name),
     body: textOrNull(row.body),
     cardId: textOrNull(row.card_id),
+    conversationId: textOrNull(row.conversation_id),
+    photoPath: textOrNull(row.photo_path),
     state: (textOrNull(row.state) ?? 'visible') as ChatMessageState,
     createdAt: text(row.created_at),
   };
