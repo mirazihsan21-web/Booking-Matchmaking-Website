@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteNav } from "@/components/site/site-nav";
-import { hasUnreadRoom } from "@/lib/chat/reads";
+import { hasUnreadRoom, privateUnread } from "@/lib/chat/reads";
 import { TeamInviteBar } from "@/components/site/team-invite-bar";
 import { unreadCount } from "@/lib/notifications/inbox";
 import { createClient } from "@/lib/supabase/server";
@@ -16,10 +16,11 @@ export async function SiteChrome({ brand, children }: { brand: Brand; children: 
   // Team logins are venue-only: no player bell, and the menu leads to Manage.
   const bellProfileId = player && !player.isTeam ? player.profileId : null;
   const supabase = await createClient();
-  const [unread, invite, chatUnread] = await Promise.all([
+  const [unread, invite, chatUnread, chatPrivate] = await Promise.all([
     bellProfileId ? unreadCount(supabase, bellProfileId, brand.id) : 0,
     getMyTeamInvite(),
     player ? hasUnreadRoom(supabase, { organizationId: brand.id, userId: player.user.id }) : false,
+    bellProfileId ? privateUnread(supabase, brand.id) : 0,
   ]);
   const team = player?.isTeam ? { name: player.teamName ?? player.user.name ?? player.user.email ?? "", avatarUrl: player.user.avatarUrl } : null;
   const logo = logoUrl(brand.branding.logo_path);
@@ -34,7 +35,7 @@ export async function SiteChrome({ brand, children }: { brand: Brand; children: 
         signedIn={Boolean(player)}
         team={team}
         bell={bellProfileId ? { profileId: bellProfileId, organizationId: brand.id, unread } : null}
-        chat={player ? { organizationId: brand.id, userId: player.user.id, unread: chatUnread } : null}
+        chat={player ? { organizationId: brand.id, userId: player.user.id, unread: chatUnread, privateUnread: chatPrivate } : null}
       />
       {invite && <TeamInviteBar brandName={brand.name} />}
       {children}

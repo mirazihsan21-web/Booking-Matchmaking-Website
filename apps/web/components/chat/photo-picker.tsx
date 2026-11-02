@@ -1,7 +1,7 @@
 "use client";
 
 import { ImagePlus, X } from "lucide-react";
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { prepareChatPhoto, uploadChatPhoto } from "@/lib/chat/photos";
 import { createClient } from "@/lib/supabase/client";
 import { m } from "@/messages";
@@ -15,10 +15,11 @@ export function PhotoPicker({ userId }: { userId: string }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
 
-  async function pick(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = ""; // the same file can be picked again
+  async function pick() {
+    const file = input.current?.files?.[0];
+    if (input.current) input.current.value = ""; // the same file can be picked again
     if (!file) return;
     setProblem(null);
     const prepared = await prepareChatPhoto(file);
@@ -36,6 +37,12 @@ export function PhotoPicker({ userId }: { userId: string }) {
     setPath(stored);
     setPreview(URL.createObjectURL(prepared.blob));
   }
+
+  // A photo picked before the page finished loading (a slow phone) is taken up once it has.
+  useEffect(() => {
+    if (input.current?.files?.length) void pick();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+  }, []);
 
   function clear() {
     setPath(null);
@@ -63,7 +70,15 @@ export function PhotoPicker({ userId }: { userId: string }) {
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:bg-raised">
             <ImagePlus aria-hidden className="size-4" />
             <span>{uploading ? m.chat.photo.uploading : m.chat.photo.add}</span>
-            <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={m.chat.photo.add} onChange={pick} disabled={uploading} className="sr-only" />
+            <input
+              ref={input}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              aria-label={m.chat.photo.add}
+              onChange={() => void pick()}
+              disabled={uploading}
+              className="sr-only"
+            />
           </label>
         )}
       </div>

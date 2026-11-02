@@ -47,8 +47,9 @@ export function SiteNav({
 }) {
   const path = usePathname();
   const on = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`));
-  const chatUnread = useChatUnread(chat, on("/chat"));
-  const chatLabel = chatUnread ? m.chat.linkUnread : undefined;
+  const { dot: chatDot, count: chatCount } = useChatUnread(chat, on("/chat"), path);
+  const chatUnread = chatDot || chatCount > 0;
+  const chatLabel = chatCount > 0 ? m.chat.linkPrivate(chatCount) : chatDot ? m.chat.linkUnread : undefined;
   const meHref = signedIn ? "/me" : "/signin";
 
   return (
@@ -73,7 +74,13 @@ export function SiteNav({
             ))}
             <Link href="/chat" aria-label={chatLabel} className={cn("relative hover:underline", on("/chat") && "underline underline-offset-8")}>
               {m.site.nav.chat}
-              {chatUnread && <span aria-hidden className="absolute -right-2.5 top-0 size-2 rounded-full bg-primary" />}
+              {chatCount > 0 ? (
+                <span aria-hidden className="ml-1 rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
+                  {chatCount}
+                </span>
+              ) : (
+                chatDot && <span aria-hidden className="absolute -right-2.5 top-0 size-2 rounded-full bg-primary" />
+              )}
             </Link>
           </nav>
           <div className="ml-auto flex items-center gap-2 text-sm">

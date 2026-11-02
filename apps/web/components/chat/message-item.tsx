@@ -24,6 +24,7 @@ export function MessageItem({
   timeZone,
   now,
   actions,
+  nameSlot,
   children,
 }: {
   message: ChatMessage;
@@ -31,13 +32,15 @@ export function MessageItem({
   timeZone: string;
   now: Date;
   actions?: ReactNode;
+  /** Replaces the plain name (e.g. the player panel). */
+  nameSlot?: ReactNode;
   children?: ReactNode;
 }) {
   const gone = message.state === "visible" ? null : GONE[message.state];
   return (
     <li className={cn("flex flex-col gap-1 rounded-xl px-3 py-2", mine ? "bg-raised" : "bg-card")}>
       <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
-        <span className="font-semibold text-foreground">{message.authorName}</span>
+        {nameSlot ?? <span className="font-semibold text-foreground">{message.authorName}</span>}
         {message.authorKind === "team" && (
           <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">{m.chat.team}</span>
         )}

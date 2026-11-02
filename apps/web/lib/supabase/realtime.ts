@@ -20,3 +20,12 @@ export function subscribeSignedIn(supabase: SupabaseClient, open: (suffix: strin
     if (channel) void supabase.removeChannel(channel);
   };
 }
+
+/**
+ * True for Realtime's "Subscribed to PostgreSQL" system message: database changes flow from here on. A join is
+ * confirmed (SUBSCRIBED) a moment earlier, so a row written in between arrives as no event — read again on this.
+ */
+export function changesReady(payload: unknown): boolean {
+  const p = payload as { extension?: string; status?: string } | null;
+  return p?.extension === 'postgres_changes' && p?.status === 'ok';
+}

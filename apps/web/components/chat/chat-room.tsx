@@ -8,12 +8,13 @@ import { cardsFor, isRoomMessage, roomPage, roomSince } from "@/lib/chat/room";
 import { cardFromRow, mergeMessages, mergeUpdates, messageFromRow, type ChatCard, type ChatMessage } from "@/lib/chat/rows";
 import { formatNight } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
-import { subscribeSignedIn } from "@/lib/supabase/realtime";
+import { changesReady, subscribeSignedIn } from "@/lib/supabase/realtime";
 import { m } from "@/messages";
 import { CardItem } from "./card-item";
 import { CardStrip } from "./card-strip";
 import { Composer } from "./composer";
 import { MessageMenu } from "./message-menu";
+import { PlayerPanel } from "./player-panel";
 import { MessageItem } from "./message-item";
 
 export interface ChatMe {
@@ -41,6 +42,7 @@ export function ChatRoom({
   box,
   initial,
   openCards,
+  blockedIds = [],
   renderedAt,
 }: {
   organizationId: string;
@@ -50,6 +52,8 @@ export function ChatRoom({
   initial: { messages: ChatMessage[]; cards: ChatCard[] };
   /** The open cards for the strip, with seats left for games (re-read by the page every minute). */
   openCards: Array<ChatCard & { seatsLeft: number | null }>;
+  /** Players this person has blocked: their messages and cards fold away. */
+  blockedIds?: string[];
   renderedAt: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -155,6 +159,9 @@ export function ChatRoom({
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_messages", filter }, onMessageChange)
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_cards", filter }, onCard)
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_cards", filter }, onCard)
+        .on("system", {}, (payload) => {
+          if (changesReady(payload)) catchUp().catch(() => undefined);
+        })
         .subscribe((status) => {
           if (status === "SUBSCRIBED") {
             setConnected(true);
@@ -256,7 +263,27 @@ export function ChatRoom({
     setUnseen(false);
   }
 
-  const stripCards = [...strip.values()].sort((a, b) => a.card.startsAt.localeCompare(b.card.startsAt));
+  const blocked = new Set(blockedIds);
+  const stripCards = [...strip.values()]
+    .filter(({ card }) => !(card.posterProfileId && blocked.has(card.posterProfileId)))
+    .sort((a, b) => a.card.startsAt.localeCompare(b.card.startsAt));
+  const canMessage = me.profileId !== null && !me.isTeam;
+  const nameFor = (message: ChatMessage) =>
+    canMessage && message.authorKind === "player" && message.authorProfileId && message.authorUserId !== me.userId ? (
+      <PlayerPanel profileId={message.authorProfileId} name={message.authorName} />
+    ) : undefined;
+
+  // Runs of messages by people you blocked become one line.
+  const rows: Array<{ kind: "message"; message: ChatMessage } | { kind: "blocked"; id: string; count: number }> = [];
+  for (const message of messages) {
+    if (message.authorProfileId && blocked.has(message.authorProfileId)) {
+      const last = rows.at(-1);
+      if (last?.kind === "blocked") last.count += 1;
+      else rows.push({ kind: "blocked", id: message.id, count: 1 });
+    } else {
+      rows.push({ kind: "message", message });
+    }
+  }
 
   return (
     <section className="relative flex flex-col gap-3">
@@ -276,13 +303,29 @@ export function ChatRoom({
         )}
         {messages.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">{m.chat.empty}</p>}
         <ol className="flex flex-col gap-2">
-          {messages.map((message) => {
+          {rows.map((row) => {
+            if (row.kind === "blocked") {
+              return (
+                <li key={`blocked-${row.id}`} className="px-3 py-1 text-xs italic text-muted-foreground">
+                  {m.chat.blockedLine(row.count)}
+                </li>
+              );
+            }
+            const { message } = row;
             const mine = message.authorUserId === me.userId;
             const card = message.cardId ? cards.get(message.cardId) : undefined;
             if (message.cardId && !card) return null;
             if (card) {
               return (
-                <MessageItem key={message.id} message={message} mine={mine} timeZone={timeZone} now={now} actions={<MessageMenu message={message} me={me} cardOpen={card.status === "open" || card.status === "full"} />}>
+                <MessageItem
+                  key={message.id}
+                  message={message}
+                  mine={mine}
+                  timeZone={timeZone}
+                  now={now}
+                  nameSlot={nameFor(message)}
+                  actions={<MessageMenu message={message} me={me} cardOpen={card.status === "open" || card.status === "full"} />}
+                >
                   <CardItem card={card} timeZone={timeZone} mine={card.posterUserId === me.userId} seatsLeft={strip.get(card.id)?.seatsLeft ?? null} />
                 </MessageItem>
               );
@@ -294,6 +337,7 @@ export function ChatRoom({
                 mine={mine}
                 timeZone={timeZone}
                 now={now}
+                nameSlot={nameFor(message)}
                 actions={<MessageMenu message={message} me={me} />}
               />
             );
