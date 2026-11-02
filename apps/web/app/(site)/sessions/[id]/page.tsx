@@ -40,7 +40,7 @@ function Actions({ view, signedIn, hasProfile, team }: { view: PlayerSessionView
   }
   if (!hasProfile || !me) {
     return (
-      <Link href="/me" className={primary}>
+      <Link href="/me/edit" className={primary}>
         {m.openPlay.createProfile}
       </Link>
     );

@@ -100,7 +100,7 @@ async function MyBookings() {
         <MeTabs active="bookings" />
         <div className="flex max-w-xl flex-col gap-4 rounded-xl bg-card p-6">
           <p>{m.bookings.createProfileFirst}</p>
-          <Link href="/me" className={cn(buttonVariants({ size: "lg" }), "self-start px-4")}>
+          <Link href="/me/edit" className={cn(buttonVariants({ size: "lg" }), "self-start px-4")}>
             {m.bookings.createProfile}
           </Link>
         </div>
