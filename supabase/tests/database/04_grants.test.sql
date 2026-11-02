@@ -9,7 +9,7 @@ select is_empty(
        'player_profiles', 'profile_activities', 'availability', 'seat_requests', 'groups', 'bookings',
        'waitlist_entries', 'seat_offers', 'notifications', 'events', 'resource_bookings',
        'chat_cards', 'chat_messages', 'chat_message_archive', 'chat_join_requests', 'chat_mutes', 'chat_reports',
-       'chat_blocked_words', 'chat_reads'
+       'chat_blocked_words', 'chat_reads', 'chat_conversations', 'chat_conversation_reads', 'chat_blocks', 'chat_photo_trash'
      ]) as t
      where has_table_privilege('anon', 'public.' || t, 'SELECT,INSERT,UPDATE,DELETE') $$,
   'anon has no privileges on non-public tables'
