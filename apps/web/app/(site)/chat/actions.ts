@@ -18,7 +18,7 @@ export async function sendMessageAction(_state: FormState, formData: FormData): 
   if (!player) return { ok: false, message: m.chat.signInToSee };
   const parsed = parseChatMessageForm(formData);
   if (!parsed.ok) return { ok: false, message: parsed.errors.body, errors: parsed.errors };
-  const result = await postMessage(createServiceClient(), { organizationId: player.brand.id, userId: player.user.id, body: parsed.value.body });
+  const result = await postMessage(createServiceClient(), { organizationId: player.brand.id, userId: player.user.id, body: parsed.value.body ?? '' });
   return result.status === "posted" ? { ok: true } : { ok: false, message: m.chat.refusal[result.status] };
 }
 

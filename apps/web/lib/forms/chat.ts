@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { m } from '@/messages';
+import { CHAT_PHOTO_PATH } from '@/lib/chat/photo-size';
 import { fieldErrors, text, type FormResult } from './result';
 
 /** A reason the chat's database functions refuse something; `m.chat.refusal` has a sentence for each. */
@@ -13,18 +14,20 @@ const uuid = (message: string) => z.string().regex(UUID, message);
 const note = z.string().refine((value) => chars(value) <= 200, m.chat.errors.noteTooLong);
 const orNull = (value: string) => (value === '' ? null : value);
 
-const messageSchema = z.object({
-  body: z
-    .string()
-    .min(1, m.chat.errors.empty)
-    .refine((value) => chars(value) <= 500, m.chat.errors.tooLong(500)),
-});
+const bodySchema = z.string().refine((value) => chars(value) <= 500, m.chat.errors.tooLong(500));
 
-/** The chat box: 1–500 characters after trimming. */
-export function parseChatMessageForm(formData: FormData): FormResult<{ body: string }> {
-  const parsed = messageSchema.safeParse({ body: text(formData, 'body') });
-  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
-  return { ok: true, value: parsed.data };
+/**
+ * The chat box: 1–500 characters after trimming, and/or a photo already uploaded to the sender's folder
+ * (`photoPath`, `<user id>/<file id>.jpg`; the database checks the folder is theirs). Neither → "Write something first."
+ */
+export function parseChatMessageForm(formData: FormData): FormResult<{ body: string | null; photoPath: string | null }> {
+  const body = text(formData, 'body');
+  const photo = text(formData, 'photoPath');
+  const photoPath = CHAT_PHOTO_PATH.test(photo) ? photo : null;
+  if (body === '' && !photoPath) return { ok: false, errors: { body: m.chat.errors.empty } };
+  const parsed = bodySchema.safeParse(body);
+  if (!parsed.success) return { ok: false, errors: { body: m.chat.errors.tooLong(500) } };
+  return { ok: true, value: { body: body === '' ? null : body, photoPath } };
 }
 
 export type CardTarget = { kind: 'booking'; bookingId: string } | { kind: 'session'; sessionId: string };
@@ -59,12 +62,12 @@ export function parseCardForm(formData: FormData): FormResult<{ target: CardTarg
 
 const reportSchema = z.object({
   messageId: uuid(m.chat.refusal.not_found),
-  reason: z.enum(['spam', 'abuse', 'other'], { message: m.chat.errors.reason }),
+  reason: z.enum(['spam', 'abuse', 'photo', 'other'], { message: m.chat.errors.reason }),
   note,
 });
 
-/** Report a message: spam, rude or abusive, or other (photos come with stage C2), with an optional note. */
-export function parseReportForm(formData: FormData): FormResult<{ messageId: string; reason: 'spam' | 'abuse' | 'other'; note: string | null }> {
+/** Report a message: spam, rude or abusive, an inappropriate photo, or other, with an optional note. */
+export function parseReportForm(formData: FormData): FormResult<{ messageId: string; reason: 'spam' | 'abuse' | 'photo' | 'other'; note: string | null }> {
   const parsed = reportSchema.safeParse({ messageId: text(formData, 'messageId'), reason: text(formData, 'reason'), note: text(formData, 'note') });
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
   return { ok: true, value: { ...parsed.data, note: orNull(parsed.data.note) } };

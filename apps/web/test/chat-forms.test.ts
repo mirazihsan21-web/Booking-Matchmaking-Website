@@ -11,9 +11,16 @@ const form = (fields: Record<string, string>) => {
 
 describe('parseChatMessageForm', () => {
   it('trims the text and refuses an empty message', () => {
-    expect(parseChatMessageForm(form({ body: '  hi all  ' }))).toEqual({ ok: true, value: { body: 'hi all' } });
+    expect(parseChatMessageForm(form({ body: '  hi all  ' }))).toEqual({ ok: true, value: { body: 'hi all', photoPath: null } });
     expect(parseChatMessageForm(form({ body: '   ' }))).toEqual({ ok: false, errors: { body: m.chat.errors.empty } });
     expect(parseChatMessageForm(form({}))).toEqual({ ok: false, errors: { body: m.chat.errors.empty } });
+  });
+
+  it('takes a photo with no text, but not a made-up photo path', () => {
+    const photoPath = `${ID}/${ID}.jpg`;
+    expect(parseChatMessageForm(form({ body: '', photoPath }))).toEqual({ ok: true, value: { body: null, photoPath } });
+    expect(parseChatMessageForm(form({ body: ' our team ', photoPath }))).toEqual({ ok: true, value: { body: 'our team', photoPath } });
+    expect(parseChatMessageForm(form({ body: '', photoPath: 'x' }))).toEqual({ ok: false, errors: { body: m.chat.errors.empty } });
   });
 
   it('counts characters, not UTF-16 units: 500 emoji or Bangla letters fit, 501 do not', () => {
@@ -66,8 +73,8 @@ describe('parseReportForm', () => {
     });
   });
 
-  it('has no photo reason until photos exist', () => {
-    expect(parseReportForm(form({ messageId: ID, reason: 'photo' })).ok).toBe(false);
+  it('takes an inappropriate photo as a reason', () => {
+    expect(parseReportForm(form({ messageId: ID, reason: 'photo' }))).toEqual({ ok: true, value: { messageId: ID, reason: 'photo', note: null } });
     expect(parseReportForm(form({ messageId: 'nope', reason: 'spam' })).ok).toBe(false);
   });
 });
@@ -96,6 +103,7 @@ describe('refusal words', () => {
       'muted', 'too_fast', 'no_profile', 'invalid', 'not_found', 'not_allowed', 'not_yours', 'already_posted', 'too_many_cards',
       'bad_spots', 'single_space', 'not_going', 'not_open', 'own_card', 'already_asked', 'too_many_waiting', 'full',
       'already_reported', 'own_message', 'too_many_reports', 'exists', 'too_many_words', 'nothing_open',
+      'blocked', 'bad_photo', 'too_many_photos',
     ]) {
       expect(m.chat.refusal[key as keyof typeof m.chat.refusal], key).toMatch(/\.$/);
     }

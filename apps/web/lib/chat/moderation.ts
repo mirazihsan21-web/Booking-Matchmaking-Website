@@ -23,7 +23,7 @@ export async function blockedWords(db: SupabaseClient, organizationId: string): 
 
 export async function reportMessage(
   db: SupabaseClient,
-  input: { messageId: string; userId: string; reason: 'spam' | 'abuse' | 'other'; note: string | null },
+  input: { messageId: string; userId: string; reason: 'spam' | 'abuse' | 'photo' | 'other'; note: string | null },
 ): Promise<Status<'reported'>> {
   const { data: message } = await db.from('chat_messages').select('organization_id').eq('id', input.messageId).maybeSingle();
   const note = input.note && message ? maskBadWords(input.note, await blockedWords(db, message.organization_id as string)) : input.note;
