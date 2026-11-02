@@ -55,6 +55,8 @@ test('a player signs in once, books a space and joins a game in each section', a
       await expect(page.getByRole('status')).toHaveText('Booked! See My bookings.');
       // The booked slot is taken now — no longer picked or pickable (Task 8's fix).
       await expect(page.getByRole('button', { name: label, exact: true })).toBeDisabled();
+      // …and says so to screen readers.
+      await expect(page.getByRole('button', { name: label, exact: true })).toHaveAccessibleDescription('Taken');
 
       // 3b. Ask for a seat in the section's first game (or join its waitlist when it is full).
       const made = await ensureUpcomingGame(db, slug, section.slug);

@@ -4,10 +4,9 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { cn } from "cn";
 import { SlotPicker } from "@/components/bookings/slot-picker";
+import { AutoRefresh } from "@/components/site/auto-refresh";
 import { sectionStyle } from "@/components/site/section-style";
 import { TeamNote } from "@/components/site/team-note";
-import { buttonVariants } from "@/components/ui/button";
-import { requireUser } from "@/lib/auth/dal";
 import { spaceDay } from "@/lib/bookings/bookings";
 import { addDays, currentBusinessDate, parseDateParam } from "@/lib/bookings/slots";
 import { formatShortTime } from "@/lib/format";
@@ -18,6 +17,7 @@ import { findSection } from "@/lib/site/home";
 import { teamDeskHref } from "@/lib/manage/team-links";
 import { kindWords } from "@/lib/site/kinds";
 import { bookPath, sectionPath } from "@/lib/site/paths";
+import { getBrand } from "@/lib/tenancy/brand";
 import { getSitePlayer, getTeamSectionIds } from "@/lib/tenancy/player";
 import { m } from "@/messages";
 import { bookSpaceAction } from "./actions";
@@ -34,23 +34,12 @@ const dayParts = (date: string) => {
 async function Book({ params, searchParams }: { params: Promise<{ section: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { section: slug } = await params;
   const query = await searchParams;
-  await requireUser(bookPath(slug));
+  // Anyone may look at the grid; booking needs sign-in and a profile (the bar says which).
   const player = await getSitePlayer();
-  if (!player) return null;
-  const { brand } = player;
+  const brand = player?.brand ?? (await getBrand());
+  if (!brand) return null; // the layout shows "Not open yet"
   const section = findSection(brand.sections, slug);
   if (!section) notFound();
-
-  if (!player.profileId && !player.isTeam) {
-    return (
-      <div className="flex max-w-xl flex-col gap-4 rounded-xl bg-card p-6">
-        <p>{m.bookings.createProfileFirst}</p>
-        <Link href="/me/edit" className={cn(buttonVariants({ variant: "section", size: "lg" }), "self-start px-4")}>
-          {m.bookings.createProfile}
-        </Link>
-      </div>
-    );
-  }
 
   const db = createServiceClient();
   const { data: spaces } = await db
@@ -66,7 +55,7 @@ async function Book({ params, searchParams }: { params: Promise<{ section: strin
 
   // Team logins are venue-only: they can still pick a space, but the page says where the desk books it
   // instead of showing the day and slots.
-  const teamLink = player.isTeam ? teamDeskHref({ kind: "space", sectionId: section.id, resourceId: space.id }, await getTeamSectionIds(player)) : null;
+  const teamLink = player?.isTeam ? teamDeskHref({ kind: "space", sectionId: section.id, resourceId: space.id }, await getTeamSectionIds(player)) : null;
   // After midnight at a late-night section, "today" is still last night's business day.
   const today = currentBusinessDate(section.openingHours, new Date(), brand.timezone);
   const lastDay = addDays(today, section.rules.bookingHorizonDays);
@@ -76,6 +65,12 @@ async function Book({ params, searchParams }: { params: Promise<{ section: strin
   const weekOffset = Math.floor((Date.parse(date) - Date.parse(today)) / DAY_MS / 7) * 7;
   const strip = dayWindow(today, section.rules.bookingHorizonDays, addDays(today, weekOffset));
   const day = teamLink ? null : await spaceDay(db, { organizationId: brand.id, resourceId: space.id, date, withNames: false });
+  // Signed out → sign in and come back to this space and day; no profile yet → make one first.
+  const blocked = !player
+    ? { href: `/signin?next=${encodeURIComponent(bookPath(section.slug, { resource: space.id, date }))}`, label: m.bookings.signInToBook }
+    : !player.profileId
+      ? { href: "/me/edit", label: m.bookings.createProfileToBook }
+      : null;
 
   const price =
     space.price_per_hour_poisha === null ? m.bookings.priceAtVenue : m.bookings.perSlot(formatBdt(Math.round((space.price_per_hour_poisha * space.slot_minutes) / 60)));
@@ -143,6 +138,7 @@ async function Book({ params, searchParams }: { params: Promise<{ section: strin
           <SlotPicker
             key={`${space.id}-${date}`}
             action={bookSpaceAction.bind(null, space.id)}
+            blocked={blocked}
             slotMinutes={space.slot_minutes}
             priceLabel={price}
             slots={(day?.slots ?? []).map((s) => ({
@@ -153,14 +149,16 @@ async function Book({ params, searchParams }: { params: Promise<{ section: strin
           />
         </>
       )}
+      {/* Slots others book while this page is open turn Taken within half a minute. */}
+      <AutoRefresh />
     </div>
   );
 }
 
 async function Shell({ params, searchParams }: { params: Promise<{ section: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { section: slug } = await params;
-  const player = await getSitePlayer();
-  const accent = player ? findSection(player.brand.sections, slug)?.accent : undefined;
+  const brand = (await getSitePlayer())?.brand ?? (await getBrand());
+  const accent = brand ? findSection(brand.sections, slug)?.accent : undefined;
   return (
     <main style={accent ? sectionStyle(accent) : undefined} className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 sm:px-6">
       <Book params={params} searchParams={searchParams} />
