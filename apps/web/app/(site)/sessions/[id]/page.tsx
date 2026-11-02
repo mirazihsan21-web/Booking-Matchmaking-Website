@@ -24,13 +24,14 @@ const primary = cn(buttonVariants({ variant: "section", size: "lg" }), "press se
 
 /**
  * What the visitor can do, one thing at a time: sign in, create a profile, rate, ask, withdraw, answer an offer
- * or cancel. The brand's team (venue-only logins) are told where to run the game instead.
+ * or cancel. The brand's team (venue-only logins) are told where to run the game instead of asking for a seat
+ * or answering an offer; a request, waitlist place or seat from before they joined can still be given up.
  */
 function Actions({ view, signedIn, hasProfile, team }: { view: PlayerSessionView; signedIn: boolean; hasProfile: boolean; team: { brandName: string; link: TeamDeskLink } | null }) {
   const { session, me } = view;
   const live = (session.status === "open" || session.status === "matched") && new Date(session.startsAt) > new Date();
   if (!live) return <p className="text-muted-foreground">{session.status === "cancelled" ? m.openPlay.cancelledSession : m.openPlay.closed}</p>;
-  if (team) return <TeamNote brandName={team.brandName} link={team.link} />;
+  if (team && (!me || me.state === "none" || me.state === "offered")) return <TeamNote brandName={team.brandName} link={team.link} />;
   if (!signedIn) {
     return (
       <Link href={`/signin?next=${encodeURIComponent(`/sessions/${session.id}`)}`} className={primary}>

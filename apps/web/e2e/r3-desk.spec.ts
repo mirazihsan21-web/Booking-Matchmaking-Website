@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { localAdmin, signIn, signInLink } from './helpers';
+import { ensureUpcomingGame, localAdmin, removeTestGame, signIn, signInLink } from './helpers';
 
 const OWNER = 'owner@demo-arena.test';
 const taka = (text: string) => Number(text.replace(/[^\d.]/g, ''));
@@ -202,6 +202,8 @@ test('a turf-only staff member sees only turf', async ({ page }) => {
   const cafe = await brandSection(slug, 'cafe');
   const { data: game } = await db.from('open_play_sessions').select('id').eq('section_id', cafe.sectionId).neq('status', 'cancelled').limit(1).single();
   const email = `e2e-staff-${randomUUID().slice(0, 8)}@example.test`;
+  let madeGame: string | null = null;
+  let requestedGame: string | undefined;
   const { data: created, error } = await db.auth.admin.createUser({ email, email_confirm: true });
   if (error) throw error;
   const userId = created.user!.id;
@@ -209,7 +211,20 @@ test('a turf-only staff member sees only turf', async ({ page }) => {
     await db.from('organization_members').insert({ organization_id: turf.orgId, user_id: userId, role: 'staff' });
     await db.from('section_staff').insert({ organization_id: turf.orgId, section_id: turf.sectionId, user_id: userId });
     // They played here before joining the team (Review Focus 4): their login is still a team login.
-    await db.from('player_profiles').insert({ organization_id: turf.orgId, user_id: userId, display_name: 'Staff Who Played' });
+    const { data: profile } = await db.from('player_profiles').insert({ organization_id: turf.orgId, user_id: userId, display_name: 'Staff Who Played' }).select('id').single();
+    // …and had asked for a seat in an upcoming turf game.
+    madeGame = await ensureUpcomingGame(db, slug, 'turf');
+    const { data: upcoming } = await db
+      .from('open_play_sessions')
+      .select('id')
+      .eq('section_id', turf.sectionId)
+      .eq('status', 'open')
+      .gt('starts_at', new Date().toISOString())
+      .order('starts_at')
+      .limit(1)
+      .single();
+    requestedGame = upcoming!.id as string;
+    await db.from('seat_requests').insert({ organization_id: turf.orgId, session_id: requestedGame, profile_id: profile!.id });
     await signIn(page, email, '/manage');
 
     await expect(page.getByText('Pitch 1').first()).toBeVisible();
@@ -230,7 +245,15 @@ test('a turf-only staff member sees only turf', async ({ page }) => {
     await expect(page).toHaveURL((url) => url.pathname === '/manage/account');
     await expect(page.locator('main').getByText('Turf', { exact: true })).toBeVisible();
     await expect(page.getByText('The owner chooses your sections on the Staff page.')).toBeVisible();
+
+    // The old request can still be taken back from the game page (spec §2: leaving still works).
+    await page.goto(`/sessions/${requestedGame}`);
+    await expect(page.getByRole('button', { name: 'Withdraw' })).toBeVisible();
+    await page.getByRole('button', { name: 'Withdraw' }).click();
+    await expect.poll(async () => (await db.from('seat_requests').select('id').eq('session_id', requestedGame!).eq('profile_id', profile!.id)).data?.length).toBe(0);
   } finally {
+    if (requestedGame) await db.from('seat_requests').delete().eq('session_id', requestedGame);
+    if (madeGame) await removeTestGame(db, madeGame);
     await db.from('player_profiles').delete().eq('user_id', userId);
     await db.from('section_staff').delete().eq('user_id', userId);
     await db.from('organization_members').delete().eq('user_id', userId);
