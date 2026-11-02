@@ -26,6 +26,10 @@ export interface Manager {
   org: ManagedOrganization;
   role: OrgRole;
   sectionIds: string[];
+  /** Their own name and mobile (My account) and when they joined the team (ISO). */
+  displayName: string;
+  phone: string | null;
+  memberSince: string;
 }
 
 /**
@@ -39,13 +43,16 @@ export const getManager = cache(async (): Promise<Manager | null> => {
   const supabase = await createClient();
   const { data: org } = await supabase.from('organizations').select('id, slug, name, status, business_type, timezone, branding').eq('slug', slug).maybeSingle();
   if (!org) return null;
-  const { data: member } = await supabase.from('organization_members').select('role').eq('organization_id', org.id).eq('user_id', user.id).maybeSingle();
+  const { data: member } = await supabase.from('organization_members').select('role, display_name, phone, created_at').eq('organization_id', org.id).eq('user_id', user.id).maybeSingle();
   if (!member) return null;
   const sectionIds = await allowedSectionIds(createServiceClient(), { organizationId: org.id, userId: user.id });
   return {
     user,
     role: member.role as OrgRole,
     sectionIds,
+    displayName: member.display_name as string,
+    phone: (member.phone as string | null) ?? null,
+    memberSince: member.created_at as string,
     org: {
       id: org.id,
       slug: org.slug,

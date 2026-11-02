@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { changeRole, listMembers, removeMember, setStaffSections } from '@/lib/orgs/members';
+import { changeRole, listMembers, removeMember, setStaffSections, updateMyTeamDetails } from '@/lib/orgs/members';
 import { recordPayment } from '@/lib/payments/payments';
 import { allowedSectionIds, canManageSection } from '@/lib/tenancy/sections-access';
 import { createTestUser, deleteTestUser, serviceDb, signedInClient, type TestUser } from './helpers';
@@ -161,3 +161,33 @@ function must<T extends { error: unknown }>(result: T): T {
   if (result.error) throw result.error;
   return result;
 }
+
+describe('team names and mobiles (My account)', () => {
+  it('lists each member with a name; one added without a name gets their email before "@"', async () => {
+    const staff = await user();
+    await addMember(staff.id, 'staff');
+    const member = (await listMembers(db, orgId)).find((m) => m.userId === staff.id)!;
+    expect(member.name).toBe(staff.email.split('@')[0]);
+  });
+
+  it("saves only the signed-in member's own name and mobile, leaving their role and everyone else alone", async () => {
+    const a = await user();
+    const b = await user();
+    await addMember(a.id, 'staff');
+    await addMember(b.id, 'staff');
+    const before = must(await db.from('organization_members').select('display_name, phone, role').eq('organization_id', orgId).eq('user_id', b.id).single()).data!;
+
+    expect(await updateMyTeamDetails(db, { organizationId: orgId, userId: a.id, displayName: 'Desk Person', phone: '+8801712345678' })).toEqual({ status: 'saved' });
+
+    const after = must(await db.from('organization_members').select('display_name, phone, role').eq('organization_id', orgId).eq('user_id', a.id).single()).data!;
+    expect(after).toEqual({ display_name: 'Desk Person', phone: '+8801712345678', role: 'staff' });
+    expect(must(await db.from('organization_members').select('display_name, phone, role').eq('organization_id', orgId).eq('user_id', b.id).single()).data).toEqual(before);
+    expect((await listMembers(db, orgId)).find((m) => m.userId === a.id)!.name).toBe('Desk Person');
+  });
+
+  it('reports not_member for someone outside the team and changes nothing', async () => {
+    const stranger = await user();
+    expect(await updateMyTeamDetails(db, { organizationId: orgId, userId: stranger.id, displayName: 'Nobody', phone: null })).toEqual({ status: 'not_member' });
+    expect(must(await db.from('organization_members').select('user_id').eq('user_id', stranger.id)).data).toEqual([]);
+  });
+});

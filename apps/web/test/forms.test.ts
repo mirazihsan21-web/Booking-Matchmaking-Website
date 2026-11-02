@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { parseActivityForm } from '../lib/forms/activity';
 import { parseResourceForm } from '../lib/forms/resource';
 import { parseSectionForm } from '../lib/forms/section';
+import { parseTeamDetailsForm } from '../lib/forms/team-details';
+import { m } from '../messages';
 import { DEFAULT_OPENING_HOURS, parseOpeningHours } from '../lib/opening-hours';
 
 function form(fields: Record<string, string>): FormData {
@@ -128,5 +130,31 @@ describe('parseActivityForm', () => {
       ok: true,
       value: { name: 'Catan', teamMode: 'none', teamSize: null, minPlayers: 3, maxPlayers: 4, durationMin: 90 },
     });
+  });
+});
+
+describe('parseTeamDetailsForm (My account: name and mobile)', () => {
+  it('needs a name', () => {
+    expect(parseTeamDetailsForm(form({ displayName: '', phone: '' }))).toEqual({ ok: false, errors: { displayName: m.forms.required } });
+  });
+
+  it('allows at most 60 characters', () => {
+    expect(parseTeamDetailsForm(form({ displayName: 'x'.repeat(61), phone: '' }))).toEqual({ ok: false, errors: { displayName: m.forms.tooLong } });
+    expect(parseTeamDetailsForm(form({ displayName: 'x'.repeat(60), phone: '' })).ok).toBe(true);
+  });
+
+  it('stores a mobile typed with dashes and spaces in the +880 form (Review Focus 5)', () => {
+    expect(parseTeamDetailsForm(form({ displayName: ' Miraz Ihsan ', phone: '017-1234 5678' }))).toEqual({
+      ok: true,
+      value: { displayName: 'Miraz Ihsan', phone: '+8801712345678' },
+    });
+  });
+
+  it('keeps no mobile as null', () => {
+    expect(parseTeamDetailsForm(form({ displayName: 'Miraz', phone: '' }))).toEqual({ ok: true, value: { displayName: 'Miraz', phone: null } });
+  });
+
+  it('refuses a number that is not a mobile', () => {
+    expect(parseTeamDetailsForm(form({ displayName: 'Miraz', phone: '12' }))).toEqual({ ok: false, errors: { phone: m.profile.phoneFormat } });
   });
 });

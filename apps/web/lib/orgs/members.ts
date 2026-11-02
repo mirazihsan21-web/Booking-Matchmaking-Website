@@ -7,17 +7,38 @@ export interface Member {
   userId: string;
   email: string | null;
   role: Role;
+  /** Their own name (My account); new members start with their Google name or email before "@". */
+  name: string;
 }
 
 export async function listMembers(db: SupabaseClient, organizationId: string): Promise<Member[]> {
   const { data, error } = await db
     .from('organization_members')
-    .select('user_id, role, created_at')
+    .select('user_id, role, display_name, created_at')
     .eq('organization_id', organizationId)
     .order('created_at');
   if (error) throw error;
   const emails = await memberEmails(db, organizationId);
-  return data.map((row) => ({ userId: row.user_id, email: emails.get(row.user_id) ?? null, role: row.role as Role }));
+  return data.map((row) => ({ userId: row.user_id, email: emails.get(row.user_id) ?? null, role: row.role as Role, name: row.display_name as string }));
+}
+
+/**
+ * A team member saves their own name and mobile (My account). Changes only that one membership row and only
+ * those two columns; `not_member` when the person isn't on this organisation's team. Pass the service client;
+ * the caller has checked who is signed in.
+ */
+export async function updateMyTeamDetails(
+  db: SupabaseClient,
+  input: { organizationId: string; userId: string; displayName: string; phone: string | null },
+): Promise<{ status: 'saved' | 'not_member' }> {
+  const { data, error } = await db
+    .from('organization_members')
+    .update({ display_name: input.displayName, phone: input.phone })
+    .eq('organization_id', input.organizationId)
+    .eq('user_id', input.userId)
+    .select('user_id');
+  if (error) throw error;
+  return { status: data.length > 0 ? 'saved' : 'not_member' };
 }
 
 async function isOnlyOwner(db: SupabaseClient, organizationId: string, userId: string): Promise<boolean> {
