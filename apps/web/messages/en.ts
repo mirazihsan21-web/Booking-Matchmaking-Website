@@ -678,6 +678,8 @@ export const en = {
     chatCardFull: (poster: string) => `${poster}'s game is full`,
     chatCardClosed: (poster: string) => `${poster} closed their game`,
     chatGameCancelled: (poster: string) => `${poster}'s game was cancelled`,
+    chatPrivateMessage: (sender: string) => `${sender} sent you a message`,
+    chatPrivateBody: 'Open the chat to read it.',
   },
   email: {
     open: 'View details',

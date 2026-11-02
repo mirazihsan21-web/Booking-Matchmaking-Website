@@ -119,6 +119,13 @@ describe('renderNotification for the players chat', () => {
     expect(show('chat_card_closed', { reason: 'closed' })).toEqual({ title: 'Sami closed their game', body: `${at}.` });
   });
 
+  it('says who sent a private message, never what it says', () => {
+    expect(renderNotification({ kind: 'chat_private_message', payload: { sender_name: 'Sami', conversation_id: 'c1' } }, zone)).toEqual({
+      title: 'Sami sent you a message',
+      body: 'Open the chat to read it.',
+    });
+  });
+
   it('tells everyone involved a game was cancelled', () => {
     expect(show('chat_game_cancelled')).toEqual({ title: "Sami's game was cancelled", body: `${at}.` });
   });

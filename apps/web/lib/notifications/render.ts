@@ -18,7 +18,8 @@ export type NotificationKind =
   | 'chat_join_declined'
   | 'chat_join_left'
   | 'chat_card_closed'
-  | 'chat_game_cancelled';
+  | 'chat_game_cancelled'
+  | 'chat_private_message';
 
 const str = (value: unknown) => (typeof value === 'string' ? value : '');
 
@@ -101,6 +102,8 @@ export function renderNotification(n: { kind: NotificationKind; payload: Record<
         title: n.payload.reason === 'full' ? t.chatCardFull(str(n.payload.poster_name)) : t.chatCardClosed(str(n.payload.poster_name)),
         body: `${spaceAndTime(n.payload, timeZone)}.`,
       };
+    case 'chat_private_message':
+      return { title: t.chatPrivateMessage(str(n.payload.sender_name)), body: t.chatPrivateBody };
     case 'chat_game_cancelled':
       return { title: t.chatGameCancelled(str(n.payload.poster_name)), body: `${spaceAndTime(n.payload, timeZone)}.` };
     default:
