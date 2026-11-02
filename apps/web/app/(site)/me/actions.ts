@@ -7,12 +7,16 @@ import { parseProfileForm } from "@/lib/forms/profile";
 import { saveProfile } from "@/lib/profiles/save-profile";
 import { createClient } from "@/lib/supabase/server";
 import { getBrand } from "@/lib/tenancy/brand";
+import { getSitePlayer } from "@/lib/tenancy/player";
+import { teamRefusal } from "@/lib/tenancy/team-refusal";
 import { m } from "@/messages";
 
 /** Saves the signed-in player's profile (one per brand), through RLS as that player. */
 export async function saveProfileAction(_state: FormState, form: FormData): Promise<FormState> {
   const [user, brand] = await Promise.all([getUser(), getBrand()]);
   if (!user || !brand) return { ok: false, message: m.profile.unavailable };
+  const refused = teamRefusal(await getSitePlayer());
+  if (refused) return refused;
 
   const parsed = parseProfileForm(form, brand.sections.map((s) => s.id));
   if (!parsed.ok) return { ok: false, errors: parsed.errors };

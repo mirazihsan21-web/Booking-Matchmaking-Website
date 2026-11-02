@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { cn } from "cn";
 import { SlotPicker } from "@/components/bookings/slot-picker";
 import { sectionStyle } from "@/components/site/section-style";
+import { TeamNote } from "@/components/site/team-note";
 import { buttonVariants } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/dal";
 import { spaceDay } from "@/lib/bookings/bookings";
@@ -14,6 +15,7 @@ import { formatBdt } from "@/lib/money";
 import { createServiceClient } from "@/lib/service-client";
 import { dayWindow } from "@/lib/site/days";
 import { findSection } from "@/lib/site/home";
+import { teamDeskHref } from "@/lib/manage/team-links";
 import { kindWords } from "@/lib/site/kinds";
 import { bookPath, sectionPath } from "@/lib/site/paths";
 import { getSitePlayer } from "@/lib/tenancy/player";
@@ -39,7 +41,7 @@ async function Book({ params, searchParams }: { params: Promise<{ section: strin
   const section = findSection(brand.sections, slug);
   if (!section) notFound();
 
-  if (!player.profileId) {
+  if (!player.profileId && !player.isTeam) {
     return (
       <div className="flex max-w-xl flex-col gap-4 rounded-xl bg-card p-6">
         <p>{m.bookings.createProfileFirst}</p>
@@ -61,6 +63,21 @@ async function Book({ params, searchParams }: { params: Promise<{ section: strin
 
   // Junk or foreign ?resource= falls back to the first space; a date outside the window to today.
   const space = spaces.find((s) => s.id === one(query.resource)) ?? spaces[0]!;
+
+  // Team logins are venue-only: the page says where the desk books instead of offering Book.
+  if (player.isTeam) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-1">
+          <Link href={sectionPath(section.slug)} className="font-display text-xl uppercase tracking-wide text-section hover:underline">
+            {section.name}
+          </Link>
+          <h1 className="font-display text-4xl uppercase tracking-wide sm:text-5xl">{kindWords(section.kind).book}</h1>
+        </div>
+        <TeamNote brandName={brand.name} link={teamDeskHref({ kind: "space", sectionId: section.id, resourceId: space.id }, player.teamSectionIds)} />
+      </div>
+    );
+  }
   // After midnight at a late-night section, "today" is still last night's business day.
   const today = currentBusinessDate(section.openingHours, new Date(), brand.timezone);
   const lastDay = addDays(today, section.rules.bookingHorizonDays);

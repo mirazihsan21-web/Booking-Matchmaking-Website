@@ -6,8 +6,10 @@ import { ActionButton } from "@/components/forms/action-form";
 import { AutoRefresh } from "@/components/site/auto-refresh";
 import { SeatsBar } from "@/components/site/seats-bar";
 import { sectionStyle } from "@/components/site/section-style";
+import { TeamNote } from "@/components/site/team-note";
 import { buttonVariants } from "@/components/ui/button";
 import { formatNight, formatShortTime } from "@/lib/format";
+import { teamDeskHref, type TeamDeskLink } from "@/lib/manage/team-links";
 import { formatBdt } from "@/lib/money";
 import { playerSessionView, seatCounts, type PlayerSessionView } from "@/lib/open-play/open-play";
 import { createServiceClient } from "@/lib/service-client";
@@ -20,11 +22,15 @@ import { requestSeatAction, withdrawAction } from "./actions";
 
 const primary = cn(buttonVariants({ variant: "section", size: "lg" }), "press self-start px-5");
 
-/** What the visitor can do, one thing at a time: sign in, create a profile, rate, ask, withdraw, answer an offer or cancel. */
-function Actions({ view, signedIn, hasProfile }: { view: PlayerSessionView; signedIn: boolean; hasProfile: boolean }) {
+/**
+ * What the visitor can do, one thing at a time: sign in, create a profile, rate, ask, withdraw, answer an offer
+ * or cancel. The brand's team (venue-only logins) are told where to run the game instead.
+ */
+function Actions({ view, signedIn, hasProfile, team }: { view: PlayerSessionView; signedIn: boolean; hasProfile: boolean; team: { brandName: string; link: TeamDeskLink } | null }) {
   const { session, me } = view;
   const live = (session.status === "open" || session.status === "matched") && new Date(session.startsAt) > new Date();
   if (!live) return <p className="text-muted-foreground">{session.status === "cancelled" ? m.openPlay.cancelledSession : m.openPlay.closed}</p>;
+  if (team) return <TeamNote brandName={team.brandName} link={team.link} />;
   if (!signedIn) {
     return (
       <Link href={`/signin?next=${encodeURIComponent(`/sessions/${session.id}`)}`} className={primary}>
@@ -45,7 +51,7 @@ function Actions({ view, signedIn, hasProfile }: { view: PlayerSessionView; sign
         return (
           <div className="flex flex-col items-start gap-3">
             <p>{m.openPlay.outcome.needs_skill}</p>
-            <Link href="/me" className={primary}>
+            <Link href="/me/edit" className={primary}>
               {m.openPlay.rateLevel}
             </Link>
           </div>
@@ -146,7 +152,16 @@ async function SessionDetail({ params }: { params: Promise<{ id: string }> }) {
           {formatNight(session.startsAt, brand.timezone)}–{formatShortTime(session.endsAt, brand.timezone)} · {m.site.perSeat(formatBdt(session.pricePoisha))}
         </p>
         {live && <SeatsBar left={counts.left} total={counts.total} />}
-        <Actions view={view} signedIn={Boolean(player)} hasProfile={Boolean(player?.profileId)} />
+        <Actions
+          view={view}
+          signedIn={Boolean(player)}
+          hasProfile={Boolean(player?.profileId)}
+          team={
+            player?.isTeam
+              ? { brandName: brand.name, link: teamDeskHref({ kind: "game", sectionId: session.sectionId, sessionId: session.id }, player.teamSectionIds) }
+              : null
+          }
+        />
       </section>
       <Group view={view} />
       <AutoRefresh />

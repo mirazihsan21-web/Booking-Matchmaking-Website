@@ -6,11 +6,14 @@ import { bookSpace } from "@/lib/bookings/bookings";
 import { sectionOfResource } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { getSitePlayer } from "@/lib/tenancy/player";
+import { teamRefusal } from "@/lib/tenancy/team-refusal";
 import { m } from "@/messages";
 
 /** A signed-in player books 1–4 slots of a space. */
 export async function bookSpaceAction(resourceId: string, _state: FormState, form: FormData): Promise<FormState> {
   const player = await getSitePlayer();
+  const refused = teamRefusal(player);
+  if (refused) return refused;
   if (!player) return { ok: false, message: m.bookings.unavailable };
   if (!player.profileId) return { ok: false, message: m.bookings.createProfileFirst };
 

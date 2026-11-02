@@ -412,6 +412,13 @@ export const en = {
       rights: (name: string, year: number) => `© ${year} ${name}`,
     },
   },
+  team: {
+    note: (brand: string) => `You're signed in as ${brand}'s team. Book walk-ins from Today.`,
+    openSpace: 'Open this space on Today',
+    openGame: 'Open this game in Manage',
+    goToday: 'Go to Today',
+    refused: "Team accounts can't book, take seats or keep a player profile here. Use Manage.",
+  },
   profile: {
     title: (venue: string) => `Your profile at ${venue}`,
     intro: 'This helps us put you in fair, fun games.',

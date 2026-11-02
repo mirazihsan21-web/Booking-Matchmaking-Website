@@ -5,6 +5,7 @@ import type { FormState } from "@/components/forms/action-form";
 import { requestSeat, withdrawRequest } from "@/lib/open-play/open-play";
 import { createServiceClient } from "@/lib/service-client";
 import { getSitePlayer } from "@/lib/tenancy/player";
+import { teamRefusal } from "@/lib/tenancy/team-refusal";
 import { m } from "@/messages";
 
 const OK = new Set(["requested", "seated", "waitlisted", "withdrawn"]);
@@ -12,6 +13,8 @@ const OK = new Set(["requested", "seated", "waitlisted", "withdrawn"]);
 /** A player with a profile asks for a seat in a game. */
 export async function requestSeatAction(sessionId: string, _state: FormState, _form: FormData): Promise<FormState> {
   const player = await getSitePlayer();
+  const refused = teamRefusal(player);
+  if (refused) return refused;
   if (!player?.profileId) return { ok: false, message: m.openPlay.createProfile };
   const result = await requestSeat(createServiceClient(), { organizationId: player.brand.id, sessionId, profileId: player.profileId });
   refresh();
