@@ -63,8 +63,12 @@ test('the players chat is live between two players, with the unread dot, the fil
     await pageB.reload();
     await expect(pageB.getByText('older 60', { exact: true })).toBeVisible();
     await expect(pageB.getByText('older 10', { exact: true })).toHaveCount(0);
-    await pageB.getByRole('button', { name: 'Load earlier' }).click();
-    await expect(pageB.getByText('older 10', { exact: true })).toBeVisible();
+    // A click before the page has hydrated does nothing (a person taps again): retry until the older ones load.
+    const older10 = pageB.getByText('older 10', { exact: true });
+    await expect(async () => {
+      if ((await older10.count()) === 0) await pageB.getByRole('button', { name: 'Load earlier' }).click();
+      await expect(older10).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
   } finally {
     await removeTestPlayer(db, a.email);
     await removeTestPlayer(db, b.email);

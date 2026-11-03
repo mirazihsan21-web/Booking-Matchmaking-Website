@@ -77,3 +77,81 @@ test('players message each other privately — the unread count, a photo, kept o
     }
   }
 });
+
+test('a conversation you come back to is marked read', async ({ browser }) => {
+  test.setTimeout(90_000);
+  const { db, slug } = localAdmin();
+  const { data: org } = await db.from('organizations').select('id').eq('slug', slug).single();
+  const a = await chatPlayer(db, org!.id, 'Sami');
+  const b = await chatPlayer(db, org!.id, 'Tanvir');
+  try {
+    const pageA = await (await browser.newContext()).newPage();
+    const pageB = await (await browser.newContext()).newPage();
+    await signIn(pageA, a.email, `/chat/private/${b.profileId}`);
+    await send(pageA, 'first');
+    await signIn(pageB, b.email, `/chat/private/${a.profileId}`);
+    await expect(pageB.getByText('first')).toBeVisible();
+
+    // Tanvir switches to another tab; a message arrives; he comes back to it.
+    await pageB.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await wait(pageA);
+    await send(pageA, 'while you were away');
+    await expect(pageB.getByText('while you were away')).toBeVisible({ timeout: 8_000 });
+    const { data: last } = await db.from('chat_messages').select('created_at').eq('body', 'while you were away').single();
+    await pageB.waitForTimeout(11_000); // past the 10-second read throttle, still hidden
+    await pageB.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect
+      .poll(async () => {
+        const { data } = await db.from('chat_conversation_reads').select('read_at').eq('profile_id', b.profileId).single();
+        return data?.read_at ? new Date(data.read_at).getTime() >= new Date(last!.created_at).getTime() : false;
+      })
+      .toBe(true);
+  } finally {
+    await removeTestPlayer(db, a.email);
+    await removeTestPlayer(db, b.email);
+  }
+});
+
+test('a block from the room can be undone from Private, even when both blocked each other', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const { db, slug } = localAdmin();
+  const { data: org } = await db.from('organizations').select('id').eq('slug', slug).single();
+  const a = await chatPlayer(db, org!.id, 'Sami');
+  const b = await chatPlayer(db, org!.id, 'Tanvir');
+  try {
+    const pageA = await (await browser.newContext()).newPage();
+    const pageB = await (await browser.newContext()).newPage();
+    await signIn(pageA, a.email, '/chat');
+    await signIn(pageB, b.email, '/chat');
+    await send(pageA, 'hello from Sami');
+    await send(pageB, 'hello from Tanvir');
+
+    // Tanvir blocks Sami from the room; Sami blocks Tanvir the same way.
+    const samis = pageB.getByRole('listitem').filter({ hasText: 'hello from Sami' });
+    await samis.getByRole('button', { name: 'Sami' }).click();
+    await pageB.getByRole('button', { name: 'Block' }).click();
+    await expect(pageB.getByText('1 message from someone you blocked')).toBeVisible();
+    const tanvirs = pageA.getByRole('listitem').filter({ hasText: 'hello from Tanvir' });
+    await tanvirs.getByRole('button', { name: 'Tanvir' }).click();
+    await pageA.getByRole('button', { name: 'Block' }).click();
+
+    // Tanvir can still undo his block: from his blocked list, and on the conversation page.
+    await pageB.goto(`/chat/private/${a.profileId}`);
+    await expect(pageB.getByRole('button', { name: 'Unblock' })).toBeVisible();
+    await pageB.goto('/chat/private');
+    const blocked = pageB.getByRole('region', { name: 'Blocked players' });
+    await blocked.getByRole('button', { name: 'Unblock' }).click();
+    await expect(blocked).toHaveCount(0);
+    await pageB.goto('/chat');
+    await expect(pageB.getByText('hello from Sami')).toBeVisible();
+  } finally {
+    await removeTestPlayer(db, a.email);
+    await removeTestPlayer(db, b.email);
+  }
+});

@@ -41,12 +41,22 @@ export async function listConversations(db: SupabaseClient, input: { organizatio
   }));
   if (rows.length === 0) return [];
 
-  const [names, reads] = await Promise.all([
+  const [names, reads, blocks] = await Promise.all([
     db.from('player_profiles').select('id, display_name').in('id', rows.map((r) => r.other)),
     db.from('chat_conversation_reads').select('conversation_id, read_at').eq('profile_id', input.profileId).in('conversation_id', rows.map((r) => r.id)),
+    db
+      .from('chat_blocks')
+      .select('blocker_profile_id, blocked_profile_id')
+      .eq('organization_id', input.organizationId)
+      .or(`blocker_profile_id.eq.${input.profileId},blocked_profile_id.eq.${input.profileId}`),
   ]);
   if (names.error) throw names.error;
   if (reads.error) throw reads.error;
+  if (blocks.error) throw blocks.error;
+  // Either side blocked: nothing there counts as unread (it can't be opened to read).
+  const blockedWith = new Set(
+    (blocks.data ?? []).map((b) => (b.blocker_profile_id === input.profileId ? b.blocked_profile_id : b.blocker_profile_id) as string),
+  );
   const nameOf = new Map((names.data ?? []).map((p) => [p.id as string, p.display_name as string]));
   const readAt = new Map((reads.data ?? []).map((r) => [r.conversation_id as string, r.read_at as string | null]));
 
@@ -76,7 +86,7 @@ export async function listConversations(db: SupabaseClient, input: { organizatio
         lastText: visible ? ((last.data?.body as string | null) ?? null) : null,
         lastHasPhoto: visible && Boolean(last.data?.photo_path),
         lastAt: row.lastAt,
-        unread: unread.count ?? 0,
+        unread: blockedWith.has(row.other) ? 0 : (unread.count ?? 0),
       };
     }),
   );
@@ -153,4 +163,13 @@ export async function playerCard(
     .filter((section): section is string => Boolean(section))
     .sort();
   return { name, sections, blockedByMe: Boolean(block?.data) };
+}
+
+/** The players this player has blocked, with their names (so each block can be undone from the Private tab). */
+export async function blockedPlayers(db: SupabaseClient, input: { organizationId: string; profileId: string }): Promise<Array<{ profileId: string; name: string }>> {
+  const ids = await blockedByMe(db, input);
+  if (ids.length === 0) return [];
+  const { data, error } = await db.from('player_profiles').select('id, display_name').in('id', ids);
+  if (error) throw error;
+  return (data ?? []).map((p) => ({ profileId: p.id as string, name: p.display_name as string })).sort((a, b) => a.name.localeCompare(b.name));
 }

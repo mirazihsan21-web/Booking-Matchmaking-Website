@@ -103,7 +103,19 @@ export function ConversationRoom({
         mark();
       }, wait);
     }
+    const onVisible = () => {
+      if (document.visibilityState === "visible") mark();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [conversationId, me.profileId, messages, organizationId, supabase]);
+
+  useEffect(
+    () => () => {
+      if (readTimer.current !== null) window.clearTimeout(readTimer.current);
+    },
+    [],
+  );
 
   function sent(result: SendResult) {
     if (result?.conversationId && !conversationId) setConversationId(result.conversationId);

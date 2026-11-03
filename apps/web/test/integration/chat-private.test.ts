@@ -98,6 +98,21 @@ describe('private messages', () => {
   });
 });
 
+describe('blocking and unread', () => {
+  it('stops counting a conversation as unread once either side blocks', async () => {
+    await pause();
+    expect((await postPrivateMessage(db, { organizationId: orgId, userId: a.id, toProfileId: pb, body: 'one more thing', photoPath: null })).status).toBe('posted');
+    expect((await listConversations(db, { organizationId: orgId, profileId: pb }))[0]!.unread).toBeGreaterThan(0);
+    expect(await blockPlayer(db, { organizationId: orgId, userId: b.id, profileId: pa })).toBe('blocked');
+    try {
+      expect((await listConversations(db, { organizationId: orgId, profileId: pb }))[0]!.unread).toBe(0);
+      expect(await privateUnread(await signedInClient(b.email, b.password), orgId)).toBe(0);
+    } finally {
+      await unblockPlayer(db, { organizationId: orgId, userId: b.id, profileId: pa });
+    }
+  });
+});
+
 describe('photos', () => {
   it('shows a room photo to signed-in people, and a private photo only to its two people', async () => {
     const asA = await signedInClient(a.email, a.password);

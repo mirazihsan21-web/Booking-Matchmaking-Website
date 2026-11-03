@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { BlockButton } from "@/components/chat/player-panel";
 import { PrivateShell } from "@/components/chat/private-shell";
-import { listConversations } from "@/lib/chat/private";
+import { blockedPlayers, listConversations } from "@/lib/chat/private";
 import { privateUnread } from "@/lib/chat/reads";
 import { chatTime } from "@/lib/chat/time";
 import { createServiceClient } from "@/lib/service-client";
@@ -41,9 +42,11 @@ async function Conversations() {
     );
   }
 
-  const [conversations, unread] = await Promise.all([
-    listConversations(createServiceClient(), { organizationId: brand.id, profileId: player.profileId }),
+  const db = createServiceClient();
+  const [conversations, unread, blocked] = await Promise.all([
+    listConversations(db, { organizationId: brand.id, profileId: player.profileId }),
     privateUnread(await createClient(), brand.id),
+    blockedPlayers(db, { organizationId: brand.id, profileId: player.profileId }),
   ]);
   const now = new Date();
   return (
@@ -65,6 +68,19 @@ async function Conversations() {
             </li>
           ))}
         </ul>
+      )}
+      {blocked.length > 0 && (
+        <section aria-label={m.chat.private.blockedTitle} className="flex flex-col gap-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{m.chat.private.blockedTitle}</h2>
+          <ul className="flex flex-col gap-2">
+            {blocked.map((p) => (
+              <li key={p.profileId} className="flex items-center gap-3 rounded-xl bg-card p-3">
+                <span className="flex-1 font-semibold">{p.name}</span>
+                <BlockButton profileId={p.profileId} blocked />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </PrivateShell>
   );

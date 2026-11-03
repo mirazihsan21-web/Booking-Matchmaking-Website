@@ -51,3 +51,32 @@ test('players share a photo in the room; a file that is too big or not a photo i
     await removeTestPlayer(db, b.email);
   }
 });
+
+test('Send waits while a photo is still uploading', async ({ browser }) => {
+  test.setTimeout(90_000);
+  const { db, slug } = localAdmin();
+  const { data: org } = await db.from('organizations').select('id').eq('slug', slug).single();
+  const a = await chatPlayer(db, org!.id, 'Sami');
+  try {
+    const page = await (await browser.newContext()).newPage();
+    await signIn(page, a.email, '/chat');
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route('**/storage/v1/object/chat-photos/**', async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.getByLabel('Add photo').setInputFiles({ name: 'slow.png', mimeType: 'image/png', buffer: PNG });
+    await expect(page.getByText('Uploading…')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send' })).toBeDisabled();
+    release();
+    await expect(page.getByRole('button', { name: 'Remove photo' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send' })).toBeEnabled();
+  } finally {
+    const own = await db.storage.from('chat-photos').list(a.userId);
+    if (own.data?.length) await db.storage.from('chat-photos').remove(own.data.map((f) => `${a.userId}/${f.name}`));
+    await removeTestPlayer(db, a.email);
+  }
+});

@@ -851,6 +851,7 @@ export const en = {
       photoOnly: 'Photo',
       with: (name: string) => `Messages with ${name}`,
       back: 'All private messages',
+      blockedTitle: 'Blocked players',
     },
     photo: {
       add: 'Add photo',

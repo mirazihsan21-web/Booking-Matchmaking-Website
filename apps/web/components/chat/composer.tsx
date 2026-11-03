@@ -26,6 +26,7 @@ export function Composer({
 }) {
   const [state, action, pending] = useActionState(send, null);
   const [round, setRound] = useState(0); // a new photo picker after each sent message
+  const [uploading, setUploading] = useState(false); // Send waits for a photo still on its way
   const formRef = useRef<HTMLFormElement>(null);
   const sentRef = useRef(onSent);
   useEffect(() => {
@@ -48,6 +49,7 @@ export function Composer({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (uploading) return; // Enter while the photo is still uploading
     const data = new FormData(event.currentTarget);
     startTransition(() => action(data));
   }
@@ -73,11 +75,11 @@ export function Composer({
           onKeyDown={keyDown}
           className="min-h-11 flex-1 resize-none rounded-xl border border-input bg-transparent px-3 py-2 text-sm"
         />
-        <Button type="submit" disabled={pending} className="h-11 px-5">
+        <Button type="submit" disabled={pending || uploading} className="h-11 px-5">
           {m.chat.send}
         </Button>
       </div>
-      <PhotoPicker key={round} userId={userId} />
+      <PhotoPicker key={round} userId={userId} onBusy={setUploading} />
       {state && !state.ok && state.message && (
         <p role="status" className="text-sm text-destructive">
           {state.message}

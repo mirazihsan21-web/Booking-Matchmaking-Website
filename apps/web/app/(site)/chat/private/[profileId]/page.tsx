@@ -57,7 +57,7 @@ async function Conversation({ params }: { params: Promise<{ profileId: string }>
           ← {m.chat.private.back}
         </Link>
         <h2 className="flex-1 font-semibold">{m.chat.private.with(view.otherName)}</h2>
-        {!view.blockedMe && <BlockButton profileId={profileId} blocked={view.blockedByMe} />}
+        {(view.blockedByMe || !view.blockedMe) && <BlockButton profileId={profileId} blocked={view.blockedByMe} />}
       </div>
       {blocked ? (
         <p className="rounded-xl bg-card p-4 text-center text-sm text-muted-foreground">{m.chat.refusal.blocked}</p>

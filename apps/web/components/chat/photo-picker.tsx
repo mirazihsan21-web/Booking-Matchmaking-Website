@@ -10,7 +10,7 @@ import { m } from "@/messages";
  * Add a photo to a message: the file is checked and shrunk in the browser (nothing leaves the phone if it's the wrong
  * type or too big), uploaded to the sender's own folder, and its path put in a hidden `photoPath` field.
  */
-export function PhotoPicker({ userId }: { userId: string }) {
+export function PhotoPicker({ userId, onBusy }: { userId: string; onBusy?: (busy: boolean) => void }) {
   const [path, setPath] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -28,8 +28,10 @@ export function PhotoPicker({ userId }: { userId: string }) {
       return;
     }
     setUploading(true);
+    onBusy?.(true);
     const stored = await uploadChatPhoto(createClient(), userId, prepared.blob);
     setUploading(false);
+    onBusy?.(false);
     if (!stored) {
       setProblem(m.chat.photo.uploadFailed);
       return;
