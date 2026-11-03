@@ -12,6 +12,7 @@ import type { ChatMe } from "./chat-room";
 import { Composer, type SendResult } from "./composer";
 import { MessageItem } from "./message-item";
 import { MessageMenu } from "./message-menu";
+import { useFitHeight } from "./use-fit-height";
 
 const READ_EVERY_MS = 10_000;
 
@@ -41,6 +42,8 @@ export function ConversationRoom({
   const [messages, setMessages] = useState(initial);
   const [now, setNow] = useState(() => new Date(renderedAt));
   const scroller = useRef<HTMLDivElement>(null);
+  const below = useRef<HTMLDivElement>(null);
+  const fitted = useFitHeight(scroller, below);
   const newest = useRef(initial.at(-1));
 
   const catchUp = useCallback(async () => {
@@ -79,11 +82,12 @@ export function ConversationRoom({
     };
   }, []);
 
+  // Always at the newest message: on a new one, and when the list is sized to the screen.
   useLayoutEffect(() => {
     newest.current = messages.at(-1);
     const el = scroller.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [messages, fitted]);
 
   // Read up to the newest message while the tab is visible, at most every 10 seconds.
   const lastRead = useRef(0);
@@ -124,22 +128,31 @@ export function ConversationRoom({
 
   return (
     <section className="flex flex-col gap-3">
-      <div ref={scroller} className="h-[55dvh] min-h-72 overflow-y-auto rounded-xl border border-border p-2">
-        {messages.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">{m.chat.empty}</p>}
-        <ol className="flex flex-col gap-2">
-          {messages.map((message) => (
-            <MessageItem
-              key={message.id}
-              message={message}
-              mine={message.authorUserId === me.userId}
-              timeZone={timeZone}
-              now={now}
-              actions={<MessageMenu message={message} me={me} />}
-            />
-          ))}
-        </ol>
+      <div
+        ref={scroller}
+        style={fitted === null ? undefined : { height: fitted }}
+        className="h-[55dvh] min-h-40 overflow-y-auto rounded-xl border border-border p-2"
+      >
+        {/* The newest messages sit at the bottom, next to the chat box. */}
+        <div className="flex min-h-full flex-col justify-end">
+          {messages.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">{m.chat.empty}</p>}
+          <ol className="flex flex-col gap-2">
+            {messages.map((message) => (
+              <MessageItem
+                key={message.id}
+                message={message}
+                mine={message.authorUserId === me.userId}
+                timeZone={timeZone}
+                now={now}
+                actions={<MessageMenu message={message} me={me} />}
+              />
+            ))}
+          </ol>
+        </div>
       </div>
-      <Composer action={sendPrivateAction} hidden={{ toProfileId: otherProfileId }} userId={me.userId} onSent={sent} />
+      <div ref={below} className="flex flex-col">
+        <Composer action={sendPrivateAction} hidden={{ toProfileId: otherProfileId }} userId={me.userId} onSent={sent} />
+      </div>
     </section>
   );
 }

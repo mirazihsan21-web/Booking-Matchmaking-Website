@@ -852,6 +852,7 @@ export const en = {
       with: (name: string) => `Messages with ${name}`,
       back: 'All private messages',
       blockedTitle: 'Blocked players',
+      unavailable: "This player can't be shown right now.",
     },
     photo: {
       add: 'Add photo',
@@ -864,6 +865,9 @@ export const en = {
       open: 'Open full size',
     },
     options: 'Message options',
+    close: 'Close',
+    cancel: 'Cancel',
+    menuCard: 'a game card',
     report: 'Report',
     reportTitle: 'Why are you reporting this?',
     reasons: { spam: 'Spam', abuse: 'Rude or abusive', photo: 'Inappropriate photo', other: 'Other' } as Record<string, string>,

@@ -16,6 +16,7 @@ import { Composer } from "./composer";
 import { MessageMenu } from "./message-menu";
 import { PlayerPanel } from "./player-panel";
 import { MessageItem } from "./message-item";
+import { useFitHeight } from "./use-fit-height";
 
 export interface ChatMe {
   userId: string;
@@ -74,6 +75,8 @@ export function ChatRoom({
   }
 
   const scroller = useRef<HTMLDivElement>(null);
+  const below = useRef<HTMLDivElement>(null);
+  const fitted = useFitHeight(scroller, below);
   const nearBottom = useRef(true);
   const newest = useRef(initial.messages.at(-1));
   const keepOffset = useRef<number | null>(null);
@@ -205,6 +208,12 @@ export function ChatRoom({
     if (el) el.scrollTop = el.scrollHeight;
   }, []);
 
+  // The list was sized to the screen: if you were at the newest message, stay there.
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (el && nearBottom.current) el.scrollTop = el.scrollHeight;
+  }, [fitted]);
+
   // Read up to the newest message while the tab is visible, at most every 10 seconds.
   const lastRead = useRef(0);
   const readTimer = useRef<number | null>(null);
@@ -293,29 +302,50 @@ export function ChatRoom({
           {m.chat.reconnecting}
         </p>
       )}
-      <div ref={scroller} onScroll={onScroll} className="h-[60dvh] min-h-72 overflow-y-auto rounded-xl border border-border p-2">
-        {hasMore && (
-          <div className="flex justify-center pb-2">
-            <button type="button" onClick={() => void loadEarlier()} className="rounded-lg px-3 py-1 text-sm font-semibold text-muted-foreground hover:bg-raised">
-              {m.chat.loadEarlier}
-            </button>
-          </div>
-        )}
-        {messages.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">{m.chat.empty}</p>}
-        <ol className="flex flex-col gap-2">
-          {rows.map((row) => {
-            if (row.kind === "blocked") {
-              return (
-                <li key={`blocked-${row.id}`} className="px-3 py-1 text-xs italic text-muted-foreground">
-                  {m.chat.blockedLine(row.count)}
-                </li>
-              );
-            }
-            const { message } = row;
-            const mine = message.authorUserId === me.userId;
-            const card = message.cardId ? cards.get(message.cardId) : undefined;
-            if (message.cardId && !card) return null;
-            if (card) {
+      <div
+        ref={scroller}
+        onScroll={onScroll}
+        style={fitted === null ? undefined : { height: fitted }}
+        className="h-[60dvh] min-h-40 overflow-y-auto rounded-xl border border-border p-2"
+      >
+        {/* The newest messages sit at the bottom, next to the chat box. */}
+        <div className="flex min-h-full flex-col justify-end">
+          {hasMore && (
+            <div className="flex justify-center pb-2">
+              <button type="button" onClick={() => void loadEarlier()} className="rounded-lg px-3 py-1 text-sm font-semibold text-muted-foreground hover:bg-raised">
+                {m.chat.loadEarlier}
+              </button>
+            </div>
+          )}
+          {messages.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">{m.chat.empty}</p>}
+          <ol className="flex flex-col gap-2">
+            {rows.map((row) => {
+              if (row.kind === "blocked") {
+                return (
+                  <li key={`blocked-${row.id}`} className="px-3 py-1 text-xs italic text-muted-foreground">
+                    {m.chat.blockedLine(row.count)}
+                  </li>
+                );
+              }
+              const { message } = row;
+              const mine = message.authorUserId === me.userId;
+              const card = message.cardId ? cards.get(message.cardId) : undefined;
+              if (message.cardId && !card) return null;
+              if (card) {
+                return (
+                  <MessageItem
+                    key={message.id}
+                    message={message}
+                    mine={mine}
+                    timeZone={timeZone}
+                    now={now}
+                    nameSlot={nameFor(message)}
+                    actions={<MessageMenu message={message} me={me} cardOpen={card.status === "open" || card.status === "full"} />}
+                  >
+                    <CardItem card={card} timeZone={timeZone} mine={card.posterUserId === me.userId} seatsLeft={strip.get(card.id)?.seatsLeft ?? null} />
+                  </MessageItem>
+                );
+              }
               return (
                 <MessageItem
                   key={message.id}
@@ -324,25 +354,12 @@ export function ChatRoom({
                   timeZone={timeZone}
                   now={now}
                   nameSlot={nameFor(message)}
-                  actions={<MessageMenu message={message} me={me} cardOpen={card.status === "open" || card.status === "full"} />}
-                >
-                  <CardItem card={card} timeZone={timeZone} mine={card.posterUserId === me.userId} seatsLeft={strip.get(card.id)?.seatsLeft ?? null} />
-                </MessageItem>
+                  actions={<MessageMenu message={message} me={me} />}
+                />
               );
-            }
-            return (
-              <MessageItem
-                key={message.id}
-                message={message}
-                mine={mine}
-                timeZone={timeZone}
-                now={now}
-                nameSlot={nameFor(message)}
-                actions={<MessageMenu message={message} me={me} />}
-              />
-            );
-          })}
-        </ol>
+            })}
+          </ol>
+        </div>
       </div>
       {unseen && (
         <button
@@ -353,17 +370,19 @@ export function ChatRoom({
           {m.chat.newMessages}
         </button>
       )}
-      {box.kind === "open" && <Composer action={sendMessageAction} userId={me.userId} onSent={() => void catchUp().catch(() => undefined)} />}
-      {box.kind === "no_profile" && (
-        <Link href="/me/edit?next=/chat" className="rounded-xl bg-card p-4 text-center font-semibold hover:bg-raised">
-          {m.chat.setUpProfile}
-        </Link>
-      )}
-      {box.kind === "muted" && (
-        <p className="rounded-xl bg-card p-4 text-center text-sm text-muted-foreground">
-          {box.until ? m.chat.mutedUntil(formatNight(box.until, timeZone)) : m.chat.mutedForever}
-        </p>
-      )}
+      <div ref={below} className="flex flex-col">
+        {box.kind === "open" && <Composer action={sendMessageAction} userId={me.userId} onSent={() => void catchUp().catch(() => undefined)} />}
+        {box.kind === "no_profile" && (
+          <Link href="/me/edit?next=/chat" className="rounded-xl bg-card p-4 text-center font-semibold hover:bg-raised">
+            {m.chat.setUpProfile}
+          </Link>
+        )}
+        {box.kind === "muted" && (
+          <p className="rounded-xl bg-card p-4 text-center text-sm text-muted-foreground">
+            {box.until ? m.chat.mutedUntil(formatNight(box.until, timeZone)) : m.chat.mutedForever}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

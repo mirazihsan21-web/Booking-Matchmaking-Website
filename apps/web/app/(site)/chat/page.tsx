@@ -20,7 +20,8 @@ function Shell({ children, privateUnread: unread }: { children: React.ReactNode;
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-4 py-6 sm:px-6">
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-4xl uppercase tracking-wide">{m.chat.title}</h1>
-        <p className="text-muted-foreground">{m.chat.intro}</p>
+        {/* On a phone the room needs the height (the chat box stays on screen); the title and the buttons say enough. */}
+        <p className="hidden text-muted-foreground sm:block">{m.chat.intro}</p>
         {unread !== undefined && <ChatTabs active="everyone" privateUnread={unread} />}
       </header>
       {children}

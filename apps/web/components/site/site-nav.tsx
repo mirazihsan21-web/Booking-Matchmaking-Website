@@ -110,7 +110,7 @@ export function SiteNav({
         </div>
       </header>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      <nav data-bottom-nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         <ul className="mx-auto flex max-w-md items-stretch justify-around">
           <Tab href="/" label={m.site.nav.home} Icon={House} active={on("/")} />
           {sections.map((s) => (
