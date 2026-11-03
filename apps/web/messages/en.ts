@@ -658,6 +658,12 @@ export const en = {
     cancelledByVenue: 'The venue cancelled your booking',
     payAtVenue: (price: string) => `Pay ${price} at the venue.`,
     payAtVenueNoPrice: 'Pay at the venue.',
+    paidBy: (price: string, method: string) => `Paid ${price} by ${method}.`,
+    holdExpired: 'Your hold ended',
+    holdExpiredBody: (spaceAndTime: string) => `Your hold on ${spaceAndTime} ended — book again if you still want it.`,
+    paymentRejected: "Not confirmed — we couldn't find your payment",
+    contactUsOn: (phone: string) => `If you did send money, contact us on ${phone}.`,
+    contactTheVenue: 'If you did send money, contact the venue.',
     update: 'Update',
     openPlay: 'Open play',
     team: (n: number) => `Team ${n}`,
@@ -989,6 +995,21 @@ export const en = {
     bkash: 'bKash',
     nagad: 'Nagad',
     closed: 'Online booking opens soon — call or visit us.',
+    teamEmail: {
+      title: 'A payment to check',
+      subject: (player: string, space: string, when: string, amount: string, method: string, trxId: string) =>
+        `Payment to check: ${player}, ${space}, ${when}, ${amount} by ${method} (TrxID ${trxId})`,
+      body: (player: string, space: string, when: string, amount: string, method: string, trxId: string) =>
+        `${player} says they sent ${amount} by ${method} for ${space}, ${when}. Transaction ID: ${trxId}. Check your ${method} messages, then confirm or reject it.`,
+      button: 'Payments to check',
+    },
+    numbersEmail: {
+      title: 'The payment numbers were changed',
+      subject: (venue: string) => `${venue}: the bKash/Nagad numbers for online bookings were changed`,
+      notSet: 'not set',
+      changedBy: (name: string) => `Changed by ${name}.`,
+      button: 'See them on the Brand page',
+    },
     errors: {
       method: 'Choose bKash or Nagad.',
       senderPhone: 'Type the 11-digit number you sent from (01XXXXXXXXX).',

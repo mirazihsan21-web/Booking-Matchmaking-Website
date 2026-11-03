@@ -49,6 +49,7 @@ begin
                                   'starts_at', lower(v_booking.period), 'ends_at', upper(v_booking.period), 'price_poisha', v_booking.price_poisha);
 
   if p_decision = 'confirm' then
+    v_payload := v_payload || jsonb_build_object('paid_method', v_claim.method); -- "Paid ৳X by bKash", not "pay at the venue"
     update public.resource_bookings set status = 'confirmed' where id = p_booking_id;
     insert into public.payments (resource_booking_id, amount_poisha, method, reference, taken_by)
     values (p_booking_id, v_claim.amount_poisha, v_claim.method, v_claim.trx_id, p_user_id);

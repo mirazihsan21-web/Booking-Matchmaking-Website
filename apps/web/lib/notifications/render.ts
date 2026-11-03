@@ -19,7 +19,9 @@ export type NotificationKind =
   | 'chat_join_left'
   | 'chat_card_closed'
   | 'chat_game_cancelled'
-  | 'chat_private_message';
+  | 'chat_private_message'
+  | 'booking_hold_expired'
+  | 'booking_payment_rejected';
 
 const str = (value: unknown) => (typeof value === 'string' ? value : '');
 
@@ -58,6 +60,9 @@ function seat(payload: Record<string, unknown>): string {
 
 function price(payload: Record<string, unknown>): string {
   const poisha = Number(payload.price_poisha ?? 0);
+  // Paid online (the team confirmed a bKash or Nagad payment): say so, not "pay at the venue".
+  const method = str(payload.paid_method);
+  if (method === 'bkash' || method === 'nagad') return m.notifications.paidBy(formatBdt(poisha), m.payments[method]);
   return poisha > 0 ? m.notifications.payAtVenue(formatBdt(poisha)) : m.notifications.payAtVenueNoPrice;
 }
 
@@ -106,6 +111,16 @@ export function renderNotification(n: { kind: NotificationKind; payload: Record<
       return { title: t.chatPrivateMessage(str(n.payload.sender_name)), body: t.chatPrivateBody };
     case 'chat_game_cancelled':
       return { title: t.chatGameCancelled(str(n.payload.poster_name)), body: `${spaceAndTime(n.payload, timeZone)}.` };
+    case 'booking_hold_expired':
+      return { title: t.holdExpired, body: t.holdExpiredBody(spaceAndTime(n.payload, timeZone)) };
+    case 'booking_payment_rejected': {
+      const reason = str(n.payload.reason);
+      const phone = str(n.payload.contact_phone);
+      return {
+        title: t.paymentRejected,
+        body: `${spaceAndTime(n.payload, timeZone)}.${reason ? ` “${reason}”` : ''} ${phone ? t.contactUsOn(phone) : t.contactTheVenue}`,
+      };
+    }
     default:
       return { title: t.update, body: '' };
   }

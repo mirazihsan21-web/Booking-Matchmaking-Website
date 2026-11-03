@@ -4,6 +4,7 @@ import { bookSpace, cancelSpaceBooking, listMyBookings } from '@/lib/bookings/bo
 import { loadDeskDay } from '@/lib/manage/desk-day';
 import { claimsToCheck, claimsToCheckCount, decideClaim, holdsWaiting, payBooking, submitClaim } from '@/lib/payments/claims';
 import { paymentNumbers, setPaymentNumbers } from '@/lib/payments/numbers';
+import { ownerEmails, teamForSection } from '@/lib/payments/team-emails';
 import { createTestUser, deleteTestUser, serviceDb, type TestUser } from './helpers';
 
 // Paying for online bookings by bKash or Nagad, through the app's library: a player's request is pending with the
@@ -166,6 +167,13 @@ describe('the team decides', () => {
     expect(await decideClaim(db, { bookingId: other.bookingId, userId: people.owner.id, decision: 'reject', reason: 'Payment not found' })).toBe('rejected');
     const mine = (await listMyBookings(db, { organizationId: orgId, profileId: profileB })).past.find((b) => b.id === other.bookingId)!;
     expect(mine).toMatchObject({ status: 'cancelled', payment: 'rejected', rejectReason: 'Payment not found' });
+  });
+});
+
+describe('who hears about a payment', () => {
+  it('the owners and the staff of that section — not another section’s staff', async () => {
+    expect((await teamForSection(db, { organizationId: orgId, sectionId: turf })).sort()).toEqual([people.owner.email, people.turfStaff.email].sort());
+    expect(await ownerEmails(db, orgId)).toEqual([people.owner.email]);
   });
 });
 

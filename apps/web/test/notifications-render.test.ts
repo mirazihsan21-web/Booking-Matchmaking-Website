@@ -34,6 +34,34 @@ describe('renderNotification', () => {
     expect(renderNotification({ kind: 'booking_cancelled', payload: { ...when, by_venue: false } }, zone).title).toBe('Booking cancelled');
   });
 
+  it('confirms a booking paid online with how it was paid, not "pay at the venue"', () => {
+    expect(renderNotification({ kind: 'booking_confirmed', payload: { ...when, section_name: 'Turf', price_poisha: 250000, paid_method: 'bkash' } }, zone)).toEqual({
+      title: 'Booking confirmed',
+      body: 'Pitch 1 (Turf), Fri 23 Oct, 8pm–9pm. Paid ৳2,500 by bKash.',
+    });
+    expect(renderNotification({ kind: 'booking_confirmed', payload: { ...when, price_poisha: 250000, paid_method: 'nagad' } }, zone).body).toBe(
+      'Pitch 1, Fri 23 Oct, 8pm–9pm. Paid ৳2,500 by Nagad.',
+    );
+  });
+
+  it('says a hold ended', () => {
+    expect(renderNotification({ kind: 'booking_hold_expired', payload: { ...when, section_name: 'Turf' } }, zone)).toEqual({
+      title: 'Your hold ended',
+      body: 'Your hold on Pitch 1 (Turf), Fri 23 Oct, 8pm–9pm ended — book again if you still want it.',
+    });
+  });
+
+  it('says a payment wasn’t found, why, and how to reach the venue', () => {
+    expect(
+      renderNotification({ kind: 'booking_payment_rejected', payload: { ...when, section_name: 'Turf', reason: 'Payment not found', contact_phone: '01712345678' } }, zone),
+    ).toEqual({
+      title: "Not confirmed — we couldn't find your payment",
+      body: 'Pitch 1 (Turf), Fri 23 Oct, 8pm–9pm. “Payment not found” If you did send money, contact us on 01712345678.',
+    });
+    expect(renderNotification({ kind: 'booking_payment_rejected', payload: { ...when, reason: null, contact_phone: null } }, zone).body).toBe(
+      'Pitch 1, Fri 23 Oct, 8pm–9pm. If you did send money, contact the venue.',
+    );
+  });
 });
 
 describe('renderNotification for open play', () => {

@@ -5,7 +5,7 @@
 -- Org …38a0: turf f1 (Pitch 1 ৳2,500/h), café f2. Owner b1, turf staff b2, café staff b3, players b4/c4 and b5/c5.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(30);
+select plan(31);
 
 create function pg_temp.id(suffix text) returns uuid language sql as $$ select ('00000000-0000-4000-8000-0000000038' || suffix)::uuid $$;
 create function pg_temp.at(days int, hhmm text) returns timestamptz language sql as $$
@@ -56,6 +56,8 @@ select row_eq(
   format($$ select status, decided_by from public.payment_claims where booking_id = %L $$, pg_temp.k('one')),
   row('confirmed'::text, pg_temp.id('b2')), 'the claim says who confirmed it');
 select is((select count(*)::int from public.notifications where profile_id = pg_temp.id('c4') and kind = 'booking_confirmed'), 1, 'the player hears it''s booked');
+select is((select payload ->> 'paid_method' from public.notifications where profile_id = pg_temp.id('c4') and kind = 'booking_confirmed'), 'bkash',
+  'and that it was paid by bKash (not "pay at the venue")');
 select is(public.decide_payment_claim(pg_temp.k('one'), pg_temp.id('b1'), 'confirm'), 'not_pending', 'deciding again changes nothing');
 select is(public.set_resource_booking_status(pg_temp.k('two'), 'attended'), 'invalid', 'a pending booking can''t be marked Arrived');
 
