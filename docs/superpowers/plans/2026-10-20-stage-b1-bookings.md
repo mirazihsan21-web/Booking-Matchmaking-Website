@@ -33,7 +33,7 @@
 
 ## Global Constraints
 
-- **Branch.** Work on `stage-b1-bookings`, cut from `stage-b-design` (which holds the spec and this plan). Every commit message ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- **Branch.** Work on `stage-b1-bookings`, cut from `stage-b-design` (which holds the spec and this plan).
 - **Migrations.**
   - Create each one with `pnpm exec supabase migration new <name>`; never edit an existing migration.
   - Apply it with `pnpm exec supabase migration up --local`. **Don't run `db:reset` casually**: the local DB holds the demo venue.

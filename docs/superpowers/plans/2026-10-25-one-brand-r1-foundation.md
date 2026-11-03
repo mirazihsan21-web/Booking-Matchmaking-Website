@@ -19,7 +19,6 @@
 ## Global Constraints
 
 - **Branch** `one-brand-r1`, cut from `one-brand-design` (which holds the spec and this plan).
-  - Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
   - Run `git branch --show-current` before every commit; another session once shared this folder (memory.md §6).
 - **Local stack only:** start Docker Desktop, `pnpm db:start`, then `pnpm env:local` (switches `apps/web/.env.local` from the hosted project to local).
   - This plan does not touch the hosted project.

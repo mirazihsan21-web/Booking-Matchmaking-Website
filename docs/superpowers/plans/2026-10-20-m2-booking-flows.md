@@ -26,7 +26,7 @@
 
 ## Global Constraints
 
-- Work on branch `m2-booking-flows`, created from `main`. Every commit message ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Work on branch `m2-booking-flows`, created from `main`.
 - **Never edit the M1 migrations.** Every schema change is a new file created with `pnpm exec supabase migration new <name>` (the CLI picks the timestamp).
 - **Every new table or function gets explicit `grant`/`revoke` statements.** Nothing relies on default privileges. Every new function gets `set search_path = ''`. Booking RPCs: `security invoker`, execute granted to `service_role` only.
 - **Secrets stay on the server.** The service client lives in `apps/web/lib/booking/service-client.ts`, which starts with `import 'server-only'`. Client components never import it. The secret key is never in a `NEXT_PUBLIC_` variable.

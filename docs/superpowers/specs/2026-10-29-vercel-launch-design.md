@@ -70,14 +70,14 @@ the brand Gmail; the job timer runs every minute against the live site.
 - **Pre-launch check:** the hosted outbox is checked for undelivered old emails; any found are reported to the
   developer before the timer starts (not deleted silently).
 - **Pointing it at the site:** the hosted Vault gets `app_url = https://chattoturf.vercel.app` and
-  `job_secret` = the Vercel `JOB_SECRET`, written by `pnpm env:vercel` through the Supabase CLI (if Claude
-  Code's permission check blocks a live-database write, the developer runs that step with `!`).
+  `job_secret` = the Vercel `JOB_SECRET`, written by `pnpm env:vercel` through the Supabase CLI (if the coding
+  assistant's permission check blocks a live-database write, the developer runs that step with `!`).
 - **Emergency stop:** remove `app_url` from the Vault; the site keeps working.
 
 ## 5. Launch order
 
 1. (developer) Create the brand Gmail, turn on 2-Step Verification, create an App Password.
-2. (developer) `vercel login`; Claude creates and links the `chattoturf` project.
+2. (developer) `vercel login`; the assistant creates and links the `chattoturf` project.
 3. `pnpm env:vercel` — Vercel production variables and the hosted Vault (the developer types the Gmail App Password).
 4. (developer, via `!`) `pnpm exec supabase db push --yes` — the timer migration.
 5. (developer) Supabase dashboard: URL configuration, custom SMTP, invite template.

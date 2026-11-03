@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Work on branch `r3-manage-area`; check `git branch --show-current` before every commit; end commit messages with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Work on branch `r3-manage-area`; check `git branch --show-current` before every commit.
 - Next.js 16 with `cacheComponents: true`: request data (cookies, `searchParams`, `new Date()` before dynamic data) only inside `<Suspense>`; read `apps/web/node_modules/next/dist/docs` before using an unfamiliar API.
 - Schema changes are new migration files only. A migration that changes an existing function copies its **current** definition (`select pg_get_functiondef('public.<fn>'::regprocedure)` on the local DB) and edits that.
 - No `security definer` in `public`; explicit grants; `pnpm db:lint` (advisors) stays clean.

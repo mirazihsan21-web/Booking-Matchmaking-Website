@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Branch `players-chat`. Run `git branch --show-current` before every commit. Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Branch `players-chat`. Run `git branch --show-current` before every commit.
 - Every user-facing string lives in `apps/web/messages/en.ts` (new blocks `m.chat` and `m.manage.chat`); no literals in components.
 - SQL functions in `public` are `language plpgsql security invoker set search_path = ''`, `revoke execute … from public, anon, authenticated`, `grant execute … to service_role`. **No `security definer` in `public`**; RLS helpers that need it go in `private`.
 - Every foreign key to a tenant table includes `organization_id` (composite `(x_id, organization_id)`; `supabase/tests/database/06_tenant_refs.test.sql` enforces it). Every new table gets `unique (id, organization_id)` when other tables point at it.

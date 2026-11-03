@@ -19,7 +19,7 @@
 - Vercel builds with the repo's pnpm (`packageManager: pnpm@12.14.0`) through `ENABLE_EXPERIMENTAL_COREPACK=1` — a 14th, non-secret variable beside the spec's 13 — and Node 24 from `apps/web/package.json` `"engines": { "node": "24.x" }`.
 - Email: `EMAIL_TRANSPORT=smtp`, `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `EMAIL_FROM=Chattoturf <brand gmail>`; `RESEND_API_KEY` unset.
 - Secrets (`SUPABASE_SECRET_KEY`, `JOB_SECRET`, `SMTP_PASS`) are never printed, logged, committed or put on a command line; scripts print variable names only.
-- Writes to the live database may be blocked by Claude Code's permission check — the developer then runs the exact command with `!`.
+- Writes to the live database may be blocked by the coding assistant's permission check — the developer then runs the exact command with `!`.
 - E2E and integration tests stay on the local stack; nothing writes real data automatically.
 
 ## Review Focus
@@ -88,10 +88,10 @@
 
 ### Task 4: Launch
 
-Runs **after** the whole-branch review of Tasks 1–3, its fix pass, and the merge to `main` (finishing-a-development-branch) — the launch deploys `main`. No code. Steps marked (dev) are done by the developer in their own accounts; Claude gives exact values and verifies.
+Runs **after** the whole-branch review of Tasks 1–3, its fix pass, and the merge to `main` (finishing-a-development-branch) — the launch deploys `main`. No code. Steps marked (dev) are done by the developer in their own accounts; the assistant gives exact values and verifies.
 
 - [ ] **Step 1: (dev)** Brand Gmail with 2-Step Verification and an App Password.
-- [ ] **Step 2: (dev)** `! pnpm dlx vercel@65.4.0 login`. Then Claude: create/link the project from `apps/web` (`vercel link`, project name `chattoturf`, root directory `apps/web`, connect the GitHub repo), and read the assigned production domain — Expected: a `*.vercel.app` host; it is THE host from here on.
+- [ ] **Step 2: (dev)** `! pnpm dlx vercel@65.4.0 login`. Then the assistant: create/link the project from `apps/web` (`vercel link`, project name `chattoturf`, root directory `apps/web`, connect the GitHub repo), and read the assigned production domain — Expected: a `*.vercel.app` host; it is THE host from here on.
 - [ ] **Step 3:** `pnpm env:vercel --host <host> --gmail <address>` (dev types the App Password) — Expected: the 13 names listed; "Vault: app_url, job_secret set" (if the Vault write is blocked, dev runs the printed command with `!`). **Before it,** count the hosted outbox: `pnpm exec supabase db query --linked "select email_status, count(*) from public.notifications group by 1"` — Expected: no `pending`/`sending` rows; any found are reported to the developer and the launch waits for their call.
 - [ ] **Step 4: (dev)** `! pnpm exec supabase db push --yes` — Expected: `20261029010000_launch_timer.sql` applied.
 - [ ] **Step 5: (dev)** Supabase dashboard (Auth → URL Configuration; Auth → SMTP Settings; Auth → Email Templates → Invite user; Auth → Rate Limits → emails 100/h) and Google Cloud (Audience → Publish app), with the README values.

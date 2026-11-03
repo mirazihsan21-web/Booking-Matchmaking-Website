@@ -20,7 +20,7 @@
 
 ## Global Constraints
 
-- **Branch and commits.** Work on branch `stage-a-platform-foundation`, cut from `main`. Every commit message ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- **Branch and commits.** Work on branch `stage-a-platform-foundation`, cut from `main`.
 - **Migrations.**
   - Create each one with `pnpm exec supabase migration new <name>`. Never edit an existing migration file.
   - Every table enables RLS **in the migration that creates it**.

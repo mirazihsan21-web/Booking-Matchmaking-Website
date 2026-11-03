@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Branch `players-chat-c2`. Run `git branch --show-current` before every commit. Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Branch `players-chat-c2`. Run `git branch --show-current` before every commit.
 - Every user-facing string lives in `apps/web/messages/en.ts` (`m.chat`, `m.manage.chat`, `m.notifications`).
 - SQL in `public`: `security invoker`, `set search_path = ''`, revoked from `public, anon, authenticated`, granted to `service_role`. The one exception is `chat_private_unread`, which is also granted to `authenticated`: it reads under the caller's row rules. Helpers that need `security definer` go in `private`. No `security definer` in `public`.
 - Every FK to a tenant table is composite with `organization_id` (pgTAP 06). New tables get RLS and explicit grants (pgTAP 04 lists).

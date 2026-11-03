@@ -16,7 +16,7 @@
 
 ## Global Constraints
 
-- Work on branch `m1-foundation`, created from `main` before Task 1. Every commit message ends with the trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Work on branch `m1-foundation`, created from `main` before Task 1.
 - Use `"type": "module"` and TS `strict: true` everywhere. Workspace packages are consumed as TS source (`"exports": { ".": "./src/index.ts" }`), with no build step.
 - Package names: `@bm/engine`, `@bm/sim`, `web`.
 - `@bm/engine` has **zero runtime dependencies** and no I/O. It never calls `Math.random()` or `Date.now()`; all randomness comes from `createRng(seed)`.

@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Branch `team-and-player-accounts`; run `git branch --show-current` before every commit. Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Branch `team-and-player-accounts`; run `git branch --show-current` before every commit.
 - Before writing Next.js code, read the matching guide in `apps/web/node_modules/next/dist/docs/` (AGENTS.md: this Next.js differs from training data).
 - Tests run on the LOCAL stack: `pnpm env:local` (from `apps/web`), local Docker/Supabase up (`pnpm db:start`), dev server restarted. At the very end switch back: `pnpm env:hosted` and restart the dev server.
 - Restart the dev server after any `messages/en.ts` change.

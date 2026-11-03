@@ -124,7 +124,7 @@ A colour an owner changed by hand is left alone. Nothing else in the schema chan
   profile flows unchanged.
 - **pgTAP:** `kind_accent` defaults; the migration updates only sections still on an old default.
 - **End to end (spec R2 "done when"):** in a real browser a player signs in **once**, then books a space and joins a
-  game **in each of the three sections**. Driven by a script (Claude Code's browser tool makes `next dev` reload in a
+  game **in each of the three sections**. Driven by a script (the coding assistant's browser tool makes `next dev` reload in a
   loop), then clicked through by the user.
 - **Done when:** the end-to-end check passes; the full suite is green (typecheck, lint, build, unit, pgTAP, advisors,
   race, integration, replay diff); pages match A1 at phone and desktop width; removed pages are gone; a fresh

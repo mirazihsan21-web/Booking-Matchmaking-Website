@@ -30,7 +30,7 @@ Notes: `memory.md`.
 
 ## Global Constraints
 
-- **Branch** `stage-b2-open-play`, cut from `main`. Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- **Branch** `stage-b2-open-play`, cut from `main`.
 - **Migrations are new files, hand-named after `20261021010100`** (the CLI's clock-stamped names sort too early; see memory.md §3). Apply them with `pnpm exec supabase migration up --local`, and prove from-scratch replay with `pnpm exec supabase db diff --local --schema public` → `No schema changes found`. Don't run `db:reset` casually.
 - **The B1 rules carry over:**
   - RLS on every new table, with explicit grants and one policy per action.

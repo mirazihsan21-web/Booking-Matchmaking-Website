@@ -23,7 +23,7 @@
 - Photos: `public/sections/{turf,cafe,lounge}.jpg`, ≤ 250 KB, ~1600 px wide, Unsplash or Pexels licence, recorded in `public/sections/CREDITS.md`.
 - Migrations are new files; a recreated function copies its latest definition (generated, asserted substitutions).
 - Server actions establish who is asking before using the service client; no new data access is opened to anon.
-- Never drive pages with Claude Code's Playwright MCP browser (its `.playwright-mcp/` logs make `next dev` reload forever); use scripts or the e2e suite, whose output goes to the OS temp dir.
+- Never drive pages with the coding assistant's Playwright MCP browser (its `.playwright-mcp/` logs make `next dev` reload forever); use scripts or the e2e suite, whose output goes to the OS temp dir.
 
 ## Review Focus
 
