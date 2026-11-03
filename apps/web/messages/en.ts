@@ -985,6 +985,16 @@ export const en = {
       too_many_photos: "That's 10 photos this hour — try again later.",
     },
   },
+  payments: {
+    bkash: 'bKash',
+    nagad: 'Nagad',
+    closed: 'Online booking opens soon — call or visit us.',
+    errors: {
+      method: 'Choose bKash or Nagad.',
+      senderPhone: 'Type the 11-digit number you sent from (01XXXXXXXXX).',
+      trxId: 'Type the transaction ID from your bKash or Nagad message (6–20 letters and numbers).',
+    },
+  },
 };
 
 export type Messages = typeof en;

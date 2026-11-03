@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { redirect } from "next/navigation";
 import type { FormState } from "@/components/forms/action-form";
 import { bookSpace } from "@/lib/bookings/bookings";
 import { sectionOfResource } from "@/lib/sections/sections";
@@ -35,6 +36,10 @@ export async function bookSpaceAction(resourceId: string, _state: FormState, for
   switch (result.status) {
     case "booked":
       return { ok: true, message: m.bookings.booked };
+    case "pending":
+      redirect(`/me/bookings/${result.bookingId}/pay`); // held: send the money and the details
+    case "payment_closed":
+      return { ok: false, message: m.payments.closed };
     case "taken":
       return { ok: false, message: m.bookings.taken };
     case "already_yours":

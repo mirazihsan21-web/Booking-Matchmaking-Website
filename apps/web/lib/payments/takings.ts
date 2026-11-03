@@ -3,7 +3,11 @@ import { parseTstzRange } from '@/lib/bookings/bookings';
 import { addDays, businessDayWindow } from '@/lib/bookings/slots';
 import { loadSections, type Section } from '@/lib/sections/sections';
 
-/** One section's day: space bookings and game seats that start that business day (not cancelled), who came, and the cash taken. */
+/**
+ * One section's day: space bookings and game seats that start that business day (booked — not cancelled, and not
+ * an online request still waiting for its payment check), who came, and the money taken: cash at the desk, and
+ * bKash / Nagad payments the team confirmed.
+ */
 export interface TakingsRow {
   sectionId: string;
   bookings: number;
@@ -11,7 +15,11 @@ export interface TakingsRow {
   arrived: number;
   noShows: number;
   cashPoisha: number;
+  bkashPoisha: number;
+  nagadPoisha: number;
 }
+
+export type PaymentMethod = 'cash' | 'bkash' | 'nagad';
 
 type Totals = Omit<TakingsRow, 'sectionId'>;
 type Timed = { sectionId: string; start: Date; status: string };
@@ -26,12 +34,14 @@ export function takingsFromRows(input: {
   timeZone: string;
   spaceBookings: Timed[];
   seats: Timed[];
-  payments: Array<{ sectionId: string; takenAt: Date; amountPoisha: number }>;
+  payments: Array<{ sectionId: string; takenAt: Date; amountPoisha: number; method: PaymentMethod }>;
 }): { rows: TakingsRow[]; total: Totals } {
   const rows = input.sections.map((section): TakingsRow => {
     const { start, end } = businessDayWindow(section.openingHours, input.date, input.timeZone);
     const within = (t: Date) => t >= start && t < end;
-    const counted = (list: Timed[]) => list.filter((b) => b.sectionId === section.id && within(b.start) && b.status !== 'cancelled');
+    const counted = (list: Timed[]) => list.filter((b) => b.sectionId === section.id && within(b.start) && b.status !== 'cancelled' && b.status !== 'pending');
+    const taken = (method: PaymentMethod) =>
+      input.payments.filter((p) => p.sectionId === section.id && p.method === method && within(p.takenAt)).reduce((sum, p) => sum + p.amountPoisha, 0);
     const bookings = counted(input.spaceBookings);
     const seats = counted(input.seats);
     const both = [...bookings, ...seats];
@@ -41,12 +51,22 @@ export function takingsFromRows(input: {
       seats: seats.length,
       arrived: both.filter((b) => b.status === 'attended').length,
       noShows: both.filter((b) => b.status === 'no_show').length,
-      cashPoisha: input.payments.filter((p) => p.sectionId === section.id && within(p.takenAt)).reduce((sum, p) => sum + p.amountPoisha, 0),
+      cashPoisha: taken('cash'),
+      bkashPoisha: taken('bkash'),
+      nagadPoisha: taken('nagad'),
     };
   });
   const total = rows.reduce<Totals>(
-    (t, r) => ({ bookings: t.bookings + r.bookings, seats: t.seats + r.seats, arrived: t.arrived + r.arrived, noShows: t.noShows + r.noShows, cashPoisha: t.cashPoisha + r.cashPoisha }),
-    { bookings: 0, seats: 0, arrived: 0, noShows: 0, cashPoisha: 0 },
+    (t, r) => ({
+      bookings: t.bookings + r.bookings,
+      seats: t.seats + r.seats,
+      arrived: t.arrived + r.arrived,
+      noShows: t.noShows + r.noShows,
+      cashPoisha: t.cashPoisha + r.cashPoisha,
+      bkashPoisha: t.bkashPoisha + r.bkashPoisha,
+      nagadPoisha: t.nagadPoisha + r.nagadPoisha,
+    }),
+    { bookings: 0, seats: 0, arrived: 0, noShows: 0, cashPoisha: 0, bkashPoisha: 0, nagadPoisha: 0 },
   );
   return { rows, total };
 }
@@ -65,7 +85,7 @@ export async function takingsDay(
   const [spaces, sessions, payments] = await Promise.all([
     db.from('resource_bookings').select('period, status, resources!inner(section_id)').eq('organization_id', input.organizationId).overlaps('period', `[${from},${to})`),
     db.from('open_play_sessions').select('id, section_id, starts_at').eq('organization_id', input.organizationId).gte('starts_at', from).lt('starts_at', to),
-    db.from('payments').select('section_id, taken_at, amount_poisha').eq('organization_id', input.organizationId).is('voided_at', null).gte('taken_at', from).lt('taken_at', to),
+    db.from('payments').select('section_id, taken_at, amount_poisha, method').eq('organization_id', input.organizationId).is('voided_at', null).gte('taken_at', from).lt('taken_at', to),
   ]);
   for (const r of [spaces, sessions, payments]) if (r.error) throw r.error;
   const sessionOf = new Map((sessions.data ?? []).map((s) => [s.id as string, { sectionId: s.section_id as string, start: new Date(s.starts_at as string) }]));
@@ -84,16 +104,24 @@ export async function takingsDay(
       status: b.status as string,
     })),
     seats: (seatRows.data ?? []).map((b) => ({ ...sessionOf.get(b.session_id as string)!, status: b.status as string })),
-    payments: (payments.data ?? []).map((p) => ({ sectionId: p.section_id as string, takenAt: new Date(p.taken_at as string), amountPoisha: p.amount_poisha as number })),
+    payments: (payments.data ?? []).map((p) => ({
+      sectionId: p.section_id as string,
+      takenAt: new Date(p.taken_at as string),
+      amountPoisha: p.amount_poisha as number,
+      method: p.method as PaymentMethod,
+    })),
   });
 }
 
-/** The cash taken on each of the seven business days ending `endDate`, newest first. */
+/** The money taken (cash, bKash, Nagad) on each of the seven business days ending `endDate`, newest first. */
 export async function takingsWeek(
   db: SupabaseClient,
   input: { organizationId: string; endDate: string; timeZone: string },
-): Promise<Array<{ date: string; cashPoisha: number }>> {
+): Promise<Array<{ date: string; cashPoisha: number; bkashPoisha: number; nagadPoisha: number }>> {
   const dates = Array.from({ length: 7 }, (_, i) => addDays(input.endDate, -i));
   const days = await Promise.all(dates.map((date) => takingsDay(db, { organizationId: input.organizationId, date, timeZone: input.timeZone })));
-  return dates.map((date, i) => ({ date, cashPoisha: days[i]!.total.cashPoisha }));
+  return dates.map((date, i) => {
+    const { cashPoisha, bkashPoisha, nagadPoisha } = days[i]!.total;
+    return { date, cashPoisha, bkashPoisha, nagadPoisha };
+  });
 }

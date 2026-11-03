@@ -4,7 +4,8 @@ import { bookSpace, sectionDay, cancelSpaceBooking, listMyBookings, setSpaceBook
 import { createTestUser, deleteTestUser, serviceDb, type TestUser } from './helpers';
 
 // A fresh venue (Dhaka time, defaults: 14-day window, 2-hour cancel cut-off; limit raised to 10 so it
-// doesn't interfere). Main branch 10:00–23:00 with Pitch 1 and Pitch 2; Late branch 14:00–02:00 with
+// doesn't interfere). Its spaces are priced at the venue, so a player's booking is instant — paying online for a
+// priced space (pending until the team confirms) is tested in payment-claims.test.ts. Main branch 10:00–23:00 with Pitch 1 and Pitch 2; Late branch 14:00–02:00 with
 // Zone L. "Now" for the TypeScript checks is Tue 20 Oct 2026, 12:00 in Dhaka.
 const db = serviceDb();
 const now = new Date('2026-10-20T06:00:00Z');
@@ -69,10 +70,10 @@ beforeAll(async () => {
     await db
       .from('resources')
       .insert([
-        { organization_id: orgId, section_id: mainBranch, name: 'Pitch 1', kind: 'pitch', capacity: 14, price_per_hour_poisha: 250000 },
-        { organization_id: orgId, section_id: mainBranch, name: 'Pitch 2', kind: 'pitch', capacity: 14, price_per_hour_poisha: 250000 },
-        { organization_id: orgId, section_id: lateBranch, name: 'Zone L', kind: 'zone', capacity: 10, price_per_hour_poisha: 150000 },
-        { organization_id: orgId, section_id: cafe, name: 'Table C', kind: 'table', capacity: 4, price_per_hour_poisha: 50000 },
+        { organization_id: orgId, section_id: mainBranch, name: 'Pitch 1', kind: 'pitch', capacity: 14, price_per_hour_poisha: null },
+        { organization_id: orgId, section_id: mainBranch, name: 'Pitch 2', kind: 'pitch', capacity: 14, price_per_hour_poisha: null },
+        { organization_id: orgId, section_id: lateBranch, name: 'Zone L', kind: 'zone', capacity: 10, price_per_hour_poisha: null },
+        { organization_id: orgId, section_id: cafe, name: 'Table C', kind: 'table', capacity: 4, price_per_hour_poisha: null },
       ])
       .select('id, name'),
   );

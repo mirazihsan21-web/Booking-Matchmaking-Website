@@ -19,25 +19,28 @@ describe('takingsFromRows', () => {
       { sectionId: 'turf', start: dhaka('2026-10-28T18:00:00'), status: 'attended' },
       { sectionId: 'turf', start: dhaka('2026-10-28T20:00:00'), status: 'no_show' },
       { sectionId: 'turf', start: dhaka('2026-10-28T21:00:00'), status: 'cancelled' },
+      { sectionId: 'turf', start: dhaka('2026-10-28T19:00:00'), status: 'pending' }, // not booked until the team confirms
       { sectionId: 'turf', start: dhaka('2026-10-29T12:00:00'), status: 'confirmed' }, // the next day
       { sectionId: 'lounge', start: dhaka('2026-10-29T00:30:00'), status: 'confirmed' }, // still the 28th's night
     ],
     seats: [{ sectionId: 'lounge', start: dhaka('2026-10-28T21:00:00'), status: 'attended' }],
     payments: [
-      { sectionId: 'turf', takenAt: dhaka('2026-10-28T18:05:00'), amountPoisha: 60000 },
-      { sectionId: 'lounge', takenAt: dhaka('2026-10-29T01:00:00'), amountPoisha: 15000 }, // after midnight: the 28th (spec edge 4)
-      { sectionId: 'turf', takenAt: dhaka('2026-10-29T01:00:00'), amountPoisha: 99900 }, // turf closed at 23:00: the 29th
+      { sectionId: 'turf', takenAt: dhaka('2026-10-28T18:05:00'), amountPoisha: 60000, method: 'cash' },
+      { sectionId: 'lounge', takenAt: dhaka('2026-10-29T01:00:00'), amountPoisha: 15000, method: 'cash' }, // after midnight: the 28th (spec edge 4)
+      { sectionId: 'turf', takenAt: dhaka('2026-10-29T01:00:00'), amountPoisha: 99900, method: 'cash' }, // turf closed at 23:00: the 29th
+      { sectionId: 'turf', takenAt: dhaka('2026-10-28T19:10:00'), amountPoisha: 250000, method: 'bkash' }, // a confirmed online payment
+      { sectionId: 'lounge', takenAt: dhaka('2026-10-28T22:00:00'), amountPoisha: 40000, method: 'nagad' },
     ],
   });
 
-  it('counts each section on its own business day', () => {
+  it('counts each section on its own business day, money by how it was paid', () => {
     expect(rows.rows).toEqual([
-      { sectionId: 'turf', bookings: 2, seats: 0, arrived: 1, noShows: 1, cashPoisha: 60000 },
-      { sectionId: 'lounge', bookings: 1, seats: 1, arrived: 1, noShows: 0, cashPoisha: 15000 },
+      { sectionId: 'turf', bookings: 2, seats: 0, arrived: 1, noShows: 1, cashPoisha: 60000, bkashPoisha: 250000, nagadPoisha: 0 },
+      { sectionId: 'lounge', bookings: 1, seats: 1, arrived: 1, noShows: 0, cashPoisha: 15000, bkashPoisha: 0, nagadPoisha: 40000 },
     ]);
   });
 
   it('adds up a total', () => {
-    expect(rows.total).toEqual({ bookings: 3, seats: 1, arrived: 2, noShows: 1, cashPoisha: 75000 });
+    expect(rows.total).toEqual({ bookings: 3, seats: 1, arrived: 2, noShows: 1, cashPoisha: 75000, bkashPoisha: 250000, nagadPoisha: 40000 });
   });
 });

@@ -17,6 +17,9 @@ const booking = (startsIn: number, status = 'confirmed', resourceName = 'Pitch 1
   status,
   cancellable: true,
   paid: false,
+  payment: null,
+  holdUntil: null,
+  rejectReason: null,
 });
 
 const seat = (startsIn: number, status = 'confirmed', activityName = '7-a-side football'): MySeat => ({

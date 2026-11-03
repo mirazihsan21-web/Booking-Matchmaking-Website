@@ -94,7 +94,7 @@ describe('takingsWeek', () => {
   it('lists seven days, today first', async () => {
     const week = await takingsWeek(db, { organizationId: orgId, endDate: today, timeZone: TZ });
     expect(week).toHaveLength(7);
-    expect(week[0]).toEqual({ date: today, cashPoisha: 130000 });
+    expect(week[0]).toEqual({ date: today, cashPoisha: 130000, bkashPoisha: 0, nagadPoisha: 0 });
     expect(week[6]!.cashPoisha).toBe(0);
   });
 });

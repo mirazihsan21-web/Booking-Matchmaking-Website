@@ -19,6 +19,8 @@ export interface DeskBooking {
   end: Date;
   pricePoisha: number;
   payment: { id: string; amountPoisha: number } | null;
+  /** An online request's payment details, once the player has sent them (status `pending`). */
+  claim: { method: 'bkash' | 'nagad'; senderPhone: string; trxId: string } | null;
 }
 
 /** A game that day: the spaces it holds and how full it is. `name` is null when players pick the game. */
@@ -60,7 +62,7 @@ export async function loadDeskDay(
   const raw = sections.map((section, i) => ({
     section,
     spaces: (days[i] ?? []).map((day) => {
-      const seen = new Map<string, Omit<DeskBooking, 'pricePoisha' | 'payment'>>();
+      const seen = new Map<string, Omit<DeskBooking, 'pricePoisha' | 'payment' | 'claim'>>();
       for (const b of [...day.slots.flatMap((slot) => slot.bookings ?? []), ...(day.extra ?? [])]) {
         if (!seen.has(b.id)) seen.set(b.id, { kind: 'space', id: b.id, resourceId: day.resource.id, name: b.name, phone: b.phone, status: b.status, start: b.start, end: b.end });
       }
@@ -68,24 +70,35 @@ export async function loadDeskDay(
     }),
   }));
   const bookingIds = raw.flatMap((s) => s.spaces.flatMap((sp) => sp.bookings.map((b) => b.id)));
-  const [prices, payments] = await Promise.all([
+  const [prices, payments, claims] = await Promise.all([
     bookingIds.length ? db.from('resource_bookings').select('id, price_poisha').in('id', bookingIds) : Promise.resolve({ data: [], error: null }),
     livePayments(db, { spaceBookingIds: bookingIds, seatBookingIds: [] }),
+    bookingIds.length
+      ? db.from('payment_claims').select('booking_id, method, sender_phone, trx_id').eq('status', 'submitted').in('booking_id', bookingIds)
+      : Promise.resolve({ data: [], error: null }),
   ]);
   if (prices.error) throw prices.error;
+  if (claims.error) throw claims.error;
   const priceOf = new Map((prices.data ?? []).map((r) => [r.id as string, r.price_poisha as number]));
+  const claimOf = new Map(
+    (claims.data ?? []).map((c) => [
+      c.booking_id as string,
+      { method: c.method as 'bkash' | 'nagad', senderPhone: c.sender_phone as string, trxId: c.trx_id as string },
+    ]),
+  );
   const result = raw.map(({ section, spaces }) => ({
     section,
     spaces: spaces.map((sp) => ({
       ...sp,
       bookings: sp.bookings
-        .map((b): DeskBooking => ({ ...b, pricePoisha: priceOf.get(b.id) ?? 0, payment: payments.get(b.id) ?? null }))
+        .map((b): DeskBooking => ({ ...b, pricePoisha: priceOf.get(b.id) ?? 0, payment: payments.get(b.id) ?? null, claim: claimOf.get(b.id) ?? null }))
         .sort((a, b) => a.start.getTime() - b.start.getTime()),
     })),
   }));
 
   const games = await loadGames(db, { organizationId: input.organizationId, sections, date: input.date, timeZone: input.timeZone });
-  const bookings = result.flatMap((s) => s.spaces.flatMap((sp) => sp.bookings)).filter((b) => b.status !== 'cancelled');
+  // Booked ones only: a request still waiting for its payment check isn't a booking yet.
+  const bookings = result.flatMap((s) => s.spaces.flatMap((sp) => sp.bookings)).filter((b) => b.status !== 'cancelled' && b.status !== 'pending');
   const takings = await takingsDay(db, { organizationId: input.organizationId, date: input.date, timeZone: input.timeZone });
   return {
     window: deskWindow(sections, input.date, input.timeZone),

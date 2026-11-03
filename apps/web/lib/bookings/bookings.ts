@@ -22,6 +22,10 @@ export type BookSpaceInput = {
 
 export type BookSpaceResult =
   | { status: 'booked'; bookingId: string }
+  /** A player's online booking of a priced space: held 15 minutes while they pay by bKash or Nagad. */
+  | { status: 'pending'; bookingId: string }
+  /** …but the brand has no bKash or Nagad number yet, so it can't be requested. */
+  | { status: 'payment_closed' }
   | { status: 'taken' }
   | { status: 'already_yours' }
   | { status: 'limit_reached' }
@@ -55,8 +59,16 @@ export interface MyBooking {
   pricePoisha: number;
   status: string;
   cancellable: boolean;
-  /** Cash was taken at the desk (a live payment); the player can no longer cancel it themselves. */
+  /** Paid (cash at the desk, or bKash/Nagad the team confirmed); the player can no longer cancel it themselves. */
   paid: boolean;
+  /**
+   * An online request's payment: `hold` — held while the player sends money and the details; `sent` — waiting for
+   * the team; `rejected` — the team couldn't find it (`rejectReason` says why). Null for everything else.
+   */
+  payment: 'hold' | 'sent' | 'rejected' | null;
+  /** While held: when the hold ends. */
+  holdUntil: string | null;
+  rejectReason: string | null;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -147,11 +159,14 @@ export async function bookSpace(db: SupabaseClient, input: BookSpaceInput): Prom
     p_guest_name: guest?.guestName ?? null,
     p_guest_phone: guest?.guestPhone ?? null,
     p_created_by: input.createdBy,
+    p_by_player: input.actor === 'player',
   });
   if (error) throw error;
   const row = (data as Array<{ status: string; booking_id: string | null }>)[0]!;
 
   if (row.status === 'booked') return { status: 'booked', bookingId: row.booking_id! };
+  if (row.status === 'pending') return { status: 'pending', bookingId: row.booking_id! };
+  if (row.status === 'payment_closed') return { status: 'payment_closed' };
   if (row.status === 'limit_reached') return { status: 'limit_reached' };
   if (row.status === 'taken') {
     if (profileId) {
@@ -161,7 +176,7 @@ export async function bookSpace(db: SupabaseClient, input: BookSpaceInput): Prom
         .select('id', { count: 'exact', head: true })
         .eq('profile_id', profileId)
         .eq('resource_id', input.resourceId)
-        .eq('status', 'confirmed')
+        .in('status', ['confirmed', 'pending'])
         .overlaps('period', asRange(input.startsAt, check.endsAt));
       if ((count ?? 0) > 0) return { status: 'already_yours' };
     }
@@ -177,12 +192,20 @@ export async function cancelSpaceBooking(
   if (!UUID.test(input.bookingId)) return 'not_found';
   const { data: booking } = await db
     .from('resource_bookings')
-    .select('profile_id, period, status, resources(sections(cancel_cutoff_minutes))')
+    .select('profile_id, period, status, hold_until, resources(sections(cancel_cutoff_minutes))')
     .eq('id', input.bookingId)
     .eq('organization_id', input.organizationId)
     .maybeSingle();
   if (!booking) return 'not_found';
   if (input.actor.kind === 'player' && booking.profile_id !== input.actor.profileId) return 'not_found';
+  if (booking.status === 'pending') {
+    // A request: its player cancels it only while it's held (after sending the money they contact the venue);
+    // the team any time. No cut-off — nothing is booked yet.
+    if (input.actor.kind === 'player' && booking.hold_until === null) return 'paid';
+    const { data, error } = await db.rpc('cancel_resource_booking', { p_booking_id: input.bookingId, p_cancelled_by: input.cancelledBy });
+    if (error) throw error;
+    return data as 'cancelled' | 'not_cancellable' | 'not_found';
+  }
   if (booking.status !== 'confirmed') return 'not_cancellable';
   // Paid at the desk: only the desk cancels it (and gives the cash back).
   if (input.actor.kind === 'player' && (await livePayments(db, { spaceBookingIds: [input.bookingId], seatBookingIds: [] })).size > 0) return 'paid';
@@ -301,14 +324,23 @@ export async function listMyBookings(
   const now = input.now ?? new Date();
   const { data, error } = await db
     .from('resource_bookings')
-    .select('id, period, price_poisha, status, resources(name, section_id, sections(name, cancel_cutoff_minutes))')
+    .select('id, period, price_poisha, status, hold_until, resources(name, section_id, sections(name, cancel_cutoff_minutes))')
     .eq('profile_id', input.profileId)
     .eq('organization_id', input.organizationId);
   if (error) throw error;
+  const claimRows = data.length
+    ? await db.from('payment_claims').select('booking_id, status, reason').in('booking_id', data.map((b) => b.id))
+    : { data: [], error: null };
+  if (claimRows.error) throw claimRows.error;
+  const claimOf = new Map((claimRows.data ?? []).map((c) => [c.booking_id as string, { status: c.status as string, reason: c.reason as string | null }]));
   const all = data.map((b) => {
     const { start, end } = parseTstzRange(b.period);
     const resource = b.resources as unknown as { name: string; section_id: string; sections: { name: string; cancel_cutoff_minutes: number } | null } | null;
     const cutoff = (resource?.sections?.cancel_cutoff_minutes ?? 0) * 60_000;
+    const claim = claimOf.get(b.id);
+    const holdUntil = (b.hold_until as string | null) ?? null;
+    const rejected = b.status === 'cancelled' && claim?.status === 'rejected' && claim.reason !== 'cancelled';
+    const payment: MyBooking['payment'] = b.status === 'pending' ? (holdUntil ? 'hold' : 'sent') : rejected ? 'rejected' : null;
     return {
       id: b.id,
       resourceName: resource?.name ?? '',
@@ -318,15 +350,19 @@ export async function listMyBookings(
       endsAt: end.toISOString(),
       pricePoisha: b.price_poisha,
       status: b.status,
-      cancellable: b.status === 'confirmed' && now.getTime() < start.getTime() - cutoff,
+      cancellable: (b.status === 'confirmed' && now.getTime() < start.getTime() - cutoff) || payment === 'hold',
       paid: false,
+      payment,
+      holdUntil,
+      rejectReason: rejected ? (claim?.reason ?? null) : null,
       ended: end <= now,
     };
   });
   const live = await livePayments(db, { spaceBookingIds: all.map((b) => b.id), seatBookingIds: [] });
   for (const b of all) b.paid = live.has(b.id);
   const strip = ({ ended: _ended, ...rest }: (typeof all)[number]): MyBooking => rest;
-  const upcoming = all.filter((b) => b.status === 'confirmed' && !b.ended).sort((x, y) => x.startsAt.localeCompare(y.startsAt));
-  const past = all.filter((b) => !(b.status === 'confirmed' && !b.ended)).sort((x, y) => y.startsAt.localeCompare(x.startsAt));
+  const isUpcoming = (b: (typeof all)[number]) => (b.status === 'confirmed' || b.status === 'pending') && !b.ended;
+  const upcoming = all.filter(isUpcoming).sort((x, y) => x.startsAt.localeCompare(y.startsAt));
+  const past = all.filter((b) => !isUpcoming(b)).sort((x, y) => y.startsAt.localeCompare(x.startsAt));
   return { upcoming: upcoming.map(strip), past: past.map(strip) };
 }
