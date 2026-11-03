@@ -75,6 +75,10 @@ export function ChatRoom({
   }
 
   const scroller = useRef<HTMLDivElement>(null);
+  const blockedRef = useRef(new Set(blockedIds));
+  useEffect(() => {
+    blockedRef.current = new Set(blockedIds);
+  }, [blockedIds]);
   const below = useRef<HTMLDivElement>(null);
   const fitted = useFitHeight(scroller, below);
   const nearBottom = useRef(true);
@@ -186,8 +190,9 @@ export function ChatRoom({
     };
   }, []);
 
-  // Scrolling: stay at the bottom for new messages (or offer a button if you've scrolled up), and keep your place
-  // when older messages are added above.
+  // Scrolling: stay at the bottom for new messages (or offer a button if you've scrolled up — not for someone you
+  // blocked, whose messages are folded away), and keep your place when older messages are added above. Your own new
+  // message always brings you down; a catch-up that brings nothing new leaves you where you are.
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el) return;
@@ -197,10 +202,10 @@ export function ChatRoom({
       return;
     }
     const last = messages.at(-1);
-    const isNew = last && last.id !== newest.current?.id;
+    const isNew = Boolean(last && last.id !== newest.current?.id);
     newest.current = last;
-    if (nearBottom.current || last?.authorUserId === me.userId) el.scrollTop = el.scrollHeight;
-    else if (isNew) setUnseen(true);
+    if (nearBottom.current || (isNew && last?.authorUserId === me.userId)) el.scrollTop = el.scrollHeight;
+    else if (isNew && !(last?.authorProfileId && blockedRef.current.has(last.authorProfileId))) setUnseen(true);
   }, [messages, me.userId]);
 
   useEffect(() => {
@@ -214,15 +219,21 @@ export function ChatRoom({
     if (el && nearBottom.current) el.scrollTop = el.scrollHeight;
   }, [fitted]);
 
-  // Read up to the newest message while the tab is visible, at most every 10 seconds.
+  // Read up to the newest message while the tab is visible, at most every 10 seconds — never back to an older one.
   const lastRead = useRef(0);
+  const readUpTo = useRef("");
   const readTimer = useRef<number | null>(null);
   useEffect(() => {
     const mark = () => {
       const at = newest.current?.createdAt;
       if (!at || document.visibilityState !== "visible") return;
+      if (readUpTo.current && new Date(at) <= new Date(readUpTo.current)) return;
       lastRead.current = Date.now();
-      markRoomRead(supabase, { organizationId, userId: me.userId, at }).catch(() => undefined);
+      const before = readUpTo.current;
+      readUpTo.current = at;
+      markRoomRead(supabase, { organizationId, userId: me.userId, at }).catch(() => {
+        if (readUpTo.current === at) readUpTo.current = before; // try again next time
+      });
     };
     const wait = READ_EVERY_MS - (Date.now() - lastRead.current);
     if (wait <= 0) mark();

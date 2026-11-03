@@ -7,10 +7,11 @@ import { m } from "@/messages";
 
 /**
  * A chat photo, shown through a short-lived link the bucket's row rules allow only to people who may see its
- * message (nothing shows otherwise). Tapping opens it full size.
+ * message. Tapping opens it full size. A photo that can't be linked (deleted since, or not yours to see) says so,
+ * rather than leaving an empty space.
  */
 export function ChatPhoto({ path, alt }: { path: string; alt: string }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null | undefined>(undefined); // undefined while asking
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -26,7 +27,8 @@ export function ChatPhoto({ path, alt }: { path: string; alt: string }) {
     };
   }, [path]);
 
-  if (!url) return null;
+  if (url === undefined) return null;
+  if (url === null) return <p className="text-sm italic text-muted-foreground">{m.chat.photo.gone}</p>;
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} aria-label={m.chat.photo.open} className="self-start">

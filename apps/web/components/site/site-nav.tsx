@@ -47,8 +47,8 @@ export function SiteNav({
 }) {
   const path = usePathname();
   const on = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`));
-  const { dot: chatDot, count: chatCount } = useChatUnread(chat, on("/chat"), path);
-  const chatUnread = chatDot || chatCount > 0;
+  // The room's dot clears only in the room itself; the game and private pages count as elsewhere.
+  const { dot: chatDot, count: chatCount } = useChatUnread(chat, path === "/chat", path);
   const chatLabel = chatCount > 0 ? m.chat.linkPrivate(chatCount) : chatDot ? m.chat.linkUnread : undefined;
   const meHref = signedIn ? "/me" : "/signin";
 
@@ -116,7 +116,7 @@ export function SiteNav({
           {sections.map((s) => (
             <Tab key={s.slug} href={`/${s.slug}`} label={s.name} Icon={KIND_ICON[s.kind]} active={on(`/${s.slug}`)} accent={s.accent} />
           ))}
-          <Tab href="/chat" label={m.site.nav.chat} ariaLabel={chatLabel} Icon={MessagesSquare} active={on("/chat")} dot={chatUnread} />
+          <Tab href="/chat" label={m.site.nav.chat} ariaLabel={chatLabel} Icon={MessagesSquare} active={on("/chat")} dot={chatDot} count={chatCount} />
           {team ? (
             <Tab href="/manage" label={m.site.nav.manage} Icon={LayoutDashboard} active={on("/manage")} />
           ) : (
@@ -136,6 +136,7 @@ function Tab({
   accent,
   ariaLabel,
   dot = false,
+  count = 0,
 }: {
   href: string;
   label: string;
@@ -144,6 +145,8 @@ function Tab({
   accent?: string;
   ariaLabel?: string;
   dot?: boolean;
+  /** A number on the icon (unread private messages); without one, `dot` shows a dot. */
+  count?: number;
 }) {
   return (
     <li className="flex-1">
@@ -158,7 +161,13 @@ function Tab({
         )}
       >
         <Icon aria-hidden className="size-5" />
-        {dot && <span aria-hidden className="absolute right-1/4 top-1.5 size-2 rounded-full bg-primary" />}
+        {count > 0 ? (
+          <span aria-hidden className="absolute left-1/2 top-1 ml-1.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 text-primary-foreground">
+            {count > 9 ? "9+" : count}
+          </span>
+        ) : (
+          dot && <span aria-hidden className="absolute right-1/4 top-1.5 size-2 rounded-full bg-primary" />
+        )}
         <span className="max-w-full truncate">{label}</span>
       </Link>
     </li>

@@ -17,7 +17,9 @@ async function run(step: Step): Promise<FormState> {
   const result = await step(createServiceClient(), player.user.id);
   refresh();
   const done = m.chat.game.done[result];
-  return done ? { ok: true, message: done } : { ok: false, message: m.chat.refusal[result as ChatRefusal] };
+  if (done) return { ok: true, message: done };
+  // A block either way: say only that this game isn't open to you (not "You can't message this player").
+  return { ok: false, message: result === "blocked" ? m.chat.game.blocked : m.chat.refusal[result as ChatRefusal] };
 }
 
 /** I'm in: ask the poster to join their game. */

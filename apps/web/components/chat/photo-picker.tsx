@@ -8,7 +8,8 @@ import { m } from "@/messages";
 
 /**
  * Add a photo to a message: the file is checked and shrunk in the browser (nothing leaves the phone if it's the wrong
- * type or too big), uploaded to the sender's own folder, and its path put in a hidden `photoPath` field.
+ * type or too big), uploaded to the sender's own folder, and its path put in a hidden `photoPath` field. Busy from
+ * the moment a file is picked (a second pick waits, and so does Send); the preview's memory is let go when it goes.
  */
 export function PhotoPicker({ userId, onBusy }: { userId: string; onBusy?: (busy: boolean) => void }) {
   const [path, setPath] = useState<string | null>(null);
@@ -17,28 +18,41 @@ export function PhotoPicker({ userId, onBusy }: { userId: string; onBusy?: (busy
   const [uploading, setUploading] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
+  const busy = useRef(false);
+
   async function pick() {
     const file = input.current?.files?.[0];
     if (input.current) input.current.value = ""; // the same file can be picked again
-    if (!file) return;
+    if (!file || busy.current) return;
+    busy.current = true;
     setProblem(null);
-    const prepared = await prepareChatPhoto(file);
-    if ("problem" in prepared) {
-      setProblem(prepared.problem === "size" ? m.chat.photo.size : m.chat.photo.type);
-      return;
-    }
     setUploading(true);
     onBusy?.(true);
-    const stored = await uploadChatPhoto(createClient(), userId, prepared.blob);
-    setUploading(false);
-    onBusy?.(false);
-    if (!stored) {
-      setProblem(m.chat.photo.uploadFailed);
-      return;
+    try {
+      const prepared = await prepareChatPhoto(file);
+      if ("problem" in prepared) {
+        setProblem(prepared.problem === "size" ? m.chat.photo.size : m.chat.photo.type);
+        return;
+      }
+      const stored = await uploadChatPhoto(createClient(), userId, prepared.blob);
+      if (!stored) {
+        setProblem(m.chat.photo.uploadFailed);
+        return;
+      }
+      setPath(stored);
+      setPreview(URL.createObjectURL(prepared.blob));
+    } finally {
+      busy.current = false;
+      setUploading(false);
+      onBusy?.(false);
     }
-    setPath(stored);
-    setPreview(URL.createObjectURL(prepared.blob));
   }
+
+  // The preview is a blob: link to memory; let it go when the preview changes or the picker goes.
+  useEffect(() => {
+    if (!preview) return;
+    return () => URL.revokeObjectURL(preview);
+  }, [preview]);
 
   // A photo picked before the page finished loading (a slow phone) is taken up once it has.
   useEffect(() => {

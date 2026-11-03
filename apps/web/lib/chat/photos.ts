@@ -7,18 +7,24 @@ import { fitWithin, PHOTO_QUALITY, photoProblem } from './photo-size';
 const BUCKET = 'chat-photos';
 const LINK_SECONDS = 600;
 
-/** A picked file as a shrunk JPEG (longest side 1600 px), or why it can't be used. Nothing is uploaded here. */
+/**
+ * A picked file as a shrunk JPEG (longest side 1600 px), or why it can't be used. Nothing is uploaded here. The
+ * camera's rotation is applied, and see-through parts (a PNG's) come out white — a JPEG has no transparency and
+ * would turn them black.
+ */
 export async function prepareChatPhoto(file: File): Promise<{ blob: Blob } | { problem: 'type' | 'size' | 'unreadable' }> {
   const problem = photoProblem(file);
   if (problem) return { problem };
   try {
-    const bitmap = await createImageBitmap(file);
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     const { width, height } = fitWithin(bitmap.width, bitmap.height);
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext('2d');
     if (!context) return { problem: 'unreadable' };
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
     context.drawImage(bitmap, 0, 0, width, height);
     bitmap.close();
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', PHOTO_QUALITY));

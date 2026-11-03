@@ -1,10 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
- * Whether the Chat link shows its dot: a visible room message by someone else that's newer than where this person
- * last read up to (or any such message, before they've ever opened the chat). Runs under the reader's row rules.
+ * Whether the Chat link shows its dot: a visible room message by someone else — not a player they blocked — that's
+ * newer than where this person last read up to (or any such message, before they've ever opened the chat). Runs
+ * under the reader's row rules.
  */
-export async function hasUnreadRoom(db: SupabaseClient, input: { organizationId: string; userId: string }): Promise<boolean> {
+export async function hasUnreadRoom(db: SupabaseClient, input: { organizationId: string; userId: string; blocked?: string[] }): Promise<boolean> {
   const { data: read, error: readError } = await db
     .from('chat_reads')
     .select('room_read_at')
@@ -20,6 +23,9 @@ export async function hasUnreadRoom(db: SupabaseClient, input: { organizationId:
     .neq('author_user_id', input.userId)
     .eq('state', 'visible');
   if (read) query = query.gt('created_at', read.room_read_at as string);
+  // Players you blocked don't count (the venue's own messages have no profile, so they always do).
+  const blocked = (input.blocked ?? []).filter((id) => UUID.test(id));
+  if (blocked.length > 0) query = query.or(`author_profile_id.is.null,author_profile_id.not.in.(${blocked.join(',')})`);
   const { data, error } = await query.limit(1);
   if (error) throw error;
   return (data ?? []).length > 0;

@@ -5,15 +5,21 @@ import { AvailabilityEditor, type AvailabilityValue } from "@/components/profile
 import { RatingPicker } from "@/components/profile/rating-picker";
 import { MeTabs } from "@/components/site/me-tabs";
 import { createClient } from "@/lib/supabase/server";
+import { safeNext } from "@/lib/auth/redirect";
 import { requirePlayer } from "@/lib/tenancy/player";
 import { m } from "@/messages";
 import { saveProfileAction } from "../actions";
 
 const hhmm = (t: string) => t.slice(0, 5);
 
-/** The player's profile form at the brand: set it up the first time, edit it after. */
-async function EditProfile() {
-  const player = await requirePlayer("/me/edit");
+/**
+ * The player's profile form at the brand: set it up the first time, edit it after. `next` (e.g. from the chat's
+ * "Set up your player profile") is where saving goes back to; without it, saving shows the profile.
+ */
+async function EditProfile({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
+  const { next: asked } = await searchParams;
+  const next = typeof asked === "string" && asked ? safeNext(asked) : null;
+  const player = await requirePlayer(next ? `/me/edit?next=${encodeURIComponent(next)}` : "/me/edit");
   if (!player) return null; // the layout shows "Not open yet"
   const { user, brand } = player;
   const supabase = await createClient();
@@ -52,6 +58,7 @@ async function EditProfile() {
       </div>
       <section className="rise rounded-xl bg-card p-5 sm:p-6">
         <ActionForm action={saveProfileAction} submitLabel={m.profile.save} className="gap-6">
+          {next && <input type="hidden" name="next" value={next} />}
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium">{m.profile.email}</p>
             <p className="font-semibold">{user.email ?? "—"}</p>
@@ -99,11 +106,11 @@ async function EditProfile() {
   );
 }
 
-export default function EditProfilePage() {
+export default function EditProfilePage({ searchParams }: PageProps<"/me/edit">) {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-8 sm:px-6">
       <Suspense fallback={null}>
-        <EditProfile />
+        <EditProfile searchParams={searchParams} />
       </Suspense>
     </main>
   );

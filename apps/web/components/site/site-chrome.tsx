@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteNav } from "@/components/site/site-nav";
+import { blockedByMe } from "@/lib/chat/private";
 import { hasUnreadRoom, privateUnread } from "@/lib/chat/reads";
 import { TeamInviteBar } from "@/components/site/team-invite-bar";
 import { unreadCount } from "@/lib/notifications/inbox";
@@ -16,10 +17,12 @@ export async function SiteChrome({ brand, children }: { brand: Brand; children: 
   // Team logins are venue-only: no player bell, and the menu leads to Manage.
   const bellProfileId = player && !player.isTeam ? player.profileId : null;
   const supabase = await createClient();
+  // Players this person blocked (read under their own row rules): their room messages never light the Chat link.
+  const blocked = bellProfileId ? await blockedByMe(supabase, { organizationId: brand.id, profileId: bellProfileId }) : [];
   const [unread, invite, chatUnread, chatPrivate] = await Promise.all([
     bellProfileId ? unreadCount(supabase, bellProfileId, brand.id) : 0,
     getMyTeamInvite(),
-    player ? hasUnreadRoom(supabase, { organizationId: brand.id, userId: player.user.id }) : false,
+    player ? hasUnreadRoom(supabase, { organizationId: brand.id, userId: player.user.id, blocked }) : false,
     bellProfileId ? privateUnread(supabase, brand.id) : 0,
   ]);
   const team = player?.isTeam ? { name: player.teamName ?? player.user.name ?? player.user.email ?? "", avatarUrl: player.user.avatarUrl } : null;
@@ -35,7 +38,7 @@ export async function SiteChrome({ brand, children }: { brand: Brand; children: 
         signedIn={Boolean(player)}
         team={team}
         bell={bellProfileId ? { profileId: bellProfileId, organizationId: brand.id, unread } : null}
-        chat={player ? { organizationId: brand.id, userId: player.user.id, unread: chatUnread, privateUnread: chatPrivate } : null}
+        chat={player ? { organizationId: brand.id, userId: player.user.id, unread: chatUnread, privateUnread: chatPrivate, blocked } : null}
       />
       {invite && <TeamInviteBar brandName={brand.name} />}
       {children}

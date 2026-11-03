@@ -863,6 +863,7 @@ export const en = {
       uploading: 'Uploading…',
       alt: (name: string) => `Photo from ${name}`,
       open: 'Open full size',
+      gone: 'Photo no longer available',
     },
     options: 'Message options',
     close: 'Close',
@@ -907,6 +908,7 @@ export const en = {
     },
     game: {
       back: 'Back to the chat',
+      blocked: "You can't join this game.",
       requestsTitle: 'Asking to join',
       noRequests: 'Nobody has asked yet.',
       acceptedTitle: "Who's in",
