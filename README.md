@@ -7,6 +7,18 @@ team runs the day from one manage area: the desk, payments to check, the schedul
 
 **Live:** [chattoturf.vercel.app](https://chattoturf.vercel.app) · Built by Console Log Studio
 
+### See it in action
+
+A player books a pitch and pays by bKash, the venue checks its bKash phone and confirms, and the player is told
+it's booked. The GIF below plays 1.5× faster; the [full 74-second video (MP4)](docs/demo/chattoturf-demo.mp4) has
+the normal pace.
+
+<p>
+  <img src="docs/demo/chattoturf-demo.gif" alt="Demo: booking a pitch, paying by bKash, the venue confirming, and the player's booked notice" width="100%">
+</p>
+
+### Screenshots
+
 <p>
   <img src="docs/screenshots/home.png" alt="Home page: the three sections side by side" width="100%">
 </p>
