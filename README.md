@@ -9,12 +9,13 @@ team runs the day from one manage area: the desk, payments to check, the schedul
 
 ### See it in action
 
-A player books a pitch and pays by bKash, the venue checks its bKash phone and confirms, and the player is told
-it's booked. The GIF below plays 1.5× faster; the [full 74-second video (MP4)](docs/demo/chattoturf-demo.mp4) has
-the normal pace.
+A tour in four parts: a player books a pitch and pays by bKash; the venue checks the payment, confirms it and sees
+it in Takings; a player takes the last seat in a 5-a-side game and the venue matches two teams of equal skill; and
+the players chat, where a "Need players" card brings someone in, they message privately and swap numbers. The GIF
+below plays twice as fast; the [full 2½-minute video (MP4)](docs/demo/chattoturf-demo.mp4) has the normal pace.
 
 <p>
-  <img src="docs/demo/chattoturf-demo.gif" alt="Demo: booking a pitch, paying by bKash, the venue confirming, and the player's booked notice" width="100%">
+  <img src="docs/demo/chattoturf-demo.gif" alt="Demo: booking and paying by bKash, the venue confirming, matchmaking two fair teams, and the players chat with a game card and private messages" width="100%">
 </p>
 
 ### Screenshots
@@ -35,7 +36,7 @@ the normal pace.
 |---|---|---|
 | <img src="docs/screenshots/manage-takings.png" alt="Takings per section and the last 7 days"> | <img src="docs/screenshots/chat.png" alt="Players chat"> | <img src="docs/screenshots/manage-today-phone.png" alt="Today on a phone: free now and the day's bookings" width="220"> |
 
-<sub>Screenshots use the local demo brand (Demo Arena) and made-up players; the live site runs as Chattoturf.</sub>
+<sub>The video and screenshots come from a local copy of the site with made-up players, bookings and bKash numbers.</sub>
 
 ## What it does
 
