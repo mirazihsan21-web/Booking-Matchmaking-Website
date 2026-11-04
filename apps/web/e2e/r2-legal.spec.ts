@@ -19,6 +19,8 @@ test('the privacy policy and terms are on the site, linked from every page and f
   await expect(page.getByText('Chat messages, private messages and their photos are deleted after 30 days')).toBeVisible();
   await expect(page.getByText('the two of you see each other')).toBeVisible();
   await expect(page.getByText('A private message is seen only by the two of you')).toBeVisible();
+  // Paying for an online booking: the sender's number and transaction ID, and who sees them.
+  await expect(page.getByText('the number you sent the money from and its transaction ID')).toBeVisible();
 
   await page.getByRole('contentinfo').getByRole('link', { name: 'Terms' }).click();
   await expect(page).toHaveURL((url) => url.pathname === '/terms');
@@ -26,6 +28,9 @@ test('the privacy policy and terms are on the site, linked from every page and f
   await expect(page.getByText(`This website is run by ${brand!.name}, ${brand!.address}.`)).toBeVisible();
   await expect(page.getByRole('heading', { name: 'The chat' })).toBeVisible();
   await expect(page.getByText('Only share photos you have the right to share')).toBeVisible();
+  // Online bookings: paid by bKash or Nagad, held 15 minutes, booked once the venue sees it; refunds go through the venue.
+  await expect(page.getByText('the slot is held for 15 minutes')).toBeVisible();
+  await expect(page.getByText('cancelling and any refund go through the venue')).toBeVisible();
 
   // Sign-in says what signing in agrees to (its footer has the links too).
   await page.goto('/signin');

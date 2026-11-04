@@ -552,6 +552,7 @@ export const en = {
             'Your account: your email address. If you sign in with Google, Google also shares your name and profile photo with us. Nothing else, and never your password.',
             "Your player profile: the name you show, your mobile number if you add one, the activities you like, when you're usually free, the skill level you pick for each section, and whether you want emails from us.",
             'What you do here: your bookings, the games you join or ask to join, waiting lists, payments taken at the venue, and the notifications we send you.',
+            "Paying for an online booking: how you paid (bKash or Nagad), the number you sent the money from and its transaction ID, so the venue's team can match your payment. Only you and the venue's team see them, and they are kept with the booking's payment record.",
             "If you're on the venue's team: your name, your mobile number if you add one, and the sections you run.",
             'The chat: your messages, the "Need players" cards you post, who asks to join them and who you accept, any reports you make, and mutes the venue sets. Signed-in people can read the chat.',
             'Private messages between players, photos you share in the chat, and who you have blocked.',
@@ -606,13 +607,15 @@ export const en = {
         {
           heading: 'Booking a space',
           paragraphs: [
-            'A booking holds a space for the time you pick. You pay at the venue unless the venue tells you otherwise. Each section sets how far ahead you can book and how many upcoming bookings you can hold.',
+            'A booking holds a space for the time you pick. Each section sets how far ahead you can book and how many upcoming bookings you can hold.',
+            "A space with an online price is paid in full by bKash or Nagad (Send Money to the venue's number) when you book: the slot is held for 15 minutes while you pay and type in the transaction ID, and it is booked once the venue sees the money. If they can't find it, the booking isn't confirmed and the slot is freed. A space without an online price is paid at the venue.",
           ],
         },
         {
           heading: 'Cancelling',
           paragraphs: [
             "You can cancel on the site until the section's cancellation cut-off before the start. After that, contact the venue. If the venue has to cancel a booking, for example because a space is closed, we will tell you by email and on the site.",
+            'Once you have paid for a booking (online or at the venue), cancelling and any refund go through the venue: contact them, and they send the money back the way you paid.',
           ],
         },
         {

@@ -13,6 +13,8 @@ export interface TickReport {
    * reminders written, and photos deleted from Storage.
    */
   chat: { closed: number; purged: boolean; reminders: number; photosDeleted: number };
+  /** Online booking requests whose 15-minute hold ran out with no payment details (cancelled, the player told). */
+  paymentHoldsEnded: number;
   emails: { sent: number; skipped: number; failed: number } | { error: string };
 }
 
@@ -38,6 +40,7 @@ export async function runTick(deps: { db: SupabaseClient; createSender: () => Em
     matched: [],
     closed: 0,
     chat: { closed: 0, purged: false, reminders: 0, photosDeleted: 0 },
+    paymentHoldsEnded: 0,
     emails: { sent: 0, skipped: 0, failed: 0 },
   };
 
@@ -126,6 +129,13 @@ export async function runTick(deps: { db: SupabaseClient; createSender: () => Em
     const forgot = await db.rpc('forget_chat_photo_trash', { p_paths: paths });
     if (forgot.error) throw forgot.error;
     report.chat.photosDeleted = (removed.data ?? []).length;
+  });
+
+  await step('payment holds', async () => {
+    // Before the emails, so the "your hold ended" notice goes out in the same tick.
+    const { data, error } = await db.rpc('expire_payment_holds', { p_now: now.toISOString() });
+    if (error) throw error;
+    report.paymentHoldsEnded = data as number;
   });
 
   await step('emails', async () => {

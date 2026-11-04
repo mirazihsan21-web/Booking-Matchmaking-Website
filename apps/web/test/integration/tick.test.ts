@@ -142,6 +142,23 @@ describe('runTick', () => {
     expect(next.seat_no).toBe(3);
   });
 
+  it('ends an online booking request whose 15-minute hold ran out with no payment details', async () => {
+    const period = `[${inHours(30)},${inHours(31)})`;
+    const booking = must(
+      await db
+        .from('resource_bookings')
+        .insert({ organization_id: orgId, resource_id: pitchId, profile_id: profileId, period, price_poisha: 250000, status: 'pending', hold_until: inHours(-0.1) })
+        .select('id')
+        .single(),
+    );
+    must(await db.from('resource_reservations').insert({ organization_id: orgId, resource_id: pitchId, period, source: 'booking', source_id: booking.id }));
+    const report = await runTick({ db, createSender: () => recordingSender() });
+    expect(report.paymentHoldsEnded).toBeGreaterThanOrEqual(1);
+    expect(must(await db.from('resource_bookings').select('status').eq('id', booking.id).single()).status).toBe('cancelled');
+    const { count } = await db.from('resource_reservations').select('id', { count: 'exact', head: true }).eq('source_id', booking.id);
+    expect(count).toBe(0);
+  });
+
   it('closes a session once it has started', async () => {
     const started = await session(-0.1);
     const report = await runTick({ db, createSender: () => recordingSender() });

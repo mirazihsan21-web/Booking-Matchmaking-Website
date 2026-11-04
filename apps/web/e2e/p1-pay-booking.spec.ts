@@ -114,6 +114,30 @@ test('a hold can be cancelled before paying, and the slot is free again', async 
   }
 });
 
+test('a hold that runs out ends: the pay page says so and the bell tells the player', async ({ browser }) => {
+  const { db, organizationId, pitch } = await brand();
+  restore = await setPaymentNumbers(db, organizationId, { bkash: '01712345678', nagad: null });
+  const a = await chatPlayer(db, organizationId, 'Sami');
+  try {
+    const page = await (await browser.newContext()).newPage();
+    await signIn(page, a.email, '/me');
+    await page.goto(`/turf/book?resource=${pitch}&date=${dhakaDate(3)}`);
+    await pickFirstFree(page);
+    await page.getByRole('button', { name: 'Request booking' }).click();
+    await expect(page).toHaveURL(/\/pay$/);
+    const bookingId = page.url().split('/').at(-2)!;
+    // The 15 minutes pass (moved into the past), and the every-minute job runs.
+    await db.from('resource_bookings').update({ hold_until: new Date(Date.now() - 60_000).toISOString() }).eq('id', bookingId);
+    expect((await db.rpc('expire_payment_holds')).error).toBeNull();
+    await page.reload();
+    await expect(page.getByText('Your hold ended. Book again.')).toBeVisible();
+    await page.goto('/me/notifications');
+    await expect(page.getByText('Your hold ended').first()).toBeVisible();
+  } finally {
+    await removeTestPlayer(db, a.email);
+  }
+});
+
 test('with no number set, a priced space pauses and a café table still books instantly (Review Focus 5)', async ({ browser }) => {
   const { db, organizationId, pitch, table } = await brand();
   restore = await setPaymentNumbers(db, organizationId, { bkash: null, nagad: null });

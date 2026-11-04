@@ -1,16 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
-import { ensureUpcomingGame, localAdmin, removeTestGame, removeTestPlayer, signInLink } from './helpers';
+import { ensureUpcomingGame, localAdmin, removeTestGame, removeTestPlayer, setPaymentNumbers, signInLink } from './helpers';
 
+// `paid`: the section's first space has an online price, so booking it is a request paid by bKash or Nagad.
 const SECTIONS = [
-  { slug: 'turf', name: 'Turf' },
-  { slug: 'cafe', name: 'Board-game café' },
-  { slug: 'lounge', name: 'Gaming lounge' },
+  { slug: 'turf', name: 'Turf', paid: true },
+  { slug: 'cafe', name: 'Board-game café', paid: false },
+  { slug: 'lounge', name: 'Gaming lounge', paid: true },
 ];
 
 test('a player signs in once, books a space and joins a game in each section', async ({ page }) => {
   const address = `e2e-${randomUUID().slice(0, 8)}@example.test`;
   const { db, slug } = localAdmin();
+  const { data: org } = await db.from('organizations').select('id').eq('slug', slug).single();
+  const numbers = await setPaymentNumbers(db, org!.id, { bkash: '01712345678', nagad: null });
   const games: string[] = [];
   const visited: string[] = [];
   page.on('framenavigated', (frame) => {
@@ -51,9 +54,18 @@ test('a player signs in once, books a space and joins a game in each section', a
       const label = (await slot.innerText()).trim();
       await slot.click();
       await expect(page.getByRole('button', { name: `${label} ✓` })).toBeVisible();
-      await page.getByRole('button', { name: 'Book', exact: true }).click();
-      await expect(page.getByRole('status')).toHaveText('Booked! See My bookings.');
-      // The booked slot is taken now — no longer picked or pickable (Task 8's fix).
+      if (section.paid) {
+        // A priced space: held while the player pays by bKash or Nagad (the pay page), then back to the day.
+        const bookUrl = page.url();
+        await page.getByRole('button', { name: 'Request booking' }).click();
+        await expect(page).toHaveURL(/\/me\/bookings\/[0-9a-f-]{36}\/pay$/);
+        await expect(page.getByText(/Slot held for/)).toBeVisible();
+        await page.goto(bookUrl);
+      } else {
+        await page.getByRole('button', { name: 'Book', exact: true }).click();
+        await expect(page.getByRole('status')).toHaveText('Booked! See My bookings.');
+      }
+      // The booked (or held) slot is taken now — no longer picked or pickable (Task 8's fix).
       await expect(page.getByRole('button', { name: label, exact: true })).toBeDisabled();
       // …and says so to screen readers.
       await expect(page.getByRole('button', { name: label, exact: true })).toHaveAccessibleDescription('Taken');
@@ -80,5 +92,6 @@ test('a player signs in once, books a space and joins a game in each section', a
     // Each run is a new player; they and their bookings go, so later runs find tomorrow's slots free.
     await removeTestPlayer(db, address);
     for (const game of games) await removeTestGame(db, game);
+    await setPaymentNumbers(db, org!.id, numbers);
   }
 });
