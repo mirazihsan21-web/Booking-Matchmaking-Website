@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { cn } from "cn";
+import { HoldCountdown } from "@/components/bookings/hold-countdown";
 import { ActionButton } from "@/components/forms/action-form";
 import { MeTabs } from "@/components/site/me-tabs";
 import { sectionStyle } from "@/components/site/section-style";
@@ -9,6 +10,7 @@ import { listMyBookings, type MyBooking } from "@/lib/bookings/bookings";
 import { formatNight, formatShortTime } from "@/lib/format";
 import { formatBdt } from "@/lib/money";
 import { listMySeats, type MySeat } from "@/lib/open-play/open-play";
+import { paymentNumbers } from "@/lib/payments/numbers";
 import type { Section } from "@/lib/sections/sections";
 import { createServiceClient } from "@/lib/service-client";
 import { getSitePlayer, requirePlayer } from "@/lib/tenancy/player";
@@ -28,7 +30,23 @@ function RowShell({ section, faded, children }: { section: Section | undefined; 
   );
 }
 
-function BookingRow({ booking, section, timeZone, upcoming }: { booking: MyBooking; section: Section | undefined; timeZone: string; upcoming: boolean }) {
+/**
+ * One space booking. An online request also says where its payment stands: held (a link to its pay page with the
+ * time left), sent (waiting for the venue), or not confirmed (why, and the venue's number to call).
+ */
+function BookingRow({
+  booking,
+  section,
+  timeZone,
+  upcoming,
+  contact,
+}: {
+  booking: MyBooking;
+  section: Section | undefined;
+  timeZone: string;
+  upcoming: boolean;
+  contact: string | null;
+}) {
   return (
     <RowShell section={section} faded={!upcoming}>
       <span className="font-semibold">{booking.resourceName}</span>
@@ -38,7 +56,19 @@ function BookingRow({ booking, section, timeZone, upcoming }: { booking: MyBooki
       <span className="text-muted-foreground">{booking.pricePoisha > 0 ? formatBdt(booking.pricePoisha) : m.bookings.priceAtVenue}</span>
       <span className="rounded-full bg-raised px-2.5 py-0.5 text-xs font-semibold">{m.bookings.status[booking.status]}</span>
       {booking.paid && <span className="rounded-full bg-section px-2.5 py-0.5 text-xs font-semibold text-on-section">{m.bookings.paid}</span>}
-      {upcoming && (
+      {booking.payment === "hold" && booking.holdUntil && (
+        <Link href={`/me/bookings/${booking.id}/pay`} className="font-semibold text-section underline underline-offset-4">
+          <HoldCountdown until={booking.holdUntil} compact />
+        </Link>
+      )}
+      {booking.payment === "sent" && <span className="font-semibold">{m.payments.sentWaiting}</span>}
+      {booking.payment === "rejected" && (
+        <span className="w-full">
+          <span className="font-semibold">{m.notifications.paymentRejected}</span>
+          {booking.rejectReason && <> — “{booking.rejectReason}”</>}. {contact ? m.notifications.contactUsOn(contact) : m.notifications.contactTheVenue}
+        </span>
+      )}
+      {upcoming && booking.payment !== "sent" && (
         <span className="ml-auto">
           {booking.paid ? (
             <span className="text-muted-foreground">{m.bookings.paidContact}</span>
@@ -109,10 +139,12 @@ async function MyBookings() {
   }
   const { brand, profileId } = player;
   const db = createServiceClient();
-  const [{ upcoming, past }, seats] = await Promise.all([
+  const [{ upcoming, past }, seats, numbers] = await Promise.all([
     listMyBookings(db, { organizationId: brand.id, profileId }),
     listMySeats(db, { organizationId: brand.id, profileId }),
+    paymentNumbers(db, brand.id),
   ]);
+  const contact = numbers.bkash ?? numbers.nagad;
   const sectionOf = (id: string) => brand.sections.find((s) => s.id === id);
   const tz = brand.timezone;
 
@@ -127,12 +159,12 @@ async function MyBookings() {
       </List>
       <List title={m.bookings.upcoming} empty={m.bookings.noneUpcoming}>
         {upcoming.map((b) => (
-          <BookingRow key={b.id} booking={b} section={sectionOf(b.sectionId)} timeZone={tz} upcoming />
+          <BookingRow key={b.id} booking={b} section={sectionOf(b.sectionId)} timeZone={tz} upcoming contact={contact} />
         ))}
       </List>
       <List title={m.bookings.past} empty={m.bookings.nonePast}>
         {past.map((b) => (
-          <BookingRow key={b.id} booking={b} section={sectionOf(b.sectionId)} timeZone={tz} upcoming={false} />
+          <BookingRow key={b.id} booking={b} section={sectionOf(b.sectionId)} timeZone={tz} upcoming={false} contact={contact} />
         ))}
       </List>
     </div>

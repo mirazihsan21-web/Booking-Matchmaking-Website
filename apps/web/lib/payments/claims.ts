@@ -14,6 +14,7 @@ export type DecideResult = 'confirmed' | 'rejected' | 'not_allowed' | 'not_pendi
 
 export interface PayView {
   bookingId: string;
+  resourceId: string;
   resourceName: string;
   sectionId: string;
   sectionName: string;
@@ -52,7 +53,7 @@ export async function payBooking(db: SupabaseClient, input: { bookingId: string;
   if (!UUID.test(input.bookingId)) return null;
   const { data, error } = await db
     .from('resource_bookings')
-    .select('id, organization_id, period, status, hold_until, price_poisha, resources(name, section_id, sections(name))')
+    .select('id, organization_id, resource_id, period, status, hold_until, price_poisha, resources(name, section_id, sections(name))')
     .eq('id', input.bookingId)
     .eq('profile_id', input.profileId)
     .maybeSingle();
@@ -74,6 +75,7 @@ export async function payBooking(db: SupabaseClient, input: { bookingId: string;
   else status = 'confirmed';
   return {
     bookingId: data.id as string,
+    resourceId: data.resource_id as string,
     resourceName: resource?.name ?? '',
     sectionId: resource?.section_id ?? '',
     sectionName: resource?.sections?.name ?? '',

@@ -131,3 +131,19 @@ export async function send(page: Page, text: string): Promise<void> {
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue('');
 }
+
+/** Sets the brand's bKash/Nagad numbers for online bookings; returns what they were, to put back after the test. */
+export async function setPaymentNumbers(
+  db: SupabaseClient,
+  organizationId: string,
+  numbers: { bkash: string | null; nagad: string | null },
+): Promise<{ bkash: string | null; nagad: string | null }> {
+  const { data: before, error } = await db.from('organizations').select('bkash_number, nagad_number').eq('id', organizationId).single();
+  if (error) throw error;
+  const update = await db.from('organizations').update({ bkash_number: numbers.bkash, nagad_number: numbers.nagad }).eq('id', organizationId);
+  if (update.error) throw update.error;
+  return { bkash: before.bkash_number as string | null, nagad: before.nagad_number as string | null };
+}
+
+/** The Dhaka calendar date `daysAhead` days from today, as YYYY-MM-DD (for a booking page's `date`). */
+export const dhakaDate = (daysAhead: number) => new Date(Date.now() + 6 * 3_600_000 + daysAhead * 86_400_000).toISOString().slice(0, 10);

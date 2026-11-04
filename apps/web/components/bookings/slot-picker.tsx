@@ -7,6 +7,7 @@ import { ActionForm, FieldError, type FormAction } from "@/components/forms/acti
 import { SlotChip, slotChipClass } from "@/components/site/slot-chip";
 import { buttonVariants } from "@/components/ui/button";
 import type { SlotState } from "@/lib/bookings/slots";
+import { formatBdt } from "@/lib/money";
 import { m } from "@/messages";
 
 const KEY_STATES: SlotState[] = ["free", "taken", "open_play", "past"];
@@ -22,6 +23,10 @@ type Slot = { start: string; label: string; state: SlotState };
  *
  * With `blocked` (a visitor who isn't signed in, or has no profile yet) the grid is the same, but the bar
  * links to `blocked.href` instead of booking.
+ *
+ * `payOnline` (a priced space: paid by bKash or Nagad before the venue confirms): the button reads **Request
+ * booking** and the bar says what they'll pay for the length picked. `paused` (priced, but the venue has no number
+ * yet): the bar says so instead of offering a button.
  */
 export function SlotPicker({
   action,
@@ -29,14 +34,19 @@ export function SlotPicker({
   slots,
   slotMinutes,
   priceLabel,
+  payOnline = null,
+  paused = null,
 }: {
   action: FormAction;
   blocked?: { href: string; label: string } | null;
   slots: Slot[];
   slotMinutes: number;
   priceLabel: string;
+  payOnline?: { perSlotPoisha: number } | null;
+  paused?: string | null;
 }) {
   const [picked, setPicked] = useState<string | null>(null);
+  const [count, setCount] = useState(1);
   const keyId = useId();
   if (slots.length === 0) return <p className="text-muted-foreground">{m.bookings.closed}</p>;
   // Only a slot that is still free stays picked: once it is booked (by you or anyone) the refresh shows it taken.
@@ -68,6 +78,20 @@ export function SlotPicker({
     </div>
   );
 
+  if (paused) {
+    return (
+      <div className="flex flex-col gap-4">
+        {grid}
+        <div className={cn("flex items-center gap-3", BAR)}>
+          {summary()}
+          <p role="status" className="font-semibold">
+            {paused}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (blocked) {
     return (
       <div className="flex flex-col gap-4">
@@ -85,20 +109,28 @@ export function SlotPicker({
   return (
     <ActionForm
       action={action}
-      submitLabel={m.bookings.book}
+      submitLabel={payOnline ? m.payments.requestBooking : m.bookings.book}
       variant="section"
       footerClassName={BAR}
       footer={summary(
-        <label className="flex items-center gap-2 text-muted-foreground">
-          {m.bookings.howLong}
-          <select name="slots" defaultValue="1" className="h-8 rounded-lg border border-input bg-card px-2 text-foreground">
-            {[1, 2, 3, 4].map((n) => (
-              <option key={n} value={n}>
-                {m.bookings.slots(n, slotMinutes)}
-              </option>
-            ))}
-          </select>
-        </label>,
+        <>
+          <label className="flex items-center gap-2 text-muted-foreground">
+            {m.bookings.howLong}
+            <select
+              name="slots"
+              value={count}
+              onChange={(event) => setCount(Number(event.target.value))}
+              className="h-8 rounded-lg border border-input bg-card px-2 text-foreground"
+            >
+              {[1, 2, 3, 4].map((n) => (
+                <option key={n} value={n}>
+                  {m.bookings.slots(n, slotMinutes)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {payOnline && <span className="w-full text-muted-foreground">{m.payments.youllPay(formatBdt(payOnline.perSlotPoisha * count))}</span>}
+        </>,
       )}
     >
       <input type="hidden" name="startsAt" value={pickedSlot?.start ?? ""} />

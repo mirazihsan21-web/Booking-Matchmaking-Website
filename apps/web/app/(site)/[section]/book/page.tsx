@@ -17,6 +17,7 @@ import { findSection } from "@/lib/site/home";
 import { teamDeskHref } from "@/lib/manage/team-links";
 import { kindWords } from "@/lib/site/kinds";
 import { bookPath, sectionPath } from "@/lib/site/paths";
+import { paymentNumbers } from "@/lib/payments/numbers";
 import { getBrand } from "@/lib/tenancy/brand";
 import { getSitePlayer, getTeamSectionIds } from "@/lib/tenancy/player";
 import { m } from "@/messages";
@@ -72,8 +73,12 @@ async function Book({ params, searchParams }: { params: Promise<{ section: strin
       ? { href: "/me/edit", label: m.bookings.createProfileToBook }
       : null;
 
-  const price =
-    space.price_per_hour_poisha === null ? m.bookings.priceAtVenue : m.bookings.perSlot(formatBdt(Math.round((space.price_per_hour_poisha * space.slot_minutes) / 60)));
+  const perSlotPoisha = space.price_per_hour_poisha === null ? 0 : Math.round((space.price_per_hour_poisha * space.slot_minutes) / 60);
+  const price = space.price_per_hour_poisha === null ? m.bookings.priceAtVenue : m.bookings.perSlot(formatBdt(perSlotPoisha));
+  // A priced space is paid by bKash or Nagad before the venue confirms — and can't be requested until it has a number.
+  const numbers = perSlotPoisha > 0 && !blocked ? await paymentNumbers(db, brand.id) : null;
+  const payOnline = numbers && (numbers.bkash || numbers.nagad) ? { perSlotPoisha } : null;
+  const paused = numbers && !payOnline ? m.payments.closed : null;
   const chip = (active: boolean) =>
     cn("press shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-semibold", active ? "border-section bg-section text-on-section" : "border-border bg-card hover:border-section");
 
@@ -141,6 +146,8 @@ async function Book({ params, searchParams }: { params: Promise<{ section: strin
             blocked={blocked}
             slotMinutes={space.slot_minutes}
             priceLabel={price}
+            payOnline={payOnline}
+            paused={paused}
             slots={(day?.slots ?? []).map((s) => ({
               start: s.start.toISOString(),
               label: `${formatShortTime(s.start.toISOString(), brand.timezone)}–${formatShortTime(s.end.toISOString(), brand.timezone)}`,
