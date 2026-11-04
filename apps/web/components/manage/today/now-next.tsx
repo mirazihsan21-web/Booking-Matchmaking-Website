@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cn } from "cn";
 import { ActionButton, ActionForm } from "@/components/forms/action-form";
+import { RejectPayment } from "@/components/manage/reject-payment";
 import { sectionStyle } from "@/components/site/section-style";
 import { formatShortTime } from "@/lib/format";
 import { amountInput, formatBdt } from "@/lib/money";
@@ -14,7 +15,9 @@ type Item = { at: Date; section: Section; spaceName: string } & ({ booking: Desk
 
 /**
  * The day on a phone: spaces free this hour as chips, then everything by start time with one-tap
- * Arrived / No-show (or Undo); what already ended folds into "Earlier today".
+ * Arrived / No-show (or Undo); what already ended folds into "Earlier today". An online request waiting for its
+ * bKash/Nagad payment says so, with Confirm and Reject once the player sent the details — never Arrived, Undo or a
+ * cash button (cash on a pending request would clash with its own payment).
  */
 export function NowNext({
   sections,
@@ -60,13 +63,14 @@ export function NowNext({
     }
     const b = item.booking;
     const { booking, actions } = panelFor(b, item.spaceName);
+    const pending = b.status === "pending";
     return (
       <li key={b.id} style={sectionStyle(item.section.accent)} className="flex flex-col gap-2 rounded-xl border-l-[3px] border-section bg-card px-4 py-3 text-sm">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="font-semibold">{time(b.start, b.end)}</span>
           <span className="text-section">{item.spaceName}</span>
-          <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", b.status === "confirmed" ? "bg-raised" : "bg-section text-on-section")}>
-            {m.manage.desk.status[b.status] ?? b.status}
+          <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", b.status === "confirmed" || pending ? "bg-raised" : "bg-section text-on-section")}>
+            {pending ? (b.claim ? m.manage.payments.toCheck : m.manage.payments.waiting) : (m.manage.desk.status[b.status] ?? b.status)}
           </span>
           {b.payment && <span className="rounded-full bg-raised px-2 py-0.5 text-xs">{m.manage.today.paid}</span>}
         </div>
@@ -79,7 +83,14 @@ export function NowNext({
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {b.status === "confirmed" ? (
+          {pending ? (
+            b.claim && (
+              <>
+                <ActionButton action={actions.confirmPayment} label={m.manage.payments.confirm} variant="section" />
+                <RejectPayment action={actions.rejectPayment} />
+              </>
+            )
+          ) : b.status === "confirmed" ? (
             <>
               <ActionButton action={actions.arrived} label={m.manage.desk.arrived} variant="section" />
               <ActionButton action={actions.noShow} label={m.manage.desk.noShow} />
@@ -87,7 +98,7 @@ export function NowNext({
           ) : (
             <ActionButton action={actions.undo} label={m.manage.desk.undo} />
           )}
-          {!b.payment && b.pricePoisha > 0 && (
+          {!pending && !b.payment && b.pricePoisha > 0 && (
             <ActionForm action={actions.pay} submitLabel={`${m.manage.desk.paid} ${formatBdt(b.pricePoisha)}`} className="flex-row">
               <input type="hidden" name="amount" value={amountInput(b.pricePoisha)} />
             </ActionForm>

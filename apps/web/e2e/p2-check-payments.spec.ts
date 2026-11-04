@@ -43,6 +43,24 @@ async function sentRequest(player: { userId: string; profileId: string }, starts
   return row.booking_id;
 }
 
+/** Dhaka's hour now (0–23). */
+const dhakaHour = () => Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Asia/Dhaka' }).format(new Date()));
+
+/**
+ * A request on Pitch 1 today, details sent: Today shows the current business day (the demo opens 10:00–23:00), so it
+ * takes today's first free hour that hasn't started.
+ */
+async function todayRequest(player: { userId: string; profileId: string }, trxId: string): Promise<void> {
+  for (let h = Math.max(10, dhakaHour() + 1); h <= 21; h += 1) {
+    const made = await sentRequest(player, new Date(`${dhakaDate(0)}T${String(h).padStart(2, '0')}:00:00+06:00`), trxId).then(
+      () => true,
+      (error: Error) => (error.message === 'booking: taken' ? false : Promise.reject(error)),
+    );
+    if (made) return;
+  }
+  throw new Error('no free hour left today');
+}
+
 let restore: { bkash: string | null; nagad: string | null } | null = null;
 test.beforeEach(async () => {
   const { db, organizationId } = await brand();
@@ -160,22 +178,12 @@ test('café staff don’t see turf payments; a request whose time began says Sta
 });
 
 test('Today’s panel shows a payment to check, with Confirm and Reject and no Arrived', async ({ browser }) => {
-  // Today shows the current business day (the demo opens 10:00–23:00): the request takes today's first free hour
-  // that hasn't started, so it needs one left before closing.
-  const hour = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Asia/Dhaka' }).format(new Date()));
-  test.skip(hour >= 21, "Today's turf hours are over; run before 21:00 Dhaka time");
+  test.skip(dhakaHour() >= 21, "Today's turf hours are over; run before 21:00 Dhaka time");
   const { db, organizationId } = await brand();
   const a = await chatPlayer(db, organizationId, 'Sami');
   try {
     const good = trx();
-    let made = false;
-    for (let h = Math.max(10, hour + 1); h <= 21 && !made; h += 1) {
-      made = await sentRequest(a, new Date(`${dhakaDate(0)}T${String(h).padStart(2, '0')}:00:00+06:00`), good).then(
-        () => true,
-        (error: Error) => (error.message === 'booking: taken' ? false : Promise.reject(error)),
-      );
-    }
-    expect(made).toBe(true);
+    await todayRequest(a, good);
     const owner = await (await browser.newContext()).newPage();
     await signIn(owner, OWNER, '/manage');
     await owner.getByRole('button', { name: /Sami/ }).first().click();
@@ -187,6 +195,29 @@ test('Today’s panel shows a payment to check, with Confirm and Reject and no A
     await expect(panel.getByRole('button', { name: 'Arrived' })).toHaveCount(0);
     await panel.getByRole('button', { name: 'Confirm' }).click();
     await expect(panel.getByRole('button', { name: 'Arrived' })).toBeVisible();
+    // Paid online: said so, and refunded the same way — not "in cash", and no Undo payment (final review).
+    await expect(panel.getByText('Paid ৳2,500 by bKash')).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Undo payment' })).toHaveCount(0);
+  } finally {
+    await removeTestPlayer(db, a.email);
+  }
+});
+
+test('on a phone, Today shows a payment to check with Confirm — no one-tap cash and no Undo (final review)', async ({ browser }) => {
+  test.skip(dhakaHour() >= 21, "Today's turf hours are over; run before 21:00 Dhaka time");
+  const { db, organizationId } = await brand();
+  const a = await chatPlayer(db, organizationId, 'Sami');
+  try {
+    await todayRequest(a, trx());
+    const owner = await (await browser.newContext({ viewport: { width: 390, height: 740 }, isMobile: true, hasTouch: true })).newPage();
+    await signIn(owner, OWNER, '/manage');
+    const card = owner.getByRole('listitem').filter({ hasText: 'Sami' });
+    await expect(card.getByText('Payment to check').first()).toBeVisible(); // (its Details panel says it too)
+    await expect(card.getByRole('button', { name: /^Paid ৳/ })).toHaveCount(0); // cash would break Confirm
+    await expect(card.getByRole('button', { name: 'Undo' })).toHaveCount(0);
+    await expect(card.getByRole('button', { name: 'Arrived' })).toHaveCount(0);
+    await card.getByRole('button', { name: 'Confirm' }).click();
+    await expect(card.getByRole('button', { name: 'Arrived' })).toBeVisible();
   } finally {
     await removeTestPlayer(db, a.email);
   }

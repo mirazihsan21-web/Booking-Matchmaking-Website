@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bookSpace, cancelSpaceBooking, listMyBookings } from '@/lib/bookings/bookings';
 import { loadDeskDay } from '@/lib/manage/desk-day';
+import { livePayments } from '@/lib/payments/payments';
 import { claimsToCheck, claimsToCheckCount, decideClaim, holdsWaiting, payBooking, submitClaim } from '@/lib/payments/claims';
 import { paymentNumbers, setPaymentNumbers } from '@/lib/payments/numbers';
 import { ownerEmails, teamForSection } from '@/lib/payments/team-emails';
@@ -157,6 +158,8 @@ describe('the team decides', () => {
     expect(await decideClaim(db, { bookingId: requested, userId: people.turfStaff.id, decision: 'confirm', reason: null })).toBe('confirmed');
     const mine = (await listMyBookings(db, { organizationId: orgId, profileId: profileA })).upcoming.find((b) => b.id === requested)!;
     expect(mine).toMatchObject({ status: 'confirmed', paid: true, payment: null });
+    // The desk and the Bookings list see how it was paid (final review: not "in cash").
+    expect((await livePayments(db, { spaceBookingIds: [requested], seatBookingIds: [] })).get(requested)).toMatchObject({ amountPoisha: 250000, method: 'bkash' });
     expect(await claimsToCheckCount(db, { organizationId: orgId, sectionIds: [turf] })).toBe(0);
   });
 

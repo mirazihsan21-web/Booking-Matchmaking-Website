@@ -241,6 +241,7 @@ export const en = {
       amount: 'Amount (৳)',
       markPaid: 'Mark paid',
       paidAmount: (amount: string) => `Paid ${amount} in cash`,
+      paidOnline: (amount: string, method: string) => `Paid ${amount} by ${method}`,
       undoPayment: 'Undo payment',
       recorded: 'Payment recorded.',
       alreadyPaid: 'Already paid',
@@ -249,6 +250,7 @@ export const en = {
       voided: 'Payment undone.',
       alreadyVoided: 'Already undone.',
       paidCancelWarning: (amount: string) => `Paid ${amount} in cash. Give it back before cancelling`,
+      paidOnlineCancelWarning: (amount: string, method: string) => `Paid ${amount} by ${method}. Send it back by ${method} before cancelling`,
     },
     bookingsPage: {
       title: 'Bookings',

@@ -111,8 +111,11 @@ export function renderNotification(n: { kind: NotificationKind; payload: Record<
       return { title: t.chatPrivateMessage(str(n.payload.sender_name)), body: t.chatPrivateBody };
     case 'chat_game_cancelled':
       return { title: t.chatGameCancelled(str(n.payload.poster_name)), body: `${spaceAndTime(n.payload, timeZone)}.` };
-    case 'booking_hold_expired':
-      return { title: t.holdExpired, body: t.holdExpiredBody(spaceAndTime(n.payload, timeZone)) };
+    case 'booking_hold_expired': {
+      // They may have sent the money just too late: say how to reach the venue about it.
+      const phone = str(n.payload.contact_phone);
+      return { title: t.holdExpired, body: `${t.holdExpiredBody(spaceAndTime(n.payload, timeZone))} ${phone ? t.contactUsOn(phone) : t.contactTheVenue}` };
+    }
     case 'booking_payment_rejected': {
       const reason = str(n.payload.reason);
       const phone = str(n.payload.contact_phone);

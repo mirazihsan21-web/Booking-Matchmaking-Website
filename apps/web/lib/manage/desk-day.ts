@@ -18,7 +18,7 @@ export interface DeskBooking {
   start: Date;
   end: Date;
   pricePoisha: number;
-  payment: { id: string; amountPoisha: number } | null;
+  payment: { id: string; amountPoisha: number; method: 'cash' | 'bkash' | 'nagad' } | null;
   /** An online request's payment details, once the player has sent them (status `pending`). */
   claim: { method: 'bkash' | 'nagad'; senderPhone: string; trxId: string } | null;
 }

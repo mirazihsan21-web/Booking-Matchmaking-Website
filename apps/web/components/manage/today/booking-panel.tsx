@@ -20,6 +20,8 @@ export interface PanelBooking {
   spaceName: string;
   paidPoisha: number | null;
   paymentId: string | null;
+  /** How it was paid: cash at the desk, or bKash / Nagad the team confirmed online. */
+  paidMethod: "cash" | "bkash" | "nagad" | null;
   /** A pending online request's bKash/Nagad details, once the player sent them. */
   claim: { method: "bkash" | "nagad"; senderPhone: string; trxId: string } | null;
 }
@@ -111,8 +113,15 @@ export function BookingPanel({ booking, actions, timeZone, className, children }
           {live &&
             (booking.paidPoisha !== null && actions.voidPay ? (
               <div className="flex flex-col gap-2 rounded-lg bg-raised p-3">
-                <p className="text-sm font-semibold">{desk.paidAmount(formatBdt(booking.paidPoisha))}</p>
-                <ActionButton action={actions.voidPay} label={desk.undoPayment} />
+                {booking.paidMethod === "bkash" || booking.paidMethod === "nagad" ? (
+                  // Paid online: the team confirmed it against the bKash/Nagad phone — nothing to undo at the desk.
+                  <p className="text-sm font-semibold">{desk.paidOnline(formatBdt(booking.paidPoisha), m.payments[booking.paidMethod])}</p>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold">{desk.paidAmount(formatBdt(booking.paidPoisha))}</p>
+                    <ActionButton action={actions.voidPay} label={desk.undoPayment} />
+                  </>
+                )}
               </div>
             ) : (
               <ActionForm action={actions.pay} submitLabel={desk.markPaid} variant="section" className="rounded-lg bg-raised p-3">
@@ -127,7 +136,13 @@ export function BookingPanel({ booking, actions, timeZone, className, children }
           {(booking.status === "confirmed" || pending) &&
             (confirming ? (
               <div className="flex flex-col gap-2 rounded-lg bg-raised p-3">
-                {booking.paidPoisha !== null && <p className="text-sm font-semibold text-warning">{desk.paidCancelWarning(formatBdt(booking.paidPoisha))}</p>}
+                {booking.paidPoisha !== null && (
+                  <p className="text-sm font-semibold text-warning">
+                    {booking.paidMethod === "bkash" || booking.paidMethod === "nagad"
+                      ? desk.paidOnlineCancelWarning(formatBdt(booking.paidPoisha), m.payments[booking.paidMethod])
+                      : desk.paidCancelWarning(formatBdt(booking.paidPoisha))}
+                  </p>
+                )}
                 <p className="text-sm font-semibold">{p.cancelConfirm}</p>
                 <div className="flex flex-wrap gap-2">
                   <ActionButton action={actions.cancel} label={p.yesCancel} variant="destructive" />

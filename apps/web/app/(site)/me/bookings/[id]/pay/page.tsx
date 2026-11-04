@@ -71,12 +71,15 @@ async function Pay({ params }: { params: Promise<{ id: string }> }) {
           </div>
         )}
         {view.status === "ended" && (
-          <p role="status" className="font-semibold">
-            {t.holdEnded}{" "}
-            <Link href={bookHref} className="underline">
-              {t.bookAgain}
-            </Link>
-          </p>
+          <div className="flex flex-col gap-1">
+            <p role="status" className="font-semibold">
+              {t.holdEnded}{" "}
+              <Link href={bookHref} className="underline">
+                {t.bookAgain}
+              </Link>
+            </p>
+            <p>{contact ? m.notifications.contactUsOn(contact) : m.notifications.contactTheVenue}</p>
+          </div>
         )}
       </section>
 

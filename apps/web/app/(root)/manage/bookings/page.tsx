@@ -30,11 +30,13 @@ function BookingRow({
   row,
   timeZone,
   paidPoisha,
+  paidMethod,
   payment,
 }: {
   row: Row;
   timeZone: string;
   paidPoisha: number | null;
+  paidMethod?: "cash" | "bkash" | "nagad";
   payment: "check" | "waiting" | "rejected" | null;
 }) {
   const time = `${formatShortTime(row.start.toISOString(), timeZone)}–${formatShortTime(row.end.toISOString(), timeZone)}`;
@@ -67,7 +69,7 @@ function BookingRow({
             <ConfirmAction
               action={cancelBookingAction.bind(null, row.id)}
               label={desk.cancel}
-              question={cancelQuestion("booking", paidPoisha === null ? { count: 0, poisha: 0 } : { count: 1, poisha: paidPoisha })}
+              question={cancelQuestion("booking", paidPoisha === null ? { count: 0, poisha: 0 } : { count: 1, poisha: paidPoisha, method: paidMethod })}
               confirmLabel={m.manage.panel.yesCancel}
               cancelLabel={m.manage.panel.keep}
             />
@@ -158,7 +160,7 @@ async function Bookings({ searchParams }: { searchParams: Promise<Record<string,
             <h2 className="font-display text-2xl uppercase tracking-wide text-section">{section.name}</h2>
             <ul className="flex flex-col gap-2">
               {rows.map((row) => (
-                <BookingRow key={row.id} row={row} timeZone={tz} paidPoisha={paid.get(row.id)?.amountPoisha ?? null} payment={paymentOf(row)} />
+                <BookingRow key={row.id} row={row} timeZone={tz} paidPoisha={paid.get(row.id)?.amountPoisha ?? null} paidMethod={paid.get(row.id)?.method} payment={paymentOf(row)} />
               ))}
             </ul>
           </section>

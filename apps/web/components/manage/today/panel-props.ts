@@ -18,6 +18,7 @@ export function panelFor(b: DeskBooking, spaceName: string): { booking: PanelBoo
       spaceName,
       paidPoisha: b.payment?.amountPoisha ?? null,
       paymentId: b.payment?.id ?? null,
+      paidMethod: b.payment?.method ?? null,
       claim: b.claim,
     },
     actions: {

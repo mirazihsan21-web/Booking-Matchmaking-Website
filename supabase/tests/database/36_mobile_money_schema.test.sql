@@ -39,7 +39,9 @@ insert into public.resources (id, organization_id, section_id, name, kind, capac
 insert into public.resource_bookings (id, organization_id, resource_id, profile_id, period, price_poisha, status, hold_until) values
   (pg_temp.id('e1'), pg_temp.id('a0'), pg_temp.id('d1'), pg_temp.id('c4'), tstzrange(now() + interval '1 day', now() + interval '1 day 1 hour'), 250000, 'pending', now() + interval '15 minutes'),
   (pg_temp.id('e2'), pg_temp.id('a0'), pg_temp.id('d1'), pg_temp.id('c4'), tstzrange(now() + interval '2 days', now() + interval '2 days 1 hour'), 250000, 'pending', null),
-  (pg_temp.id('e3'), pg_temp.id('b0'), pg_temp.id('d2'), pg_temp.id('c6'), tstzrange(now() + interval '1 day', now() + interval '1 day 1 hour'), 250000, 'pending', null);
+  (pg_temp.id('e3'), pg_temp.id('b0'), pg_temp.id('d2'), pg_temp.id('c6'), tstzrange(now() + interval '1 day', now() + interval '1 day 1 hour'), 250000, 'pending', null),
+  -- a booked one, for the payment checks (a pending booking can't be paid at all)
+  (pg_temp.id('e4'), pg_temp.id('a0'), pg_temp.id('d1'), pg_temp.id('c5'), tstzrange(now() + interval '3 days', now() + interval '3 days 1 hour'), 250000, 'confirmed', null);
 
 -- The columns.
 select has_column('public', 'resource_bookings', 'hold_until', 'a booking can carry a hold');
@@ -53,9 +55,9 @@ select lives_ok($$ update public.organizations set bkash_number = '01712345678',
   'a real number is fine');
 
 -- Payments: cash, bKash or Nagad; a transaction ID only for the last two.
-select throws_ok($$ insert into public.payments (resource_booking_id, amount_poisha, method) values ('00000000-0000-4000-8000-0000000036e2', 250000, 'card') $$,
+select throws_ok($$ insert into public.payments (resource_booking_id, amount_poisha, method) values ('00000000-0000-4000-8000-0000000036e4', 250000, 'card') $$,
   '23514', null, 'no other way of paying');
-select throws_ok($$ insert into public.payments (resource_booking_id, amount_poisha, method) values ('00000000-0000-4000-8000-0000000036e2', 250000, 'bkash') $$,
+select throws_ok($$ insert into public.payments (resource_booking_id, amount_poisha, method) values ('00000000-0000-4000-8000-0000000036e4', 250000, 'bkash') $$,
   '23514', null, 'a bKash payment needs its transaction ID');
 
 -- Claims: one per booking, each transaction ID once per brand.

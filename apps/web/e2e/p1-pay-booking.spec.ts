@@ -129,8 +129,14 @@ test('a hold that runs out ends: the pay page says so and the bell tells the pla
     // The 15 minutes pass (moved into the past), and the every-minute job runs.
     await db.from('resource_bookings').update({ hold_until: new Date(Date.now() - 60_000).toISOString() }).eq('id', bookingId);
     expect((await db.rpc('expire_payment_holds')).error).toBeNull();
+    // Sending the details now is too late — and a player who already paid is told how to reach the venue (final review).
+    await page.getByLabel('Number you sent from').fill('01911111111');
+    await page.getByLabel('Transaction ID').fill('LATE12345');
+    await page.getByRole('button', { name: "I've sent it" }).click();
+    await expect(page.getByText('Your hold ended. Book again. If you did send money, contact us on 01712345678.')).toBeVisible();
     await page.reload();
     await expect(page.getByText('Your hold ended. Book again.')).toBeVisible();
+    await expect(page.getByText('If you did send money, contact us on 01712345678.')).toBeVisible();
     await page.goto('/me/notifications');
     await expect(page.getByText('Your hold ended').first()).toBeVisible();
   } finally {

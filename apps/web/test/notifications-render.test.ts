@@ -44,11 +44,14 @@ describe('renderNotification', () => {
     );
   });
 
-  it('says a hold ended', () => {
-    expect(renderNotification({ kind: 'booking_hold_expired', payload: { ...when, section_name: 'Turf' } }, zone)).toEqual({
+  it('says a hold ended, and how to reach the venue if the money was already sent (final review)', () => {
+    expect(renderNotification({ kind: 'booking_hold_expired', payload: { ...when, section_name: 'Turf', contact_phone: '01712345678' } }, zone)).toEqual({
       title: 'Your hold ended',
-      body: 'Your hold on Pitch 1 (Turf), Fri 23 Oct, 8pm–9pm ended — book again if you still want it.',
+      body: 'Your hold on Pitch 1 (Turf), Fri 23 Oct, 8pm–9pm ended — book again if you still want it. If you did send money, contact us on 01712345678.',
     });
+    expect(renderNotification({ kind: 'booking_hold_expired', payload: { ...when } }, zone).body).toBe(
+      'Your hold on Pitch 1, Fri 23 Oct, 8pm–9pm ended — book again if you still want it. If you did send money, contact the venue.',
+    );
   });
 
   it('says a payment wasn’t found, why, and how to reach the venue', () => {

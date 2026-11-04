@@ -11,6 +11,7 @@ import { formatNight } from "@/lib/format";
 import { parsePaymentClaimForm, type PaymentMethod } from "@/lib/forms/payment-claim";
 import { formatBdt } from "@/lib/money";
 import { payBooking, submitClaim } from "@/lib/payments/claims";
+import { paymentNumbers } from "@/lib/payments/numbers";
 import { teamForSection } from "@/lib/payments/team-emails";
 import { createServiceClient } from "@/lib/service-client";
 import { bookPath } from "@/lib/site/paths";
@@ -58,9 +59,13 @@ export async function submitClaimAction(bookingId: string, _state: FormState, fo
       return { ok: false, errors: { trxId: m.payments.trxUsed } };
     case "method_closed":
       return { ok: false, errors: { method: m.payments.methodClosed } };
-    case "hold_over":
-      refresh();
-      return { ok: false, message: m.payments.holdOver };
+    case "hold_over": {
+      // Too late — and they may already have sent the money: say how to reach the venue.
+      const numbers = await paymentNumbers(createServiceClient(), player.brand.id);
+      const contact = numbers.bkash ?? numbers.nagad;
+      // No refresh: the form (and this message) stays put; reloading shows the ended page with the same line.
+      return { ok: false, message: `${m.payments.holdOver} ${contact ? m.notifications.contactUsOn(contact) : m.notifications.contactTheVenue}` };
+    }
     case "not_pending":
       refresh();
       return { ok: false, message: m.payments.alreadySent };

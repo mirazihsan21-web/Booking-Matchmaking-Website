@@ -46,22 +46,25 @@ export async function voidPayment(db: SupabaseClient, input: { paymentId: string
   throw updateError;
 }
 
+/** A live payment: cash at the desk, or bKash / Nagad the team confirmed for an online booking. */
+export type LivePayment = { id: string; amountPoisha: number; method: 'cash' | 'bkash' | 'nagad' };
+
 /** The live (not voided) payment of each booking or seat that has one, keyed by booking id. */
 export async function livePayments(
   db: SupabaseClient,
   input: { spaceBookingIds: string[]; seatBookingIds: string[] },
-): Promise<Map<string, { id: string; amountPoisha: number }>> {
-  const live = new Map<string, { id: string; amountPoisha: number }>();
+): Promise<Map<string, LivePayment>> {
+  const live = new Map<string, LivePayment>();
   for (const [column, ids] of [
     ['resource_booking_id', input.spaceBookingIds],
     ['seat_booking_id', input.seatBookingIds],
   ] as const) {
     const valid = ids.filter((id) => UUID.test(id));
     if (valid.length === 0) continue;
-    const { data, error } = await db.from('payments').select(`id, amount_poisha, ${column}`).in(column, valid).is('voided_at', null);
+    const { data, error } = await db.from('payments').select(`id, amount_poisha, method, ${column}`).in(column, valid).is('voided_at', null);
     if (error) throw error;
     for (const row of data as unknown as Array<Record<string, string | number>>) {
-      live.set(String(row[column]), { id: String(row.id), amountPoisha: Number(row.amount_poisha) });
+      live.set(String(row[column]), { id: String(row.id), amountPoisha: Number(row.amount_poisha), method: String(row.method) as LivePayment['method'] });
     }
   }
   return live;

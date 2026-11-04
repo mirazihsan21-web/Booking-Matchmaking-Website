@@ -126,6 +126,12 @@ describe('cancelQuestion', () => {
     expect(cancelQuestion('game', { count: 1, poisha: 30000 })).toBe('1 seat paid ৳300 in cash. Give it back before cancelling');
     expect(cancelQuestion('game', { count: 2, poisha: 60000 })).toBe('2 seats paid ৳600 in cash. Give it back before cancelling');
   });
+
+  it('says a booking paid online is sent back the same way, not in cash (final review)', () => {
+    expect(cancelQuestion('booking', { count: 1, poisha: 250000, method: 'bkash' })).toBe('Paid ৳2,500 by bKash. Send it back by bKash before cancelling');
+    expect(cancelQuestion('booking', { count: 1, poisha: 250000, method: 'nagad' })).toBe('Paid ৳2,500 by Nagad. Send it back by Nagad before cancelling');
+    expect(cancelQuestion('booking', { count: 1, poisha: 250000, method: 'cash' })).toBe('Paid ৳2,500 in cash. Give it back before cancelling');
+  });
 });
 
 describe('deskRefusal', () => {
