@@ -108,9 +108,13 @@ export function Timeline({
                               "flex h-full w-full items-center gap-1.5 overflow-hidden rounded-md px-2 text-left text-xs font-semibold",
                               b.status === "attended" ? "bg-section text-on-section" : "border-l-[3px] border-section bg-raised",
                               b.status === "no_show" && "text-muted-foreground line-through",
+                              b.status === "pending" && "border border-dashed border-section bg-transparent",
                             )}
                           >
                             <span className="truncate">{b.name}</span>
+                            {b.status === "pending" && (
+                              <span className="shrink-0 rounded bg-background/30 px-1">{b.claim ? m.manage.payments.toCheck : m.manage.payments.waiting}</span>
+                            )}
                             {b.status === "attended" && <span aria-hidden>✓</span>}
                             {b.payment && <span className="shrink-0 rounded bg-background/30 px-1">{m.manage.today.paid}</span>}
                           </BookingPanel>

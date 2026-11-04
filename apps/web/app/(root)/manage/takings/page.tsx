@@ -15,7 +15,7 @@ import { m } from "@/messages";
 
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
-/** The owner's takings: a business day per section with a total, and the last seven days' cash. */
+/** The owner's takings: a business day per section with a total (cash, bKash, Nagad), and the last seven days. */
 async function Takings({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const query = await searchParams;
   const manager = await requireManager("owner");
@@ -47,11 +47,13 @@ async function Takings({ searchParams }: { searchParams: Promise<Record<string, 
       </div>
 
       <div className="overflow-x-auto rounded-xl bg-card">
-        <table className="w-full min-w-[36rem] border-collapse text-sm">
+        <table className="w-full min-w-[44rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border text-muted-foreground">
               <th scope="col" className="px-3 py-2 text-left font-semibold">{t.section}</th>
               <th scope="col" className={cn(cell, "font-semibold")}>{t.cash}</th>
+              <th scope="col" className={cn(cell, "font-semibold")}>{t.bkash}</th>
+              <th scope="col" className={cn(cell, "font-semibold")}>{t.nagad}</th>
               <th scope="col" className={cn(cell, "font-semibold")}>{t.bookings}</th>
               <th scope="col" className={cn(cell, "font-semibold")}>{t.seats}</th>
               <th scope="col" className={cn(cell, "font-semibold")}>{t.arrived}</th>
@@ -67,6 +69,8 @@ async function Takings({ searchParams }: { searchParams: Promise<Record<string, 
                     {section?.name}
                   </th>
                   <td className={cn(cell, "font-semibold")}>{formatBdt(row.cashPoisha)}</td>
+                  <td className={cn(cell, "font-semibold")}>{formatBdt(row.bkashPoisha)}</td>
+                  <td className={cn(cell, "font-semibold")}>{formatBdt(row.nagadPoisha)}</td>
                   <td className={cell}>{row.bookings}</td>
                   <td className={cell}>{row.seats}</td>
                   <td className={cell}>{row.arrived}</td>
@@ -79,6 +83,8 @@ async function Takings({ searchParams }: { searchParams: Promise<Record<string, 
             <tr className="font-semibold">
               <th scope="row" className="px-3 py-2 text-left">{t.total}</th>
               <td className={cn(cell, "text-base")}>{formatBdt(day.total.cashPoisha)}</td>
+              <td className={cn(cell, "text-base")}>{formatBdt(day.total.bkashPoisha)}</td>
+              <td className={cn(cell, "text-base")}>{formatBdt(day.total.nagadPoisha)}</td>
               <td className={cell}>{day.total.bookings}</td>
               <td className={cell}>{day.total.seats}</td>
               <td className={cell}>{day.total.arrived}</td>
@@ -99,7 +105,7 @@ async function Takings({ searchParams }: { searchParams: Promise<Record<string, 
                 className={cn("flex justify-between rounded-lg px-3 py-2 text-sm hover:bg-raised", d.date === date && "bg-raised font-semibold")}
               >
                 <span>{formatDay(d.date)}</span>
-                <span className="tabular-nums">{formatBdt(d.cashPoisha)}</span>
+                <span className="tabular-nums">{t.weekLine(formatBdt(d.cashPoisha), formatBdt(d.bkashPoisha + d.nagadPoisha))}</span>
               </Link>
             </li>
           ))}

@@ -21,8 +21,22 @@ import { cancelBookingAction } from "./actions";
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 type Row = SlotBooking & { spaceName: string };
 
-/** One booking: time, space, who (a walk-in's phone to call), its state, and what the desk can do now. */
-function BookingRow({ row, timeZone, paidPoisha }: { row: Row; timeZone: string; paidPoisha: number | null }) {
+/**
+ * One booking: time, space, who (a walk-in's phone to call), its state, and what the desk can do now. An online
+ * request waiting for its bKash/Nagad payment says so ("Waiting for payment", or "Payment to check" with a link to
+ * Payments); one the team rejected says "Not confirmed".
+ */
+function BookingRow({
+  row,
+  timeZone,
+  paidPoisha,
+  payment,
+}: {
+  row: Row;
+  timeZone: string;
+  paidPoisha: number | null;
+  payment: "check" | "waiting" | "rejected" | null;
+}) {
   const time = `${formatShortTime(row.start.toISOString(), timeZone)}–${formatShortTime(row.end.toISOString(), timeZone)}`;
   const desk = m.manage.desk;
   return (
@@ -36,8 +50,14 @@ function BookingRow({ row, timeZone, paidPoisha }: { row: Row; timeZone: string;
         </a>
       )}
       {row.phone && <span className="rounded-full bg-raised px-2 py-0.5 text-xs">{desk.walkIn}</span>}
-      <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", row.status === "confirmed" ? "bg-raised" : "bg-section text-on-section")}>
-        {desk.status[row.status] ?? row.status}
+      <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", row.status === "confirmed" || row.status === "pending" ? "bg-raised" : "bg-section text-on-section")}>
+        {payment === "check"
+          ? m.manage.payments.toCheck
+          : payment === "waiting"
+            ? m.manage.payments.waiting
+            : payment === "rejected"
+              ? m.manage.payments.notConfirmed
+              : (desk.status[row.status] ?? row.status)}
       </span>
       <span className="ml-auto flex flex-wrap gap-2">
         {row.status === "confirmed" ? (
@@ -52,6 +72,12 @@ function BookingRow({ row, timeZone, paidPoisha }: { row: Row; timeZone: string;
               cancelLabel={m.manage.panel.keep}
             />
           </>
+        ) : row.status === "pending" ? (
+          payment === "check" && (
+            <Link href="/manage/payments" className="font-semibold underline underline-offset-4">
+              {m.manage.payments.title}
+            </Link>
+          )
         ) : row.status !== "cancelled" ? (
           <ActionButton action={setDeskStatusAction.bind(null, "space", row.id, "confirmed")} label={desk.undo} />
         ) : null}
@@ -85,7 +111,18 @@ async function Bookings({ searchParams }: { searchParams: Promise<Record<string,
     return { section, rows: [...seen.values()].sort((a, b) => a.start.getTime() - b.start.getTime()) };
   });
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
-  const paid = await livePayments(db, { spaceBookingIds: groups.flatMap((g) => g.rows.map((r) => r.id)), seatBookingIds: [] });
+  const ids = groups.flatMap((g) => g.rows.map((r) => r.id));
+  const [paid, claims] = await Promise.all([
+    livePayments(db, { spaceBookingIds: ids, seatBookingIds: [] }),
+    ids.length ? db.from("payment_claims").select("booking_id, status, reason").in("booking_id", ids) : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (claims.error) throw claims.error;
+  const claimOf = new Map((claims.data ?? []).map((c) => [c.booking_id as string, { status: c.status as string, reason: c.reason as string | null }]));
+  const paymentOf = (row: Row): "check" | "waiting" | "rejected" | null => {
+    const claim = claimOf.get(row.id);
+    if (row.status === "pending") return claim?.status === "submitted" ? "check" : "waiting";
+    return row.status === "cancelled" && claim?.status === "rejected" && claim.reason !== "cancelled" ? "rejected" : null;
+  };
   const href = (d: string) => `/manage/bookings?date=${d}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
 
   return (
@@ -121,7 +158,7 @@ async function Bookings({ searchParams }: { searchParams: Promise<Record<string,
             <h2 className="font-display text-2xl uppercase tracking-wide text-section">{section.name}</h2>
             <ul className="flex flex-col gap-2">
               {rows.map((row) => (
-                <BookingRow key={row.id} row={row} timeZone={tz} paidPoisha={paid.get(row.id)?.amountPoisha ?? null} />
+                <BookingRow key={row.id} row={row} timeZone={tz} paidPoisha={paid.get(row.id)?.amountPoisha ?? null} payment={paymentOf(row)} />
               ))}
             </ul>
           </section>

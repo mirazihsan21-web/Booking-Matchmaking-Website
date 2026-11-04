@@ -3,10 +3,15 @@
 import { refresh } from "next/cache";
 import { z } from "zod";
 import type { FormState } from "@/components/forms/action-form";
+import { paymentNumbersEmail } from "@/lib/email/payment-numbers-email";
+import { createEmailSender } from "@/lib/email/sender";
 import { publishOrganization } from "@/lib/orgs/publish";
+import { setPaymentNumbers } from "@/lib/payments/numbers";
+import { ownerEmails } from "@/lib/payments/team-emails";
 import { createServiceClient } from "@/lib/service-client";
 import { createClient } from "@/lib/supabase/server";
 import { requireManager } from "@/lib/tenancy/manager";
+import { rootUrl } from "@/lib/tenancy/urls";
 import { m } from "@/messages";
 
 const schema = z.object({
@@ -50,4 +55,44 @@ export async function publishBrandAction(_state: FormState, _form: FormData): Pr
   }
   if (result.status === "suspended") return { ok: false, message: m.manage.suspendedNotice };
   return { ok: false, message: m.manage.notReady(result.missing) };
+}
+
+const PHONE = /^01[3-9][0-9]{8}$/;
+
+/**
+ * The bKash and Nagad numbers players send money to for online bookings (owners only). Spaces are dropped; an
+ * empty one is cleared. When a number changes, every owner is emailed what changed and who changed it.
+ */
+export async function savePaymentNumbersAction(_state: FormState, form: FormData): Promise<FormState> {
+  const manager = await requireManager("owner");
+  const read = (name: string) => String(form.get(name) ?? "").replace(/\s/g, "") || null;
+  const bkash = read("bkash");
+  const nagad = read("nagad");
+  const b = m.manage.brandPage;
+  const errors: Record<string, string> = {};
+  if (bkash && !PHONE.test(bkash)) errors.bkash = b.numbersInvalid;
+  if (nagad && !PHONE.test(nagad)) errors.nagad = b.numbersInvalid;
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+
+  const db = createServiceClient();
+  const result = await setPaymentNumbers(db, { organizationId: manager.org.id, userId: manager.user.id, bkash, nagad });
+  if (result.status === "invalid") return { ok: false, message: b.numbersInvalid };
+  if (result.status === "not_allowed") return { ok: false, message: m.manage.desk.notYourSection };
+  if (result.old.bkash !== bkash || result.old.nagad !== nagad) {
+    const tellOwners = async () => {
+      const email = paymentNumbersEmail({
+        venueName: manager.org.name,
+        primaryColour: manager.org.branding.primary ?? "",
+        changedBy: manager.displayName,
+        before: result.old,
+        after: { bkash, nagad },
+        link: rootUrl("/manage/brand"),
+      });
+      const sender = createEmailSender(process.env);
+      await Promise.all((await ownerEmails(db, manager.org.id)).map((to) => sender.send({ to, ...email })));
+    };
+    await tellOwners().catch((error) => console.error("payment-numbers email", error));
+  }
+  refresh();
+  return { ok: true, message: b.numbersSaved };
 }

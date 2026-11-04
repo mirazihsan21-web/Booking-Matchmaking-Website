@@ -65,6 +65,8 @@ export async function removeTestPlayer(db: SupabaseClient, email: string): Promi
     const spaceIds = (spaces ?? []).map((b) => b.id as string);
     if (spaceIds.length) {
       await db.from('resource_reservations').delete().eq('source', 'booking').in('source_id', spaceIds);
+      // A paid booking (cash, or bKash/Nagad the team confirmed) keeps its payment on record; tests clear both.
+      await db.from('payments').delete().in('resource_booking_id', spaceIds);
       await db.from('resource_bookings').delete().in('id', spaceIds);
     }
     await db.from('bookings').delete().in('profile_id', profileIds);

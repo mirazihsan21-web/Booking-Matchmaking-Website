@@ -2,6 +2,7 @@
 
 import { useId, useRef, useState, type ReactNode } from "react";
 import { ActionButton, ActionForm, FieldError, type FormAction } from "@/components/forms/action-form";
+import { RejectPayment } from "@/components/manage/reject-payment";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { amountInput, formatBdt } from "@/lib/money";
@@ -19,6 +20,8 @@ export interface PanelBooking {
   spaceName: string;
   paidPoisha: number | null;
   paymentId: string | null;
+  /** A pending online request's bKash/Nagad details, once the player sent them. */
+  claim: { method: "bkash" | "nagad"; senderPhone: string; trxId: string } | null;
 }
 
 /** The desk's actions on one booking, bound on the server (each checks the person may run its section). */
@@ -29,6 +32,8 @@ export interface PanelActions {
   cancel: FormAction;
   pay: FormAction;
   voidPay: FormAction | null;
+  confirmPayment: FormAction;
+  rejectPayment: FormAction;
 }
 
 /**
@@ -44,7 +49,11 @@ export function BookingPanel({ booking, actions, timeZone, className, children }
   const p = m.manage.panel;
   const desk = m.manage.desk;
   const time = `${formatShortTime(booking.start, timeZone)}–${formatShortTime(booking.end, timeZone)}`;
-  const live = booking.status !== "cancelled";
+  const pending = booking.status === "pending";
+  // A booked one (not cancelled, and not an online request still waiting for its payment check).
+  const live = booking.status !== "cancelled" && !pending;
+  const pay = m.manage.payments;
+  const statusLabel = pending ? (booking.claim ? pay.toCheck : pay.waiting) : (desk.status[booking.status] ?? booking.status);
   return (
     <>
       <button type="button" className={className} onClick={() => dialog.current?.showModal()}>
@@ -58,7 +67,7 @@ export function BookingPanel({ booking, actions, timeZone, className, children }
         <div className="flex flex-col gap-4 p-5">
           <div className="flex items-start justify-between gap-3">
             <h2 className="font-display text-2xl uppercase tracking-wide">{booking.name}</h2>
-            <span className="rounded-full bg-raised px-2 py-0.5 text-xs font-semibold">{desk.status[booking.status] ?? booking.status}</span>
+            <span className="rounded-full bg-raised px-2 py-0.5 text-xs font-semibold">{statusLabel}</span>
           </div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="text-muted-foreground">{p.space}</dt>
@@ -78,6 +87,19 @@ export function BookingPanel({ booking, actions, timeZone, className, children }
             <dt className="text-muted-foreground">{p.price}</dt>
             <dd>{booking.pricePoisha > 0 ? formatBdt(booking.pricePoisha) : m.bookings.priceAtVenue}</dd>
           </dl>
+          {pending && booking.claim && (
+            <div className="flex flex-col gap-3 rounded-lg bg-raised p-3 text-sm">
+              <p className="font-semibold">{pay.paidBy(formatBdt(booking.pricePoisha), m.payments[booking.claim.method])}</p>
+              <p>
+                {pay.from(booking.claim.senderPhone)} · <span className="font-mono">{pay.trx(booking.claim.trxId)}</span>
+              </p>
+              <div className="flex flex-wrap items-start gap-2">
+                <ActionButton action={actions.confirmPayment} label={pay.confirm} variant="section" />
+                <RejectPayment action={actions.rejectPayment} />
+              </div>
+            </div>
+          )}
+          {pending && !booking.claim && <p className="text-sm text-muted-foreground">{pay.waitingTitle}</p>}
           {booking.status === "confirmed" ? (
             <div className="flex flex-wrap gap-2">
               <ActionButton action={actions.arrived} label={desk.arrived} variant="section" />
@@ -102,7 +124,7 @@ export function BookingPanel({ booking, actions, timeZone, className, children }
                 <FieldError name="amount" />
               </ActionForm>
             ))}
-          {booking.status === "confirmed" &&
+          {(booking.status === "confirmed" || pending) &&
             (confirming ? (
               <div className="flex flex-col gap-2 rounded-lg bg-raised p-3">
                 {booking.paidPoisha !== null && <p className="text-sm font-semibold text-warning">{desk.paidCancelWarning(formatBdt(booking.paidPoisha))}</p>}
