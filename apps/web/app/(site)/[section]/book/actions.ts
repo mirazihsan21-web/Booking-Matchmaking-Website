@@ -39,7 +39,7 @@ export async function bookSpaceAction(resourceId: string, _state: FormState, for
     case "pending":
       redirect(`/me/bookings/${result.bookingId}/pay`); // held: send the money and the details
     case "payment_closed":
-      return { ok: false, message: m.payments.closed };
+      return { ok: false, message: m.payments.closed(player.brand.address) };
     case "taken":
       return { ok: false, message: m.bookings.taken };
     case "already_yours":

@@ -56,7 +56,7 @@ async function Payments() {
                 <span className="font-display text-2xl">{t.paidBy(formatBdt(c.amountPoisha), m.payments[c.method])}</span>
                 <span>{t.from(c.senderPhone)}</span>
                 <span className="font-mono">{t.trx(c.trxId)}</span>
-                <span className="text-muted-foreground">{t.sentAt(formatShortTime(c.submittedAt.toISOString(), tz))}</span>
+                <span className="text-muted-foreground">{t.sentAt(formatNight(c.submittedAt.toISOString(), tz))}</span>
               </div>
               <div className="flex flex-wrap items-start gap-2">
                 <ActionButton action={decideClaimAction.bind(null, c.bookingId, "confirm")} label={t.confirm} variant="section" />

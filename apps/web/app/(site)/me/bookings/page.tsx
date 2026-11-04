@@ -32,7 +32,8 @@ function RowShell({ section, faded, children }: { section: Section | undefined; 
 
 /**
  * One space booking. An online request also says where its payment stands: held (a link to its pay page with the
- * time left), sent (waiting for the venue), or not confirmed (why, and the venue's number to call).
+ * time left), sent (waiting for the venue; to cancel, the venue's number), or not confirmed (why, and the
+ * venue's number to call).
  */
 function BookingRow({
   booking,
@@ -61,7 +62,11 @@ function BookingRow({
           <HoldCountdown until={booking.holdUntil} compact />
         </Link>
       )}
-      {booking.payment === "sent" && <span className="font-semibold">{m.payments.sentWaiting}</span>}
+      {booking.payment === "sent" && (
+        <span className="w-full">
+          <span className="font-semibold">{m.payments.sentWaiting}</span>. {contact ? m.payments.contactToCancel(contact) : m.bookings.contactVenue}
+        </span>
+      )}
       {booking.payment === "rejected" && (
         <span className="w-full">
           <span className="font-semibold">{m.notifications.paymentRejected}</span>

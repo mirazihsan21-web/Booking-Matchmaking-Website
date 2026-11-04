@@ -11,12 +11,12 @@ const TOMORROW = dhakaDate(1);
 
 async function brand() {
   const { db, slug } = localAdmin();
-  const { data: org } = await db.from('organizations').select('id').eq('slug', slug).single();
+  const { data: org } = await db.from('organizations').select('id, address').eq('slug', slug).single();
   const space = async (sectionSlug: string, name: string) => {
     const { data } = await db.from('resources').select('id, sections!inner(slug)').eq('organization_id', org!.id).eq('name', name).eq('sections.slug', sectionSlug).single();
     return data!.id as string;
   };
-  return { db, organizationId: org!.id as string, pitch: await space('turf', 'Pitch 1'), table: await space('cafe', 'Table 1') };
+  return { db, organizationId: org!.id as string, address: (org!.address as string | null) ?? '', pitch: await space('turf', 'Pitch 1'), table: await space('cafe', 'Table 1') };
 }
 
 /** Picks the first free slot on the open booking page; returns its label ("8pm–9pm"). */
@@ -72,6 +72,7 @@ test('a player requests a pitch, pays by bKash and waits for the venue', async (
     const row = page.getByRole('listitem').filter({ hasText: 'Pitch 1' });
     await expect(row.getByText('Payment sent — waiting for the venue to confirm')).toBeVisible();
     await expect(row.getByRole('button', { name: 'Cancel' })).toHaveCount(0);
+    await expect(row.getByText('To cancel, contact us on 01712345678.')).toBeVisible(); // finishing touches
 
     // Another player sees the slot taken.
     const other = await (await browser.newContext()).newPage();
@@ -109,6 +110,9 @@ test('a hold can be cancelled before paying, and the slot is free again', async 
     await page.getByRole('button', { name: 'Cancel this request' }).click();
     await expect(page).toHaveURL(/\/turf\/book/);
     await expect(page.getByRole('button', { name: label, exact: true })).toBeEnabled();
+    // They just did it themselves: no "Booking cancelled" notice (finishing touches).
+    await page.goto('/me/notifications');
+    await expect(page.getByText('Booking cancelled')).toHaveCount(0);
   } finally {
     await removeTestPlayer(db, a.email);
   }
@@ -145,19 +149,47 @@ test('a hold that runs out ends: the pay page says so and the bell tells the pla
 });
 
 test('with no number set, a priced space pauses and a café table still books instantly (Review Focus 5)', async ({ browser }) => {
-  const { db, organizationId, pitch, table } = await brand();
+  const { db, organizationId, address, pitch, table } = await brand();
   restore = await setPaymentNumbers(db, organizationId, { bkash: null, nagad: null });
   const a = await chatPlayer(db, organizationId, 'Sami');
   try {
     const page = await (await browser.newContext()).newPage();
     await signIn(page, a.email, '/me');
     await page.goto(`/turf/book?resource=${pitch}&date=${TOMORROW}`);
-    await expect(page.getByText('Online booking opens soon — call or visit us.')).toBeVisible();
+    // Where to come, when the venue has an address (finishing touches).
+    await expect(page.getByText(`Online booking opens soon — call or visit us${address ? ` at ${address}` : ''}.`)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Request booking' })).toHaveCount(0);
     await page.goto(`/cafe/book?resource=${table}&date=${TOMORROW}`);
     await pickFirstFree(page);
     await page.getByRole('button', { name: 'Book', exact: true }).click();
     await expect(page.getByRole('status')).toHaveText('Booked! See My bookings.');
+  } finally {
+    await removeTestPlayer(db, a.email);
+  }
+});
+
+test('the venue cancels a held request: sending the details then says so, with the number to call', async ({ browser }) => {
+  const { db, organizationId, pitch } = await brand();
+  restore = await setPaymentNumbers(db, organizationId, { bkash: '01712345678', nagad: null });
+  const a = await chatPlayer(db, organizationId, 'Sami');
+  const { data: owner } = await db.from('organization_members').select('user_id').eq('organization_id', organizationId).eq('role', 'owner').limit(1).single();
+  try {
+    const page = await (await browser.newContext()).newPage();
+    await signIn(page, a.email, '/me');
+    await page.goto(`/turf/book?resource=${pitch}&date=${dhakaDate(5)}`);
+    await pickFirstFree(page);
+    await page.getByRole('button', { name: 'Request booking' }).click();
+    await expect(page).toHaveURL(/\/pay$/);
+    const bookingId = page.url().split('/').at(-2)!;
+    expect((await db.rpc('cancel_resource_booking', { p_booking_id: bookingId, p_cancelled_by: owner!.user_id })).data).toBe('cancelled');
+    await page.getByLabel('Number you sent from').fill('01911111111');
+    await page.getByLabel('Transaction ID').fill('VENUEGONE1');
+    await page.getByRole('button', { name: "I've sent it" }).click();
+    await expect(page.getByText('The venue cancelled this request.')).toBeVisible();
+    await expect(page.getByText('If you did send money, contact us on 01712345678.')).toBeVisible();
+    await expect(page.getByRole('button', { name: "I've sent it" })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByText('The venue cancelled this request.')).toBeVisible();
   } finally {
     await removeTestPlayer(db, a.email);
   }

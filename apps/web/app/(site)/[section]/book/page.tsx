@@ -78,7 +78,7 @@ async function Book({ params, searchParams }: { params: Promise<{ section: strin
   // A priced space is paid by bKash or Nagad before the venue confirms — and can't be requested until it has a number.
   const numbers = perSlotPoisha > 0 && !blocked ? await paymentNumbers(db, brand.id) : null;
   const payOnline = numbers && (numbers.bkash || numbers.nagad) ? { perSlotPoisha } : null;
-  const paused = numbers && !payOnline ? m.payments.closed : null;
+  const paused = numbers && !payOnline ? m.payments.closed(brand.address) : null;
   const chip = (active: boolean) =>
     cn("press shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-semibold", active ? "border-section bg-section text-on-section" : "border-border bg-card hover:border-section");
 

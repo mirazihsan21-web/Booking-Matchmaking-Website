@@ -22,8 +22,11 @@ export interface PayView {
   end: Date;
   amountPoisha: number;
   holdUntil: Date | null;
-  /** hold: send money and the details; sent: waiting for the team; ended: the hold ran out (or it was cancelled). */
-  status: 'hold' | 'sent' | 'confirmed' | 'rejected' | 'ended';
+  /**
+   * hold: send money and the details; sent: waiting for the team; ended: the hold ran out (or the player dropped
+   * it); cancelled: the venue cancelled it (before or after it was paid).
+   */
+  status: 'hold' | 'sent' | 'confirmed' | 'rejected' | 'ended' | 'cancelled';
   rejectReason: string | null;
   numbers: PaymentNumbers;
 }
@@ -53,7 +56,7 @@ export async function payBooking(db: SupabaseClient, input: { bookingId: string;
   if (!UUID.test(input.bookingId)) return null;
   const { data, error } = await db
     .from('resource_bookings')
-    .select('id, organization_id, resource_id, period, status, hold_until, price_poisha, resources(name, section_id, sections(name))')
+    .select('id, organization_id, resource_id, period, status, hold_until, price_poisha, cancelled_by, resources(name, section_id, sections(name)), player_profiles(user_id)')
     .eq('id', input.bookingId)
     .eq('profile_id', input.profileId)
     .maybeSingle();
@@ -71,7 +74,12 @@ export async function payBooking(db: SupabaseClient, input: { bookingId: string;
   const rejected = claim?.status === 'rejected' && claim.reason !== 'cancelled';
   let status: PayView['status'];
   if (data.status === 'pending') status = holdUntil ? (holdUntil > now ? 'hold' : 'ended') : 'sent';
-  else if (data.status === 'cancelled') status = rejected ? 'rejected' : 'ended';
+  else if (data.status === 'cancelled') {
+    // Nobody (the hold ran out) or the player themselves: ended. Anyone else is the venue.
+    const player = (data.player_profiles as unknown as { user_id: string } | null)?.user_id ?? null;
+    const byVenue = data.cancelled_by !== null && data.cancelled_by !== player;
+    status = rejected ? 'rejected' : byVenue ? 'cancelled' : 'ended';
+  }
   else status = 'confirmed';
   return {
     bookingId: data.id as string,

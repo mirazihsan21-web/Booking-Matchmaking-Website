@@ -16,7 +16,8 @@ import { cancelHoldAction, submitClaimAction } from "./actions";
 
 /**
  * Paying for a booking request by bKash or Nagad: while it's held (15 minutes) — the price, the venue's numbers,
- * "Use Send Money", the countdown and the form; then where it stands (sent, booked, not confirmed, ended).
+ * "Use Send Money", the countdown and the form; then where it stands (sent, booked, not confirmed, ended, or
+ * cancelled by the venue — with the number to call in case money was already sent).
  */
 async function Pay({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -67,6 +68,14 @@ async function Pay({ params }: { params: Promise<{ id: string }> }) {
           <div className="flex flex-col gap-1">
             <p className="font-semibold">{m.notifications.paymentRejected}</p>
             {view.rejectReason && <p>“{view.rejectReason}”</p>}
+            <p>{contact ? m.notifications.contactUsOn(contact) : m.notifications.contactTheVenue}</p>
+          </div>
+        )}
+        {view.status === "cancelled" && (
+          <div className="flex flex-col gap-1">
+            <p role="status" className="font-semibold">
+              {t.cancelledByVenue}
+            </p>
             <p>{contact ? m.notifications.contactUsOn(contact) : m.notifications.contactTheVenue}</p>
           </div>
         )}

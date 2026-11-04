@@ -116,6 +116,7 @@ test('the team confirms one payment and rejects another; the players see where t
     await owner.goto('/manage/payments');
     const samis = owner.getByRole('listitem').filter({ hasText: good });
     for (const text of ['Sami', 'Pitch 1', '৳2,500', 'bKash', PLAYER_PHONE]) await expect(samis.getByText(text, { exact: false }).first()).toBeVisible();
+    await expect(samis.getByText(/^sent \w{3} \d{1,2} \w{3}, \d{1,2}(:\d{2})?[ap]m$/)).toBeVisible(); // the day too (finishing touches)
     await samis.getByRole('button', { name: 'Confirm' }).click();
     await expect(owner.getByRole('listitem').filter({ hasText: good })).toHaveCount(0);
 
@@ -193,6 +194,10 @@ test('Today’s panel shows a payment to check, with Confirm and Reject and no A
     await expect(panel.getByRole('button', { name: 'Confirm' })).toBeVisible();
     await expect(panel.getByRole('button', { name: 'Reject' })).toBeVisible();
     await expect(panel.getByRole('button', { name: 'Arrived' })).toHaveCount(0);
+    // Cancelling asks first, warning that the player says they sent money (finishing touches).
+    await panel.getByRole('button', { name: 'Cancel booking' }).click();
+    await expect(panel.getByText(`The player says they sent ৳2,500 by bKash (TrxID ${good}). Send it back by bKash before cancelling`)).toBeVisible();
+    await panel.getByRole('button', { name: 'Keep it' }).click();
     await panel.getByRole('button', { name: 'Confirm' }).click();
     await expect(panel.getByRole('button', { name: 'Arrived' })).toBeVisible();
     // Paid online: said so, and refunded the same way — not "in cash", and no Undo payment (final review).

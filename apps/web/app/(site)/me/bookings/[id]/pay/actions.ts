@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import type { FormState } from "@/components/forms/action-form";
 import { cancelSpaceBooking } from "@/lib/bookings/bookings";
 import { currentBusinessDate } from "@/lib/bookings/slots";
@@ -43,7 +44,7 @@ async function tellTeam(player: SitePlayer, bookingId: string, method: PaymentMe
   await Promise.all(emails.map((to) => sender.send({ to, ...email })));
 }
 
-/** The player sends what they paid with; the team is told. */
+/** The player sends what they paid with; the team is told once the player has their answer. */
 export async function submitClaimAction(bookingId: string, _state: FormState, form: FormData): Promise<FormState> {
   const player = await getSitePlayer();
   if (!player?.profileId) return { ok: false, message: m.bookings.unavailable };
@@ -52,7 +53,7 @@ export async function submitClaimAction(bookingId: string, _state: FormState, fo
   const result = await submitClaim(createServiceClient(), { bookingId, userId: player.user.id, ...parsed.value });
   switch (result) {
     case "submitted":
-      await tellTeam(player, bookingId, parsed.value.method, parsed.value.trxId).catch((error) => console.error("payment-check email", error));
+      after(() => tellTeam(player, bookingId, parsed.value.method, parsed.value.trxId).catch((error) => console.error("payment-check email", error)));
       refresh();
       return { ok: true, message: m.payments.sentWaiting };
     case "trx_used":
@@ -67,8 +68,9 @@ export async function submitClaimAction(bookingId: string, _state: FormState, fo
       return { ok: false, message: `${m.payments.holdOver} ${contact ? m.notifications.contactUsOn(contact) : m.notifications.contactTheVenue}` };
     }
     case "not_pending":
+      // Already sent, booked, or cancelled by the venue: the page, reloaded, says which (and who to call).
       refresh();
-      return { ok: false, message: m.payments.alreadySent };
+      return { ok: false };
     case "invalid":
       return { ok: false, message: m.payments.errors.trxId };
     case "not_yours":

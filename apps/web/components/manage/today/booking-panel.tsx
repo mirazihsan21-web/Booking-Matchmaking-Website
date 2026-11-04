@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { amountInput, formatBdt } from "@/lib/money";
 import { formatShortTime } from "@/lib/format";
+import { deskCancelWarning } from "@/lib/manage/cancel";
 import { m } from "@/messages";
 
 export interface PanelBooking {
@@ -56,6 +57,7 @@ export function BookingPanel({ booking, actions, timeZone, className, children }
   const live = booking.status !== "cancelled" && !pending;
   const pay = m.manage.payments;
   const statusLabel = pending ? (booking.claim ? pay.toCheck : pay.waiting) : (desk.status[booking.status] ?? booking.status);
+  const cancelWarning = deskCancelWarning(booking);
   return (
     <>
       <button type="button" className={className} onClick={() => dialog.current?.showModal()}>
@@ -136,13 +138,7 @@ export function BookingPanel({ booking, actions, timeZone, className, children }
           {(booking.status === "confirmed" || pending) &&
             (confirming ? (
               <div className="flex flex-col gap-2 rounded-lg bg-raised p-3">
-                {booking.paidPoisha !== null && (
-                  <p className="text-sm font-semibold text-warning">
-                    {booking.paidMethod === "bkash" || booking.paidMethod === "nagad"
-                      ? desk.paidOnlineCancelWarning(formatBdt(booking.paidPoisha), m.payments[booking.paidMethod])
-                      : desk.paidCancelWarning(formatBdt(booking.paidPoisha))}
-                  </p>
-                )}
+                {cancelWarning && <p className="text-sm font-semibold text-warning">{cancelWarning}</p>}
                 <p className="text-sm font-semibold">{p.cancelConfirm}</p>
                 <div className="flex flex-wrap gap-2">
                   <ActionButton action={actions.cancel} label={p.yesCancel} variant="destructive" />

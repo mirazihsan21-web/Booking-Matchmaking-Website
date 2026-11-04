@@ -173,6 +173,37 @@ describe('the team decides', () => {
   });
 });
 
+describe('a request that ended', () => {
+  const statusOf = async (bookingId: string, profileId: string) => (await payBooking(db, { bookingId, profileId }))!.status;
+
+  it('the venue’s cancel says so on the pay page; a hold that ran out, or one the player dropped, says the hold ended', async () => {
+    const byVenue = await request(profileB, people.b, at(5, 20));
+    const ranOut = await request(profileB, people.b, at(6, 20));
+    const dropped = await request(profileB, people.b, at(7, 20));
+    if (byVenue.status !== 'pending' || ranOut.status !== 'pending' || dropped.status !== 'pending') throw new Error('not pending');
+    expect((await db.rpc('cancel_resource_booking', { p_booking_id: byVenue.bookingId, p_cancelled_by: people.owner.id })).data).toBe('cancelled');
+    await db.from('resource_bookings').update({ hold_until: new Date(Date.now() - 60_000).toISOString() }).eq('id', ranOut.bookingId);
+    expect((await db.rpc('expire_payment_holds')).error).toBeNull();
+    expect(await cancelSpaceBooking(db, { organizationId: orgId, bookingId: dropped.bookingId, actor: { kind: 'player', profileId: profileB }, cancelledBy: people.b.id })).toBe(
+      'cancelled',
+    );
+    expect([await statusOf(byVenue.bookingId, profileB), await statusOf(ranOut.bookingId, profileB), await statusOf(dropped.bookingId, profileB)]).toEqual([
+      'cancelled',
+      'ended',
+      'ended',
+    ]);
+  });
+
+  it('a paid booking the venue cancelled later says the venue cancelled it', async () => {
+    const paid = await request(profileA, people.a, at(8, 20));
+    if (paid.status !== 'pending') throw new Error(paid.status);
+    await submitClaim(db, { bookingId: paid.bookingId, userId: people.a.id, method: 'bkash', senderPhone: '01911111111', trxId: 'LATERCANCEL1' });
+    expect(await decideClaim(db, { bookingId: paid.bookingId, userId: people.owner.id, decision: 'confirm', reason: null })).toBe('confirmed');
+    expect((await db.rpc('cancel_resource_booking', { p_booking_id: paid.bookingId, p_cancelled_by: people.owner.id })).data).toBe('cancelled');
+    expect(await statusOf(paid.bookingId, profileA)).toBe('cancelled');
+  });
+});
+
 describe('who hears about a payment', () => {
   it('the owners and the staff of that section — not another section’s staff', async () => {
     expect((await teamForSection(db, { organizationId: orgId, sectionId: turf })).sort()).toEqual([people.owner.email, people.turfStaff.email].sort());

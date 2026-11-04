@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cancelQuestion } from '../lib/manage/cancel';
+import { cancelQuestion, deskCancelWarning } from '../lib/manage/cancel';
 import { deskRefusal } from '../lib/manage/refusal';
 import { accentReadability } from '../lib/manage/colour';
 import { oldManagePath } from '../lib/manage/paths';
@@ -131,6 +131,25 @@ describe('cancelQuestion', () => {
     expect(cancelQuestion('booking', { count: 1, poisha: 250000, method: 'bkash' })).toBe('Paid ৳2,500 by bKash. Send it back by bKash before cancelling');
     expect(cancelQuestion('booking', { count: 1, poisha: 250000, method: 'nagad' })).toBe('Paid ৳2,500 by Nagad. Send it back by Nagad before cancelling');
     expect(cancelQuestion('booking', { count: 1, poisha: 250000, method: 'cash' })).toBe('Paid ৳2,500 in cash. Give it back before cancelling');
+  });
+});
+
+describe('deskCancelWarning (Today’s panel)', () => {
+  const booking = { paidPoisha: null, paidMethod: null, pricePoisha: 40000, claim: null };
+
+  it('says nothing when nothing was paid or sent', () => {
+    expect(deskCancelWarning(booking)).toBeNull();
+  });
+
+  it('warns about cash, or a payment confirmed online', () => {
+    expect(deskCancelWarning({ ...booking, paidPoisha: 40000, paidMethod: 'cash' })).toBe('Paid ৳400 in cash. Give it back before cancelling');
+    expect(deskCancelWarning({ ...booking, paidPoisha: 40000, paidMethod: 'bkash' })).toBe('Paid ৳400 by bKash. Send it back by bKash before cancelling');
+  });
+
+  it('warns that a player says they sent money the team hasn’t checked yet', () => {
+    expect(deskCancelWarning({ ...booking, claim: { method: 'nagad', trxId: '9JK7ABC123' } })).toBe(
+      'The player says they sent ৳400 by Nagad (TrxID 9JK7ABC123). Send it back by Nagad before cancelling',
+    );
   });
 });
 
